@@ -30,7 +30,7 @@
     "@opentelemetry/tracing": "^0.24.0",
     "@opentelemetry/winston-transport": "^0.10.0",
     "@snyk/protect": "^1.1295.0",
-    "@types/k6": "^0.54.2",
+    "@types/k6": "^0.57.0",
     "couchbase": "^4.4.4",
     "dotenv": "^16.4.7",
     "elastic-apm-node": "^4.10.0",
