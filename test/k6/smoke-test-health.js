@@ -22,12 +22,28 @@ export const options = {
   userAgent: 'K6TestAgent/1.0',
 };
 
-const PORT = 4000;
+// Add environment variable support for PORT
+const PORT = __ENV.PORT || 4000;
 const BASE_URL = `http://localhost:${PORT}`;
 console.log(BASE_URL);
 
 export default function () {
-  const res = http.get(`${BASE_URL}/health`);
-  check(res, { 'status was 200': (r) => r.status == 200 });
+  const params = {
+    tags: { testType: 'smoke-test', endpoint: '/health' }
+  };
+  
+  const res = http.get(`${BASE_URL}/health`, params);
+  check(res, { 
+    'status was 200': (r) => r.status === 200,
+    'response time < 50ms': (r) => r.timings.duration < 50,
+    'response is valid': (r) => {
+      try {
+        const body = JSON.parse(r.body);
+        return body.status === 'healthy' || body.status === 'ok';
+      } catch (e) {
+        return false;
+      }
+    }
+  });
   sleep(1);
 }

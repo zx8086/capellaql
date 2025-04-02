@@ -6,9 +6,10 @@ import exec from 'k6/execution';
 
 export const options = {
   stages: [
-    { duration: '10s', target: 10 },
-    // { duration: '20s', target: 20 },
-    // { duration: '10s', target: 0 },
+    { duration: '30s', target: 10 },  // Warm-up
+    { duration: '1m', target: 20 },   // Ramp-up
+    { duration: '2m', target: 20 },   // Steady state
+    { duration: '30s', target: 0 },   // Ramp-down
   ],
   thresholds: {
     http_req_failed: ['rate<0.01'], // http errors should be less than 1%
@@ -18,9 +19,8 @@ export const options = {
   throw: true,
 };
 
-const GRAPHQL_ENDPOINT = 'http://localhost:4000/graphql';
+const GRAPHQL_ENDPOINT = __ENV.GRAPHQL_ENDPOINT || 'http://localhost:4000/graphql';
 // const GRAPHQL_ENDPOINT = 'https://capellaql.prd.shared-services.eu.pvh.cloud/graphql';
-
 
 const LOOKS_SUMMARY_QUERY = `
 query looksSummary($brand: String!, $division: String!, $season: String!) {
@@ -87,6 +87,12 @@ const brands = [
 
 const seasons = ["C51", "C52"];
 
+// Common headers and params
+const commonHeaders = {
+  'Content-Type': 'application/json',
+  'User-Agent': 'K6TestAgent/1.0'
+};
+
 export default function () {
   const scenario = exec.scenario.name;
 
@@ -116,10 +122,11 @@ function runLooksSummaryScenario() {
   });
 
   const params = {
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'K6TestAgent/1.0',
-    },
+    headers: commonHeaders,
+    tags: { 
+      testType: 'graphql',
+      operation: 'looksSummary'
+    }
   };
 
   const response = http.post(GRAPHQL_ENDPOINT, payload, params);
@@ -167,10 +174,11 @@ function runSeasonalAssignmentsScenario() {
   });
 
   const params = {
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'K6TestAgent/1.0',
-    },
+    headers: commonHeaders,
+    tags: { 
+      testType: 'graphql',
+      operation: 'seasonalAssignments'
+    }
   };
 
   const response = http.post(GRAPHQL_ENDPOINT, payload, params);
@@ -224,10 +232,11 @@ function runImageUrlCheckScenario() {
   });
 
   const params = {
-    headers: {
-      'Content-Type': 'application/json',
-      'User-Agent': 'K6TestAgent/1.0',
-    },
+    headers: commonHeaders,
+    tags: { 
+      testType: 'graphql',
+      operation: 'imageUrlCheck'
+    }
   };
 
   const response = http.post(GRAPHQL_ENDPOINT, payload, params);
