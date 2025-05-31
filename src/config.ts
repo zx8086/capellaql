@@ -75,34 +75,34 @@ function loadConfigFromEnv(): Partial<Config> {
   const config: Partial<Config> = {};
 
   config.application = {
-    LOG_LEVEL: parseEnvVar(process.env[envVarMapping.application.LOG_LEVEL], "string") as string || defaultConfig.application.LOG_LEVEL,
-    LOG_MAX_SIZE: parseEnvVar(process.env[envVarMapping.application.LOG_MAX_SIZE], "string") as string || defaultConfig.application.LOG_MAX_SIZE,
-    LOG_MAX_FILES: parseEnvVar(process.env[envVarMapping.application.LOG_MAX_FILES], "string") as string || defaultConfig.application.LOG_MAX_FILES,
-    YOGA_RESPONSE_CACHE_TTL: parseEnvVar(process.env[envVarMapping.application.YOGA_RESPONSE_CACHE_TTL], "number") as number || defaultConfig.application.YOGA_RESPONSE_CACHE_TTL,
-    PORT: parseEnvVar(process.env[envVarMapping.application.PORT], "number") as number || defaultConfig.application.PORT,
-    ENABLE_FILE_LOGGING: parseEnvVar(process.env[envVarMapping.application.ENABLE_FILE_LOGGING], "boolean") as boolean ?? defaultConfig.application.ENABLE_FILE_LOGGING,
-    ALLOWED_ORIGINS: process.env[envVarMapping.application.ALLOWED_ORIGINS]?.split(",") || defaultConfig.application.ALLOWED_ORIGINS,
+    LOG_LEVEL: parseEnvVar(Bun.env[envVarMapping.application.LOG_LEVEL], "string") as string || defaultConfig.application.LOG_LEVEL,
+    LOG_MAX_SIZE: parseEnvVar(Bun.env[envVarMapping.application.LOG_MAX_SIZE], "string") as string || defaultConfig.application.LOG_MAX_SIZE,
+    LOG_MAX_FILES: parseEnvVar(Bun.env[envVarMapping.application.LOG_MAX_FILES], "string") as string || defaultConfig.application.LOG_MAX_FILES,
+    YOGA_RESPONSE_CACHE_TTL: parseEnvVar(Bun.env[envVarMapping.application.YOGA_RESPONSE_CACHE_TTL], "number") as number || defaultConfig.application.YOGA_RESPONSE_CACHE_TTL,
+    PORT: parseEnvVar(Bun.env[envVarMapping.application.PORT], "number") as number || defaultConfig.application.PORT,
+    ENABLE_FILE_LOGGING: parseEnvVar(Bun.env[envVarMapping.application.ENABLE_FILE_LOGGING], "boolean") as boolean ?? defaultConfig.application.ENABLE_FILE_LOGGING,
+    ALLOWED_ORIGINS: Bun.env[envVarMapping.application.ALLOWED_ORIGINS]?.split(",") || defaultConfig.application.ALLOWED_ORIGINS,
   };
 
   config.capella = {
-    COUCHBASE_URL: parseEnvVar(process.env[envVarMapping.capella.COUCHBASE_URL], "string") as string || defaultConfig.capella.COUCHBASE_URL,
-    COUCHBASE_USERNAME: parseEnvVar(process.env[envVarMapping.capella.COUCHBASE_USERNAME], "string") as string || defaultConfig.capella.COUCHBASE_USERNAME,
-    COUCHBASE_PASSWORD: parseEnvVar(process.env[envVarMapping.capella.COUCHBASE_PASSWORD], "string") as string || defaultConfig.capella.COUCHBASE_PASSWORD,
-    COUCHBASE_BUCKET: parseEnvVar(process.env[envVarMapping.capella.COUCHBASE_BUCKET], "string") as string || defaultConfig.capella.COUCHBASE_BUCKET,
-    COUCHBASE_SCOPE: parseEnvVar(process.env[envVarMapping.capella.COUCHBASE_SCOPE], "string") as string || defaultConfig.capella.COUCHBASE_SCOPE,
-    COUCHBASE_COLLECTION: parseEnvVar(process.env[envVarMapping.capella.COUCHBASE_COLLECTION], "string") as string || defaultConfig.capella.COUCHBASE_COLLECTION,
+    COUCHBASE_URL: parseEnvVar(Bun.env[envVarMapping.capella.COUCHBASE_URL], "string") as string || defaultConfig.capella.COUCHBASE_URL,
+    COUCHBASE_USERNAME: parseEnvVar(Bun.env[envVarMapping.capella.COUCHBASE_USERNAME], "string") as string || defaultConfig.capella.COUCHBASE_USERNAME,
+    COUCHBASE_PASSWORD: parseEnvVar(Bun.env[envVarMapping.capella.COUCHBASE_PASSWORD], "string") as string || defaultConfig.capella.COUCHBASE_PASSWORD,
+    COUCHBASE_BUCKET: parseEnvVar(Bun.env[envVarMapping.capella.COUCHBASE_BUCKET], "string") as string || defaultConfig.capella.COUCHBASE_BUCKET,
+    COUCHBASE_SCOPE: parseEnvVar(Bun.env[envVarMapping.capella.COUCHBASE_SCOPE], "string") as string || defaultConfig.capella.COUCHBASE_SCOPE,
+    COUCHBASE_COLLECTION: parseEnvVar(Bun.env[envVarMapping.capella.COUCHBASE_COLLECTION], "string") as string || defaultConfig.capella.COUCHBASE_COLLECTION,
   };
 
   config.openTelemetry = {
-    ENABLE_OPENTELEMETRY: parseEnvVar(process.env[envVarMapping.openTelemetry.ENABLE_OPENTELEMETRY], "boolean") as boolean ?? defaultConfig.openTelemetry.ENABLE_OPENTELEMETRY,
-    SERVICE_NAME: parseEnvVar(process.env[envVarMapping.openTelemetry.SERVICE_NAME], "string") as string || defaultConfig.openTelemetry.SERVICE_NAME,
-    SERVICE_VERSION: parseEnvVar(process.env[envVarMapping.openTelemetry.SERVICE_VERSION], "string") as string || defaultConfig.openTelemetry.SERVICE_VERSION,
-    DEPLOYMENT_ENVIRONMENT: parseEnvVar(process.env[envVarMapping.openTelemetry.DEPLOYMENT_ENVIRONMENT], "string") as string || defaultConfig.openTelemetry.DEPLOYMENT_ENVIRONMENT,
-    TRACES_ENDPOINT: parseEnvVar(process.env[envVarMapping.openTelemetry.TRACES_ENDPOINT], "string") as string || defaultConfig.openTelemetry.TRACES_ENDPOINT,
-    METRICS_ENDPOINT: parseEnvVar(process.env[envVarMapping.openTelemetry.METRICS_ENDPOINT], "string") as string || defaultConfig.openTelemetry.METRICS_ENDPOINT,
-    LOGS_ENDPOINT: parseEnvVar(process.env[envVarMapping.openTelemetry.LOGS_ENDPOINT], "string") as string || defaultConfig.openTelemetry.LOGS_ENDPOINT,
-    METRIC_READER_INTERVAL: parseEnvVar(process.env[envVarMapping.openTelemetry.METRIC_READER_INTERVAL], "number") as number || defaultConfig.openTelemetry.METRIC_READER_INTERVAL,
-    SUMMARY_LOG_INTERVAL: parseEnvVar(process.env[envVarMapping.openTelemetry.SUMMARY_LOG_INTERVAL], "number") as number || defaultConfig.openTelemetry.SUMMARY_LOG_INTERVAL,
+    ENABLE_OPENTELEMETRY: parseEnvVar(Bun.env[envVarMapping.openTelemetry.ENABLE_OPENTELEMETRY], "boolean") as boolean ?? defaultConfig.openTelemetry.ENABLE_OPENTELEMETRY,
+    SERVICE_NAME: parseEnvVar(Bun.env[envVarMapping.openTelemetry.SERVICE_NAME], "string") as string || defaultConfig.openTelemetry.SERVICE_NAME,
+    SERVICE_VERSION: parseEnvVar(Bun.env[envVarMapping.openTelemetry.SERVICE_VERSION], "string") as string || defaultConfig.openTelemetry.SERVICE_VERSION,
+    DEPLOYMENT_ENVIRONMENT: parseEnvVar(Bun.env[envVarMapping.openTelemetry.DEPLOYMENT_ENVIRONMENT], "string") as string || defaultConfig.openTelemetry.DEPLOYMENT_ENVIRONMENT,
+    TRACES_ENDPOINT: parseEnvVar(Bun.env[envVarMapping.openTelemetry.TRACES_ENDPOINT], "string") as string || defaultConfig.openTelemetry.TRACES_ENDPOINT,
+    METRICS_ENDPOINT: parseEnvVar(Bun.env[envVarMapping.openTelemetry.METRICS_ENDPOINT], "string") as string || defaultConfig.openTelemetry.METRICS_ENDPOINT,
+    LOGS_ENDPOINT: parseEnvVar(Bun.env[envVarMapping.openTelemetry.LOGS_ENDPOINT], "string") as string || defaultConfig.openTelemetry.LOGS_ENDPOINT,
+    METRIC_READER_INTERVAL: parseEnvVar(Bun.env[envVarMapping.openTelemetry.METRIC_READER_INTERVAL], "number") as number || defaultConfig.openTelemetry.METRIC_READER_INTERVAL,
+    SUMMARY_LOG_INTERVAL: parseEnvVar(Bun.env[envVarMapping.openTelemetry.SUMMARY_LOG_INTERVAL], "number") as number || defaultConfig.openTelemetry.SUMMARY_LOG_INTERVAL,
   };
 
   return config;

@@ -46,7 +46,7 @@ const ApplicationConfigSchema = z.object({
   YOGA_RESPONSE_CACHE_TTL: z.number().min(0).default(900000),
   PORT: z.number().min(1).max(65535).default(4000),
   ENABLE_FILE_LOGGING: z.boolean().default(false),
-  ALLOWED_ORIGINS: z.array(z.string()).default(["http://localhost:3000"]),
+  ALLOWED_ORIGINS: z.array(z.string()).default(["http://localhost:4000/graphql"]),
 });
 
 const CapellaConfigSchema = z.object({
