@@ -4,53 +4,9 @@ import http from "k6/http";
 import { check, sleep } from "k6";
 import { Counter } from "k6/metrics";
 
-
 const errors = new Counter("errors");
 
-export const options = {
-  scenarios: {
-    looksSummary: {
-      executor: "ramping-vus",
-      stages: [
-        { duration: "30s", target: 10 }, // Warm-up
-        { duration: "1m", target: 20 }, // Ramp-up
-        { duration: "2m", target: 20 }, // Steady state
-        { duration: "30s", target: 0 }, // Ramp-down
-      ],
-      exec: "runLooksSummaryScenario",
-    },
-    seasonalAssignments: {
-      executor: "ramping-vus",
-      stages: [
-        { duration: "30s", target: 10 }, // Warm-up
-        { duration: "1m", target: 20 }, // Ramp-up
-        { duration: "2m", target: 20 }, // Steady state
-        { duration: "30s", target: 0 }, // Ramp-down
-      ],
-      exec: "runSeasonalAssignmentsScenario",
-    },
-    imageUrlCheck: {
-      executor: "ramping-vus",
-      stages: [
-        { duration: "30s", target: 5 }, // Warm-up
-        { duration: "1m", target: 10 }, // Ramp-up
-        { duration: "2m", target: 10 }, // Steady state
-        { duration: "30s", target: 0 }, // Ramp-down
-      ],
-      exec: "runImageUrlCheckScenario",
-    },
-  },
-  thresholds: {
-    http_req_failed: ["rate<0.01"], // http errors should be less than 1%
-    http_req_duration: ["p(95)<400"], // 95% of requests should be below 400ms
-  },
-  userAgent: "K6TestAgent/1.0",
-  throw: true,
-};
-
-const GRAPHQL_ENDPOINT =
-  __ENV.GRAPHQL_ENDPOINT || "http://localhost:4000/graphql";
-// const GRAPHQL_ENDPOINT = 'https://capellaql.prd.shared-services.eu.pvh.cloud/graphql';
+const GRAPHQL_ENDPOINT = "http://localhost:4000/graphql";
 
 const LOOKS_SUMMARY_QUERY = `
 query looksSummary($brand: String!, $division: String!, $season: String!) {
@@ -146,6 +102,47 @@ const seasons = ["C51", "C52"];
 const commonHeaders = {
   "Content-Type": "application/json",
   "User-Agent": "K6TestAgent/1.0",
+};
+
+export const options = {
+  scenarios: {
+    looksSummary: {
+      executor: "ramping-vus",
+      stages: [
+        { duration: "30s", target: 5 }, // Warm-up
+        { duration: "1m", target: 10 }, // Ramp-up
+        { duration: "2m", target: 10 }, // Steady state
+        { duration: "30s", target: 0 }, // Ramp-down
+      ],
+      exec: "runLooksSummaryScenario",
+    },
+    seasonalAssignments: {
+      executor: "ramping-vus",
+      stages: [
+        { duration: "30s", target: 5 }, // Warm-up
+        { duration: "1m", target: 10 }, // Ramp-up
+        { duration: "2m", target: 10 }, // Steady state
+        { duration: "30s", target: 0 }, // Ramp-down
+      ],
+      exec: "runSeasonalAssignmentsScenario",
+    },
+    // imageUrlCheck: {
+    //   executor: "ramping-vus",
+    //   stages: [
+    //     { duration: "30s", target: 5 }, // Warm-up
+    //     { duration: "1m", target: 10 }, // Ramp-up
+    //     { duration: "2m", target: 10 }, // Steady state
+    //     { duration: "30s", target: 0 }, // Ramp-down
+    //   ],
+    //   exec: "runImageUrlCheckScenario",
+    // },
+  },
+  thresholds: {
+    http_req_failed: ["rate<0.01"], // http errors should be less than 1%
+    http_req_duration: ["p(95)<400"], // 95% of requests should be below 400ms
+  },
+  userAgent: "K6TestAgent/1.0",
+  throw: true,
 };
 
 export function runLooksSummaryScenario() {

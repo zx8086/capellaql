@@ -15,7 +15,6 @@ import {
   type Histogram,
 } from "@opentelemetry/api";
 import { NodeSDK } from "@opentelemetry/sdk-node";
-import { Resource } from "@opentelemetry/resources";
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
@@ -62,14 +61,16 @@ let httpResponseTimeHistogram: Histogram | undefined;
 let isInitialized = false;
 
 const createResource = async () => {
-  const { defaultResource, resourceFromAttributes } = await import('@opentelemetry/resources');
+  const { defaultResource, resourceFromAttributes } = await import(
+    "@opentelemetry/resources"
+  );
   return (await defaultResource()).merge(
     resourceFromAttributes({
       [ATTR_SERVICE_NAME]: config.openTelemetry.SERVICE_NAME,
       [ATTR_SERVICE_VERSION]: config.openTelemetry.SERVICE_VERSION,
       [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]:
         config.openTelemetry.DEPLOYMENT_ENVIRONMENT,
-    })
+    }),
   );
 };
 

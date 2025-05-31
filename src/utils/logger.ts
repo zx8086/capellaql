@@ -35,7 +35,7 @@ export const logger = winston.createLogger({
   level: config.application.LOG_LEVEL,
   format: customFormat,
   transports: [
-    new winston.transports.Console(),
+    // new winston.transports.Console(),
     new OpenTelemetryTransportV3({
       level: config.application.LOG_LEVEL,
     }),
