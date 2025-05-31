@@ -8,7 +8,7 @@ import { cors } from "@elysiajs/cors";
 import { yoga } from "@elysiajs/graphql-yoga";
 import typeDefs from "./graphql/typeDefs";
 import resolvers from "./graphql/resolvers";
-import { useResponseCache } from "@graphql-yoga/plugin-response-cache";
+// import { useResponseCache } from "@graphql-yoga/plugin-response-cache";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import {
@@ -47,7 +47,7 @@ if (typeof globalThis["ENV_TRUE"] === "undefined") {
 }
 
 const SERVER_PORT = config.application["PORT"];
-const YOGA_RESPONSE_CACHE_TTL = config.application["YOGA_RESPONSE_CACHE_TTL"];
+// const YOGA_RESPONSE_CACHE_TTL = config.application["YOGA_RESPONSE_CACHE_TTL"];
 // const ALLOWED_ORIGINS = Array.isArray(config.application.ALLOWED_ORIGINS)
 //   ? config.application.ALLOWED_ORIGINS
 //   : (config.application.ALLOWED_ORIGINS as string).split(',').map(origin => origin.trim());
