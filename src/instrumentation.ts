@@ -3,7 +3,7 @@
 import { debug, log, warn, err } from "$utils/simpleLogger";
 import { trace, context } from "@opentelemetry/api";
 
-log("Starting Application - Couchbase Capella GraphQL API Service");
+log("Starting Application Instrumentation - Couchbase Capella GraphQL API Service");
 
 import {
   diag,
@@ -18,7 +18,6 @@ import { NodeSDK } from "@opentelemetry/sdk-node";
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
 } from "@opentelemetry/semantic-conventions";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { MonitoredOTLPTraceExporter } from "./otlp/MonitoredOTLPTraceExporter";
@@ -68,7 +67,7 @@ const createResource = async () => {
     resourceFromAttributes({
       [ATTR_SERVICE_NAME]: config.openTelemetry.SERVICE_NAME,
       [ATTR_SERVICE_VERSION]: config.openTelemetry.SERVICE_VERSION,
-      [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]:
+      ["deployment.environment"]:
         config.openTelemetry.DEPLOYMENT_ENVIRONMENT,
     }),
   );
@@ -214,12 +213,13 @@ async function initializeOpenTelemetry() {
         resource: resource,
         traceExporter,
         spanProcessors: [batchSpanProcessor],
-        logRecordProcessor: new BatchLogRecordProcessor(logExporter),
+        logRecordProcessors: [new BatchLogRecordProcessor(logExporter)],
         instrumentations: [
           getNodeAutoInstrumentations({
             "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
             "@opentelemetry/instrumentation-fs": { enabled: false },
             "@opentelemetry/instrumentation-winston": { enabled: false },
+            "@opentelemetry/instrumentation-runtime-node": { enabled: false }
           }),
           new GraphQLInstrumentation({
             allowValues: true,

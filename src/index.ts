@@ -105,11 +105,11 @@ const createYogaOptions = () => ({
     limit: 10,
   },
   plugins: [
-    // useResponseCache({
-    //   session: () => null,
-    //   ttl: YOGA_RESPONSE_CACHE_TTL,
-    // }),
     {
+      // useResponseCache({
+      //   session: () => null,
+      //   ttl: YOGA_RESPONSE_CACHE_TTL,
+      // }),
       onExecute: ({ args }) => {
         log("GraphQL Execute", {
           operation: args["operationName"],
