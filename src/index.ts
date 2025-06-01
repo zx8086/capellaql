@@ -110,18 +110,18 @@ const createYogaOptions = () => ({
       //   session: () => null,
       //   ttl: YOGA_RESPONSE_CACHE_TTL,
       // }),
-      onExecute: ({ args }) => {
-        log("GraphQL Execute", {
-          operation: args["operationName"],
-          variables: args["variableValues"],
-        });
-      },
-      onSubscribe: ({ args }) => {
-        log("GraphQL Subscribe", {
-          operation: args["operationName"],
-          variables: args["variableValues"],
-        });
-      },
+      // onExecute: ({ args }) => {
+        // log("GraphQL Execute", {
+        //   operation: args["operationName"],
+        //   variables: args["variableValues"],
+        // });
+      // },
+      // onSubscribe: ({ args }) => {
+        // log("GraphQL Subscribe", {
+        //   operation: args["operationName"],
+        //   variables: args["variableValues"],
+        // });
+      // },
       onError: ({ error }) => {
         err("GraphQL Error", {
           error: error["message"],
