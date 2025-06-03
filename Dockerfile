@@ -18,7 +18,7 @@ RUN mkdir -p /usr/src/app/logs /usr/src/app/deps/couchbase-cxx-cache /usr/src/ap
 FROM base AS deps
 
 # Copy only package files needed for installation
-COPY --chown=bun:bun package.json bun.lockb tsconfig.json ./
+COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
 
 # Single RUN command for better caching
 RUN --mount=type=cache,target=/root/.bun,sharing=locked \
@@ -60,7 +60,7 @@ RUN --mount=type=cache,target=/usr/src/app/.build \
 FROM base AS release
 
 # Copy package files and install dependencies in one layer
-COPY --chown=bun:bun package.json bun.lockb ./
+COPY --chown=bun:bun package.json bun.lock ./
 RUN --mount=type=cache,target=/root/.bun,sharing=locked \
     bun install --frozen-lockfile
 
