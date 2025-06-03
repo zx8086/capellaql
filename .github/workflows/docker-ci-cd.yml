@@ -183,7 +183,7 @@ jobs:
           # Create directories first
           mkdir -p "${GITHUB_WORKSPACE}/bin"
           mkdir -p "${GITHUB_WORKSPACE}/tmp"
-          
+
           cd "${GITHUB_WORKSPACE}/tmp"
 
           # Install cosign
@@ -376,7 +376,7 @@ jobs:
             type=registry,ref=docker.io/zx8086/capellaql:buildcache
             type=gha,scope=${{ github.workflow }}
           cache-to: |
-            type=local,dest=${{ env.DOCKER_BUILDX_CACHE_DIR }},mode=max
+            type=local,dest=/tmp/.buildx-cache,mode=max
             type=registry,ref=docker.io/zx8086/capellaql:buildcache,mode=max
             type=gha,mode=max,scope=${{ github.workflow }}
 
@@ -884,7 +884,7 @@ jobs:
         run: |
           # Get the runner's architecture
           RUNNER_ARCH=$(uname -m)
-          
+
           # Stop existing containers using port 4000
           docker ps -q --filter publish=4000 | xargs -r docker stop
           docker rm -f capellaql-test 2>/dev/null || true
@@ -1172,7 +1172,7 @@ jobs:
             echo "| 📦 Image | capellaql |"
             echo "| 🏗️ Platform | ${{ matrix.platform }} |"
             echo "| ⚡ Status | ${CONTAINER_STATUS:-N/A} |"
-            
+
             # Container Status
             if [ "${CONTAINER_STATUS:-}" = "running" ]; then
               STATS=$(docker stats capellaql-test --no-stream --format "{{.CPUPerc}},{{.MemUsage}},{{.NetIO}},{{.BlockIO}}" 2>/dev/null || echo "N/A,N/A,N/A,N/A")
@@ -1183,11 +1183,11 @@ jobs:
             else
               echo "| 🔄 Status | ⚠️ Not Running |"
             fi
-            
+
             echo ""
             echo "#### 🔒 Security Features"
             echo "- ✅ SBOM Generation"
-            echo "- ✅ Container Attestations" 
+            echo "- ✅ Container Attestations"
             echo "- ✅ Snyk Security Scanning"
             echo "- ✅ Multi-platform Build"
           } >> $GITHUB_STEP_SUMMARY
