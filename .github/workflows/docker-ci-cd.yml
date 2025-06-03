@@ -16,6 +16,12 @@ env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
   BUILDX_NO_DEFAULT_LOAD: true
+  ACTIONS_CACHE_SIZE: 5GB
+  ACTIONS_RUNTIME_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  ACTIONS_CACHE_DIR: /home/pi/.buildx-cache
+  ACTIONS_RUNTIME_DIR: /home/pi/.buildx-runtime
+  DOCKER_BUILDX_CACHE_DIR: /home/pi/.buildx-cache/docker
+  GITHUB_WORKSPACE_CACHE: /home/pi/actions-runner/_work/_cache
   BUILDKIT_PROGRESS: plain
   BUILDX_RETRY_ATTEMPTS: 3
   BUILDX_RETRY_DELAY: 30s
