@@ -16,9 +16,13 @@ env:
   DOCKER_BUILDKIT: 1
   COMPOSE_DOCKER_CLI_BUILD: 1
   BUILDX_NO_DEFAULT_LOAD: true
+  ACTIONS_CACHE_SIZE: 5GB
+  ACTIONS_RUNTIME_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  ACTIONS_CACHE_DIR: /home/pi/.buildx-cache
+  ACTIONS_RUNTIME_DIR: /home/pi/.buildx-runtime
+  DOCKER_BUILDX_CACHE_DIR: /home/pi/.buildx-cache/docker
+  GITHUB_WORKSPACE_CACHE: /home/pi/actions-runner/_work/_cache
   BUILDKIT_PROGRESS: plain
-  BUILDX_RETRY_ATTEMPTS: 3
-  BUILDX_RETRY_DELAY: 30s
 
 permissions:
   contents: read
@@ -368,19 +372,17 @@ jobs:
           load: false
           platforms: ${{ matrix.platform }}
           cache-from: |
-            type=local,src=/tmp/.buildx-cache
+            type=local,src=${{ env.DOCKER_BUILDX_CACHE_DIR }}
+            type=registry,ref=docker.io/zx8086/capellaql:buildcache
+            type=gha,scope=${{ github.workflow }}
           cache-to: |
-            type=local,dest=/tmp/.buildx-cache-new,mode=max
-
-      # Create a local cache directory for buildx
-      - name: Set up build cache
-        run: |
-          mkdir -p /tmp/.buildx-cache
+            type=local,dest=/tmp/.buildx-cache,mode=max
+            type=registry,ref=docker.io/zx8086/capellaql:buildcache,mode=max
+            type=gha,mode=max,scope=${{ github.workflow }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         id: docker_build
-        continue-on-error: true  # Allow failure for retry
         with:
           context: .
           push: ${{ github.event_name != 'pull_request' }}
@@ -389,11 +391,9 @@ jobs:
           platforms: ${{ matrix.platform }}
           builder: ${{ format('builder-{0}', matrix.platform-name) }}
           cache-from: |
-            type=local,src=/tmp/.buildx-cache
+            type=registry,ref=docker.io/zx8086/capellaql:buildcache-${{ matrix.platform-name }}
           cache-to: |
-            type=local,dest=/tmp/.buildx-cache-new,mode=max
-          network: host
-          no-cache-filter: ''  # Don't cache problematic layers
+            type=registry,ref=docker.io/zx8086/capellaql:buildcache-${{ matrix.platform-name }},mode=max
           provenance: false
           sbom: true
           build-args: |
@@ -429,123 +429,20 @@ jobs:
             BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=${{ vars.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS }}
             SOURCE_MAP_SUPPORT=true
             PRESERVE_SOURCE_MAPS=true
-
-      # Move cache after build
-      - name: Move cache
-        run: |
-          rm -rf /tmp/.buildx-cache
-          mv /tmp/.buildx-cache-new /tmp/.buildx-cache || true
-
-      # Retry build if failed
-      - name: Retry build and push Docker image
-        uses: docker/build-push-action@v6
-        id: docker_build_retry
-        if: steps.docker_build.outcome == 'failure'
-        with:
-          context: .
-          push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          platforms: ${{ matrix.platform }}
-          builder: ${{ format('builder-{0}', matrix.platform-name) }}
-          cache-from: |
-            type=local,src=/tmp/.buildx-cache
-          cache-to: |
-            type=local,dest=/tmp/.buildx-cache-new,mode=max
-          network: host
-          no-cache: true  # Skip cache completely on retry
-          provenance: false
-          sbom: true
-          build-args: |
-            BUILDKIT_INLINE_CACHE=1
-            DOCKER_BUILDKIT=1
-            BUILDKIT_PROGRESS=plain
-            BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
-            BUILD_VERSION=${{ github.ref_name || '2.0.0' }}
-            COMMIT_HASH=${{ github.sha }}
-            GITHUB_REF_NAME=${{ github.ref_name }}
-            NODE_ENV=production
-            BASE_URL=${{ vars.BASE_URL }}
-            PORT=${{ vars.PORT }}
-            ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
-            ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
-            LOG_LEVEL=${{ vars.LOG_LEVEL }}
-            LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
-            LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
-            YOGA_RESPONSE_CACHE_TTL=${{ vars.YOGA_RESPONSE_CACHE_TTL }}
-            COUCHBASE_BUCKET=${{ vars.COUCHBASE_BUCKET }}
-            COUCHBASE_SCOPE=${{ vars.COUCHBASE_SCOPE }}
-            COUCHBASE_COLLECTION=${{ vars.COUCHBASE_COLLECTION }}
-            SERVICE_NAME=${{ vars.SERVICE_NAME }}
-            SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
-            DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
-            TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
-            METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
-            LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
-            METRIC_READER_INTERVAL=${{ vars.METRIC_READER_INTERVAL }}
-            CONSOLE_METRIC_READER_INTERVAL=${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
-            SUMMARY_LOG_INTERVAL=${{ vars.SUMMARY_LOG_INTERVAL }}
-            ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}
-            BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=${{ vars.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS }}
-            SOURCE_MAP_SUPPORT=true
-            PRESERVE_SOURCE_MAPS=true
-
-      # Move cache after retry
-      - name: Move cache after retry
-        if: steps.docker_build.outcome == 'failure'
-        run: |
-          # Safely handle cache movement with proper error checking
-          if [ -d "/tmp/.buildx-cache-new" ]; then
-            rm -rf /tmp/.buildx-cache || true
-            mv /tmp/.buildx-cache-new /tmp/.buildx-cache || echo "Failed to move cache, but continuing"
-            echo "Cache moved successfully after retry"
-          else
-            echo "No new cache directory found after retry, skipping cache move"
-          fi
 
       # Add the new push step here, after the build
       - name: Push image with digest
         continue-on-error: true
-        if: github.event_name != 'pull_request' && (steps.docker_build.outcome == 'success' || steps.docker_build_retry.outcome == 'success')
+        if: github.event_name != 'pull_request'
         run: |
           # Get the digest from the build step
-          DIGEST="${{ steps.docker_build.outputs.digest || steps.docker_build_retry.outputs.digest }}"
-          
-          # Add retry logic for pushing
-          MAX_ATTEMPTS=3
-          ATTEMPT=1
-          
-          while [ $ATTEMPT -le $MAX_ATTEMPTS ]; do
-            echo "Attempt $ATTEMPT to push image with digest ${DIGEST}"
-            if docker buildx imagetools create \
-              --tag docker.io/zx8086/capellaql:latest \
-              --tag docker.io/zx8086/capellaql:${{ github.sha }} \
-              docker.io/zx8086/capellaql@${DIGEST}; then
-              echo "Push successful on attempt $ATTEMPT"
-              break
-            fi
-            
-            ATTEMPT=$((ATTEMPT+1))
-            if [ $ATTEMPT -le $MAX_ATTEMPTS ]; then
-              echo "Push failed, waiting 30 seconds before retry..."
-              sleep 30
-            else
-              echo "Push failed after $MAX_ATTEMPTS attempts"
-              exit 1
-            fi
-          done
+          DIGEST="${{ steps.docker_build.outputs.digest }}"
 
-      - name: Move cache after local build
-        if: success()
-        run: |
-          # Safely handle cache movement with proper error checking
-          if [ -d "/tmp/.buildx-cache-new" ]; then
-            rm -rf /tmp/.buildx-cache || true
-            mv /tmp/.buildx-cache-new /tmp/.buildx-cache || echo "Failed to move cache, but continuing"
-            echo "Cache moved successfully"
-          else
-            echo "No new cache directory found, skipping cache move"
-          fi
+          # Push the image with explicit digest
+          docker buildx imagetools create \
+            --tag docker.io/zx8086/capellaql:latest \
+            --tag docker.io/zx8086/capellaql:${{ github.sha }} \
+            docker.io/zx8086/capellaql@${DIGEST}
 
       - name: Verify build
         continue-on-error: true
@@ -918,8 +815,8 @@ jobs:
               "platforms": ["linux/arm64", "linux/amd64"],
               "push": ${{ github.event_name != 'pull_request' }},
               "tags": ${{ toJSON(steps.meta.outputs.tags) }},
-              "cache-from": ["type=local,src=/tmp/.buildx-cache"],
-              "cache-to": ["type=local,dest=/tmp/.buildx-cache-new,mode=max"]
+              "cache-from": ["type=registry,ref=zx8086/capellaql:buildcache"],
+              "cache-to": ["type=registry,ref=zx8086/capellaql:buildcache,mode=max"]
             },
             "metadata": {
               "repository": "${GITHUB_REPOSITORY}",
@@ -950,7 +847,7 @@ jobs:
           load: true
           tags: docker.io/zx8086/capellaql:latest
           platforms: ${{ matrix.platform }}
-          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-from: type=registry,ref=docker.io/zx8086/capellaql:buildcache
           build-args: |
             NODE_ENV=production
             BUILD_VERSION=${{ github.ref_name || '2.0.0' }}
