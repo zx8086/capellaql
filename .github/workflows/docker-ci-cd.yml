@@ -176,6 +176,45 @@ jobs:
           find ${{ env.ACTIONS_CACHE_DIR }} -type f -exec touch {} +
           find ${{ env.DOCKER_BUILDX_CACHE_DIR }} -type f -exec touch {} +
 
+      # Security tools installation (merged from capella-document-search)
+      - name: Install verification tools
+        shell: bash
+        run: |
+          # Create directories first
+          mkdir -p "${GITHUB_WORKSPACE}/bin"
+          mkdir -p "${GITHUB_WORKSPACE}/tmp"
+          
+          cd "${GITHUB_WORKSPACE}/tmp"
+
+          # Install cosign
+          curl -Lo cosign "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64"
+          chmod +x cosign
+          mv cosign "${GITHUB_WORKSPACE}/bin/"
+
+          # Install syft
+          SYFT_RELEASE=$(curl -s https://api.github.com/repos/anchore/syft/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
+          curl -Lo syft.tar.gz "https://github.com/anchore/syft/releases/download/${SYFT_RELEASE}/syft_${SYFT_RELEASE#v}_linux_amd64.tar.gz"
+          tar xzf syft.tar.gz syft
+          mv syft "${GITHUB_WORKSPACE}/bin/"
+
+          # Add to PATH
+          echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
+
+          # Cleanup
+          cd "${GITHUB_WORKSPACE}"
+          rm -rf "${GITHUB_WORKSPACE}/tmp"
+
+          # Verify installations
+          "${GITHUB_WORKSPACE}/bin/cosign" version || true
+          "${GITHUB_WORKSPACE}/bin/syft" --version || true
+
+      - name: Install additional security tools
+        run: |
+          # Install jq if not present
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+
       # Initial Setup
       - name: Set build timestamp
         id: timestamp
@@ -220,7 +259,7 @@ jobs:
           PRESERVE_SOURCE_MAPS=${{ vars.PRESERVE_SOURCE_MAPS }}
           EOF
 
-      # Docker metadata setup
+      # Docker metadata setup (enhanced with capella-document-search labels)
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
@@ -230,12 +269,26 @@ jobs:
             org.opencontainers.image.title=capellaql
             org.opencontainers.image.description=CapellaQL is a high-performance GraphQL service for Couchbase Capella databases
             org.opencontainers.image.version=${BUILD_VERSION}
-            org.opencontainers.image.created=${BUILD_DATE}
+            org.opencontainers.image.created=${BUILD_TIMESTAMP}
             org.opencontainers.image.revision=${GITHUB_SHA}
             org.opencontainers.image.authors=Simon Owusu <simonowusupvh@gmail.com>
             org.opencontainers.image.vendor=Siobytes
             org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.url=https://github.com/zx8086/capellaql
+            org.opencontainers.image.source=https://github.com/zx8086/capellaql
+            org.opencontainers.image.documentation=https://github.com/zx8086/capellaql/README.md
             org.opencontainers.image.base.name=oven/bun:canary-alpine
+            org.opencontainers.image.source.repository=github.com/zx8086/capellaql
+            org.opencontainers.image.source.branch=${GITHUB_REF_NAME:-master}
+            org.opencontainers.image.source.commit=${GITHUB_SHA}
+            com.capellaql.maintainer=Simon Owusu <simonowusupvh@gmail.com>
+            com.capellaql.release-date=${BUILD_TIMESTAMP}
+            com.capellaql.version.is-production=true
+            org.opencontainers.image.ref.name=${GITHUB_REF_NAME:-master}
+            org.opencontainers.image.version.semver=${GITHUB_REF_NAME:-2.0.0}
+            org.opencontainers.image.version.major=2
+            org.opencontainers.image.version.minor=0
+            org.opencontainers.image.version.patch=0
           tags: |
             type=ref,event=branch
             type=sha,format=long
@@ -247,6 +300,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
             type=sha,format=long
+            type=raw,value=buildcache,enable=true
 
       - name: Cache Bun dependencies
         uses: actions/cache@v3
@@ -824,57 +878,54 @@ jobs:
             SOURCE_MAP_SUPPORT=true
             PRESERVE_SOURCE_MAPS=true
 
-      - name: Test container
+      - name: Test container (enhanced from capella-document-search)
         continue-on-error: true
         if: github.event_name != 'pull_request'
         run: |
+          # Get the runner's architecture
+          RUNNER_ARCH=$(uname -m)
+          
           # Stop existing containers using port 4000
           docker ps -q --filter publish=4000 | xargs -r docker stop
-          docker rm -f app-test 2>/dev/null || true
+          docker rm -f capellaql-test 2>/dev/null || true
 
           # Run new container with all necessary environment variables
           docker run -d \
-            --name app-test \
+            --name capellaql-test \
             -p 4000:4000 \
             --env-file .env \
             -e NODE_ENV=production \
-            -e BUILD_VERSION=${{ github.ref_name || '0.0.1' }} \
+            -e BUILD_VERSION=${{ github.ref_name || '2.0.0' }} \
             -e COMMIT_HASH=${{ github.sha }} \
             -e BUILD_DATE=${{ env.BUILD_TIMESTAMP }} \
             -e ENABLE_OPENTELEMETRY=false \
-            -e TRACES_ENDPOINT=http://localhost:4318/v1/traces \
-            -e METRICS_ENDPOINT=http://localhost:4318/v1/metrics \
-            -e LOGS_ENDPOINT=http://localhost:4318/v1/logs \
+            -e ENABLE_FILE_LOGGING=false \
+            -e LOG_MAX_FILES=7d \
+            -e LOG_MAX_SIZE=10m \
+            -e LOG_LEVEL=info \
             zx8086/capellaql:latest
 
-            # # Verify file structure
-            # echo "Verifying container file structure..."
-            # docker exec app-test ls -la /app
-            # docker exec app-test ls -la /app/src
-
-            # # Verify bun installation
-            # echo "Verifying bun installation..."
-            # docker exec app-test bun --version
-
-            # # Verify package.json
-            # echo "Verifying package.json..."
-            # docker exec app-test cat /app/package.json
-
-          # Wait for container to start and verify
-          sleep 10
-          docker ps | grep app-test || (docker logs app-test && exit 1)
-
-          # Check container health and capture metrics
-          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' app-test)
-          if [ "$CONTAINER_STATUS" != "running" ]; then
-            echo "Container is not running. Status: $CONTAINER_STATUS"
-            docker logs app-test
+          # Add delay and better error handling
+          sleep 15
+          if ! docker ps | grep -q capellaql-test; then
+            echo "Container failed to start. Showing logs:"
+            docker logs capellaql-test
             exit 1
           fi
 
           # Capture container metrics for summary
+          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' capellaql-test)
           echo "CONTAINER_STATUS=${CONTAINER_STATUS}" >> $GITHUB_ENV
-          echo "CONTAINER_START_TIME=$(docker inspect --format='{{.State.StartedAt}}' app-test)" >> $GITHUB_ENV
+          echo "CONTAINER_START_TIME=$(docker inspect --format='{{.State.StartedAt}}' capellaql-test)" >> $GITHUB_ENV
+
+          # Verify container health
+          if [ "$CONTAINER_STATUS" != "running" ]; then
+            echo "Container is not running. Status: $CONTAINER_STATUS"
+            docker logs capellaql-test
+            exit 1
+          fi
+
+          echo "✅ Container test successful"
 
           echo "Container successfully started"
 
@@ -1107,17 +1158,55 @@ jobs:
             rm buildx-cache.tar.gz
           fi
 
-      # Enhanced cleanup with workspace cleaning
+      # Build Summary (merged from capella-document-search)
+      - name: Docker Build Summary
+        if: always()
+        run: |
+          {
+            echo "### 🐳 Docker Build Summary"
+            echo ""
+            echo "#### 📊 Build Overview"
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| 🆔 Build ID | \`${GITHUB_SHA::7}\` |"
+            echo "| 📦 Image | capellaql |"
+            echo "| 🏗️ Platform | ${{ matrix.platform }} |"
+            echo "| ⚡ Status | ${CONTAINER_STATUS:-N/A} |"
+            
+            # Container Status
+            if [ "${CONTAINER_STATUS:-}" = "running" ]; then
+              STATS=$(docker stats capellaql-test --no-stream --format "{{.CPUPerc}},{{.MemUsage}},{{.NetIO}},{{.BlockIO}}" 2>/dev/null || echo "N/A,N/A,N/A,N/A")
+              echo "| 🔄 Status | ✅ Running |"
+              echo "| 🕒 Start Time | ${CONTAINER_START_TIME} |"
+              echo "| 📈 Cache Ratio | ${CACHE_RATIO:-0}% |"
+              echo "| ⏱️ Build Duration | ${BUILD_DURATION:-N/A}s |"
+            else
+              echo "| 🔄 Status | ⚠️ Not Running |"
+            fi
+            
+            echo ""
+            echo "#### 🔒 Security Features"
+            echo "- ✅ SBOM Generation"
+            echo "- ✅ Container Attestations" 
+            echo "- ✅ Snyk Security Scanning"
+            echo "- ✅ Multi-platform Build"
+          } >> $GITHUB_STEP_SUMMARY
+
+      # Enhanced cleanup with workspace cleaning (merged from capella-document-search)
       - name: Cleanup
         if: always()
         continue-on-error: true
         run: |
-          rm -f .env
+          rm -f .env .env.production
           rm -f snyk.sarif snyk-docker.sarif
-          docker container rm -f app-test || true
+          docker container rm -f capellaql-test || true
           docker image prune -f
           docker volume prune -f
           docker builder prune -a -f
+          rm -rf security-artifacts
+          rm -rf "${GITHUB_WORKSPACE}/bin/syft"
+          rm -rf "${GITHUB_WORKSPACE}/bin/cosign"
+          rm -rf ~/.sigstore
           rm -rf node_modules
           rm -rf .gradle
           rm -rf build
