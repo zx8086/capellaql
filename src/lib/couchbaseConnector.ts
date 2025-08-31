@@ -1,7 +1,7 @@
 /* src/lib/couchbaseConnector.ts */
 
 import config from "$config";
-import { log, err } from "$utils/logger";
+import { log, error as err } from "../telemetry/logger";
 import {
   Cluster,
   Bucket,

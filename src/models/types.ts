@@ -21,22 +21,11 @@ export interface CapellaConfig {
   COUCHBASE_COLLECTION: string;
 }
 
-export interface OpenTelemetryConfig {
-  ENABLE_OPENTELEMETRY: boolean;
-  SERVICE_NAME: string;
-  SERVICE_VERSION: string;
-  DEPLOYMENT_ENVIRONMENT: string;
-  TRACES_ENDPOINT: string;
-  METRICS_ENDPOINT: string;
-  LOGS_ENDPOINT: string;
-  METRIC_READER_INTERVAL: number;
-  SUMMARY_LOG_INTERVAL: number;
-}
+// Note: OpenTelemetryConfig moved to src/telemetry/config.ts
 
 export interface Config {
   application: ApplicationConfig;
   capella: CapellaConfig;
-  openTelemetry: OpenTelemetryConfig;
 }
 
 const ApplicationConfigSchema = z.object({
@@ -58,22 +47,9 @@ const CapellaConfigSchema = z.object({
   COUCHBASE_COLLECTION: z.string().default("_default"),
 });
 
-const OpenTelemetryConfigSchema = z.object({
-  ENABLE_OPENTELEMETRY: z.boolean().default(true),
-  SERVICE_NAME: z.string().default("CapellaQL Service"),
-  SERVICE_VERSION: z.string().default("2.0"),
-  DEPLOYMENT_ENVIRONMENT: z.string().default("development"),
-  TRACES_ENDPOINT: z.string().url(),
-  METRICS_ENDPOINT: z.string().url(),
-  LOGS_ENDPOINT: z.string().url(),
-  METRIC_READER_INTERVAL: z.number().min(1000).default(60000),
-  SUMMARY_LOG_INTERVAL: z.number().min(1000).default(300000),
-});
-
 const ConfigSchema = z.object({
   application: ApplicationConfigSchema,
   capella: CapellaConfigSchema,
-  openTelemetry: OpenTelemetryConfigSchema,
 });
 
 export type ValidatedConfig = z.infer<typeof ConfigSchema>;

@@ -1,34 +1,25 @@
 /* src/utils/simpleLogger.ts */
 
+// DEPRECATED: This file is deprecated. Use ../telemetry/logger.ts instead.
+// Re-exporting for backward compatibility.
+
+import { log as telemetryLog, err as telemetryErr, warn as telemetryWarn, debug as telemetryDebug } from '../telemetry/logger';
+
+console.warn("DEPRECATED: src/utils/simpleLogger.ts is deprecated. Use ../telemetry module instead.");
+
 export function log(message: string, meta?: any): void {
-    if (meta) {
-      console.log({ message, meta });
-    } else {
-      console.log(message);
-    }
-  }
-  
-  export function err(message: string, meta?: any): void {
-    if (meta) {
-      console.error({ message, meta });
-    } else {
-      console.error(message);
-    }
-  }
-  
-  export function warn(message: string, meta?: any): void {
-    if (meta) {
-      console.warn({ message, meta });
-    } else {
-      console.warn(message);
-    }
-  }
-  
-  export function debug(message: string, meta?: any): void {
-    if (meta) {
-      console.debug({ message, meta });
-    } else {
-      console.debug(message);
-    }
-  }
+  telemetryLog(message, meta);
+}
+
+export function err(message: string, meta?: any): void {
+  telemetryErr(message, undefined, meta);
+}
+
+export function warn(message: string, meta?: any): void {
+  telemetryWarn(message, meta);
+}
+
+export function debug(message: string, meta?: any): void {
+  telemetryDebug(message, meta);
+}
   

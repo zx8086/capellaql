@@ -1,6 +1,6 @@
 /* src/graphql/resolvers/looksSummary.ts */
 
-import { log, err, debug } from "$utils/logger";
+import { log, error as err, debug } from "../../telemetry/logger";
 import { getCluster } from "$lib/clusterProvider";
 
 const looksSummary = {

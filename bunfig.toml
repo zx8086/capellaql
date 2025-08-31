@@ -1,6 +1,6 @@
 # scripts to run before `bun run`-ing a file or script
 # register plugins by adding them to this list
-preload = ['src/instrumentation.ts']
+preload = ['src/telemetry/instrumentation.ts']
 logLevel = "debug"
 
 [run]

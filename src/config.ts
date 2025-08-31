@@ -2,6 +2,7 @@
 
 import { ConfigSchema, type Config } from "$models/types";
 
+// Note: OpenTelemetry configuration is now handled in src/telemetry/config.ts
 const envVarMapping = {
   application: {
     LOG_LEVEL: "LOG_LEVEL",
@@ -19,17 +20,6 @@ const envVarMapping = {
     COUCHBASE_BUCKET: "COUCHBASE_BUCKET",
     COUCHBASE_SCOPE: "COUCHBASE_SCOPE",
     COUCHBASE_COLLECTION: "COUCHBASE_COLLECTION",
-  },
-  openTelemetry: {
-    ENABLE_OPENTELEMETRY: "ENABLE_OPENTELEMETRY",
-    SERVICE_NAME: "SERVICE_NAME",
-    SERVICE_VERSION: "SERVICE_VERSION",
-    DEPLOYMENT_ENVIRONMENT: "DEPLOYMENT_ENVIRONMENT",
-    TRACES_ENDPOINT: "TRACES_ENDPOINT",
-    METRICS_ENDPOINT: "METRICS_ENDPOINT",
-    LOGS_ENDPOINT: "LOGS_ENDPOINT",
-    METRIC_READER_INTERVAL: "METRIC_READER_INTERVAL",
-    SUMMARY_LOG_INTERVAL: "SUMMARY_LOG_INTERVAL",
   },
 };
 
@@ -50,17 +40,6 @@ const defaultConfig: Config = {
     COUCHBASE_BUCKET: "default",
     COUCHBASE_SCOPE: "_default",
     COUCHBASE_COLLECTION: "_default",
-  },
-  openTelemetry: {
-    ENABLE_OPENTELEMETRY: true,
-    SERVICE_NAME: "CapellaQL Service",
-    SERVICE_VERSION: "2.0",
-    DEPLOYMENT_ENVIRONMENT: "development",
-    TRACES_ENDPOINT: "http://localhost:4318/v1/traces",
-    METRICS_ENDPOINT: "http://localhost:4318/v1/metrics",
-    LOGS_ENDPOINT: "http://localhost:4318/v1/logs",
-    METRIC_READER_INTERVAL: 60000,
-    SUMMARY_LOG_INTERVAL: 300000,
   },
 };
 
@@ -93,18 +72,6 @@ function loadConfigFromEnv(): Partial<Config> {
     COUCHBASE_COLLECTION: parseEnvVar(Bun.env[envVarMapping.capella.COUCHBASE_COLLECTION], "string") as string || defaultConfig.capella.COUCHBASE_COLLECTION,
   };
 
-  config.openTelemetry = {
-    ENABLE_OPENTELEMETRY: parseEnvVar(Bun.env[envVarMapping.openTelemetry.ENABLE_OPENTELEMETRY], "boolean") as boolean ?? defaultConfig.openTelemetry.ENABLE_OPENTELEMETRY,
-    SERVICE_NAME: parseEnvVar(Bun.env[envVarMapping.openTelemetry.SERVICE_NAME], "string") as string || defaultConfig.openTelemetry.SERVICE_NAME,
-    SERVICE_VERSION: parseEnvVar(Bun.env[envVarMapping.openTelemetry.SERVICE_VERSION], "string") as string || defaultConfig.openTelemetry.SERVICE_VERSION,
-    DEPLOYMENT_ENVIRONMENT: parseEnvVar(Bun.env[envVarMapping.openTelemetry.DEPLOYMENT_ENVIRONMENT], "string") as string || defaultConfig.openTelemetry.DEPLOYMENT_ENVIRONMENT,
-    TRACES_ENDPOINT: parseEnvVar(Bun.env[envVarMapping.openTelemetry.TRACES_ENDPOINT], "string") as string || defaultConfig.openTelemetry.TRACES_ENDPOINT,
-    METRICS_ENDPOINT: parseEnvVar(Bun.env[envVarMapping.openTelemetry.METRICS_ENDPOINT], "string") as string || defaultConfig.openTelemetry.METRICS_ENDPOINT,
-    LOGS_ENDPOINT: parseEnvVar(Bun.env[envVarMapping.openTelemetry.LOGS_ENDPOINT], "string") as string || defaultConfig.openTelemetry.LOGS_ENDPOINT,
-    METRIC_READER_INTERVAL: parseEnvVar(Bun.env[envVarMapping.openTelemetry.METRIC_READER_INTERVAL], "number") as number || defaultConfig.openTelemetry.METRIC_READER_INTERVAL,
-    SUMMARY_LOG_INTERVAL: parseEnvVar(Bun.env[envVarMapping.openTelemetry.SUMMARY_LOG_INTERVAL], "number") as number || defaultConfig.openTelemetry.SUMMARY_LOG_INTERVAL,
-  };
-
   return config;
 }
 
@@ -115,11 +82,10 @@ try {
   const mergedConfig = {
     application: { ...defaultConfig.application, ...envConfig.application },
     capella: { ...defaultConfig.capella, ...envConfig.capella },
-    openTelemetry: { ...defaultConfig.openTelemetry, ...envConfig.openTelemetry },
   };
 
   config = ConfigSchema.parse(mergedConfig);
-  process.stderr.write("Configuration loaded successfully: " + JSON.stringify({
+  process.stderr.write("Application configuration loaded successfully: " + JSON.stringify({
     application: {
       LOG_LEVEL: config.application.LOG_LEVEL,
       PORT: config.application.PORT,
@@ -129,12 +95,8 @@ try {
       COUCHBASE_URL: config.capella.COUCHBASE_URL,
       COUCHBASE_BUCKET: config.capella.COUCHBASE_BUCKET,
     },
-    openTelemetry: {
-      ENABLE_OPENTELEMETRY: config.openTelemetry.ENABLE_OPENTELEMETRY,
-      SERVICE_NAME: config.openTelemetry.SERVICE_NAME,
-      DEPLOYMENT_ENVIRONMENT: config.openTelemetry.DEPLOYMENT_ENVIRONMENT,
-    },
   }, null, 2) + "\n");
+  process.stderr.write("Note: OpenTelemetry configuration is handled separately by telemetry module\n");
 } catch (error) {
   process.stderr.write("Configuration validation failed: " + (error instanceof Error ? error.message : String(error)) + "\n");
   throw new Error("Invalid configuration: " + (error instanceof Error ? error.message : String(error)));

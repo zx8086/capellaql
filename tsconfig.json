@@ -41,7 +41,9 @@
       "$utils/*": ["src/utils/*"],
       "$models": ["src/models/index"],
       "$models/*": ["src/models/*"],
-      "$config": ["src/config"]
+      "$config": ["src/config"],
+      "$telemetry": ["src/telemetry/index"],
+      "$telemetry/*": ["src/telemetry/*"]
     },
 
     // Some stricter flags

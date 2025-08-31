@@ -1,119 +1,24 @@
 /* src/utils/logger.ts */
 
-import winston from "winston";
-import { ecsFormat } from "@elastic/ecs-winston-format";
-import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
-import { config } from "$config";
-import { trace, context, type SpanContext } from "@opentelemetry/api";
+// DEPRECATED: This file is deprecated. Use ../telemetry/logger.ts instead.
+// Re-exporting for backward compatibility.
 
-const customFormat = winston.format.combine(
-  ecsFormat({ convertReqRes: true, apmIntegration: true }),
-  winston.format((info) => {
-    const {
-      "@timestamp": timestamp,
-      "ecs.version": ecsVersion,
-      level,
-      message,
-      ...rest
-    } = info;
-    return {
-      "@timestamp": timestamp,
-      "ecs.version": ecsVersion,
-      level,
-      log: { level },
-      message,
-      trace: {
-        id: (info["trace"] as any)?.id || "",
-        span: { id: (info["trace"]?.["span"] as any)?.id || "" },
-      },
-      ...rest,
-    };
-  })(),
-);
+import { log as telemetryLog, err as telemetryErr, warn as telemetryWarn, debug as telemetryDebug } from '../telemetry/logger';
 
-export const logger = winston.createLogger({
-  level: config.application.LOG_LEVEL,
-  format: customFormat,
-  transports: [
-    // new winston.transports.Console(),
-    new OpenTelemetryTransportV3({
-      level: config.application.LOG_LEVEL,
-    }),
-  ],
-});
+console.warn("DEPRECATED: src/utils/logger.ts is deprecated. Use ../telemetry module instead.");
 
 export function log(message: string, meta?: any): void {
-  const ctx = context.active();
-  const span = trace.getSpan(ctx);
-  const spanContext: SpanContext | undefined = span?.spanContext();
-
-  const logData = {
-    message,
-    meta,
-    trace: spanContext
-      ? {
-          id: spanContext.traceId,
-          span: { id: spanContext.spanId },
-        }
-      : undefined,
-  };
-
-  logger.info(logData);
+  telemetryLog(message, meta);
 }
 
 export function err(message: string, meta?: any): void {
-  const ctx = context.active();
-  const span = trace.getSpan(ctx);
-  const spanContext: SpanContext | undefined = span?.spanContext();
-
-  const logData = {
-    message,
-    meta,
-    trace: spanContext
-      ? {
-          id: spanContext.traceId,
-          span: { id: spanContext.spanId },
-        }
-      : undefined,
-  };
-
-  logger.error(logData);
+  telemetryErr(message, meta, meta);
 }
 
 export function warn(message: string, meta?: any): void {
-  const ctx = context.active();
-  const span = trace.getSpan(ctx);
-  const spanContext: SpanContext | undefined = span?.spanContext();
-
-  const logData = {
-    message,
-    meta,
-    trace: spanContext
-      ? {
-          id: spanContext.traceId,
-          span: { id: spanContext.spanId },
-        }
-      : undefined,
-  };
-
-  logger.warn(logData);
+  telemetryWarn(message, meta);
 }
 
 export function debug(message: string, meta?: any): void {
-  const ctx = context.active();
-  const span = trace.getSpan(ctx);
-  const spanContext: SpanContext | undefined = span?.spanContext();
-
-  const logData = {
-    message,
-    meta,
-    trace: spanContext
-      ? {
-          id: spanContext.traceId,
-          span: { id: spanContext.spanId },
-        }
-      : undefined,
-  };
-
-  logger.debug(logData);
+  telemetryDebug(message, meta);
 }

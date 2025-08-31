@@ -1,6 +1,6 @@
 /* src/lib/clusterProvider.ts */
 
-import { log, err } from "$utils/logger";
+import { log, error as err } from "../telemetry/logger";
 import { clusterConn, type capellaConn } from "./couchbaseConnector";
 
 let connection: capellaConn | null = null;

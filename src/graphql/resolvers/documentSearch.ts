@@ -1,6 +1,6 @@
 /* src/graphql/resolvers/documentSearch.ts */
 
-import { log, err } from "$utils/logger";
+import { log, err, createCouchbaseSearchSpan } from "../../telemetry";
 import { getCluster } from "$lib/clusterProvider";
 
 interface SearchResult {
@@ -21,103 +21,105 @@ const documentSearch = {
         keys: string[];
       },
     ): Promise<SearchResult[]> => {
-      try {
-        const { collections, keys } = args;
-        const connection = await getCluster();
+      const { collections, keys } = args;
+      
+      return await createCouchbaseSearchSpan(collections, keys, async () => {
+        try {
+          const connection = await getCluster();
+          const results: SearchResult[] = [];
 
-        const results: SearchResult[] = [];
+          for (const key of keys) {
+            for (const { bucket, scope, collection } of collections) {
+              const start = Date.now();
 
-        for (const key of keys) {
-          for (const { bucket, scope, collection } of collections) {
-            const start = Date.now();
+              if (!key.trim()) {
+                log(`Skipping empty key for ${bucket}.${scope}.${collection}`);
+                results.push({
+                  bucket,
+                  scope,
+                  collection,
+                  data: null,
+                  timeTaken: 0,
+                });
+                continue;
+              }
 
-            if (!key.trim()) {
-              log(`Skipping empty key for ${bucket}.${scope}.${collection}`);
-              results.push({
+              log("Fetching document using K/V operation", {
                 bucket,
                 scope,
                 collection,
-                data: null,
-                timeTaken: 0,
-              });
-              continue;
-            }
-
-            log("Fetching document using K/V operation", {
-              bucket,
-              scope,
-              collection,
-              key,
-            });
-
-            try {
-              const collectionRef = connection.collection(
-                bucket,
-                scope,
-                collection,
-              );
-              const result = await collectionRef.get(key);
-              const timeTaken = Date.now() - start;
-
-              results.push({
-                bucket,
-                scope,
-                collection,
-                data: { id: key, ...result.content },
-                timeTaken,
+                key,
               });
 
-              log(
-                `Time taken to fetch document from ${bucket}.${scope}.${collection}: ${timeTaken}ms`,
-              );
-            } catch (error) {
-              if (error instanceof connection.errors.DocumentNotFoundError) {
+              try {
+                const collectionRef = connection.collection(
+                  bucket,
+                  scope,
+                  collection,
+                );
+                const result = await collectionRef.get(key);
+                const timeTaken = Date.now() - start;
+
+                results.push({
+                  bucket,
+                  scope,
+                  collection,
+                  data: { id: key, ...result.content },
+                  timeTaken,
+                });
+
                 log(
-                  `Document with key ${key} not found in ${bucket}.${scope}.${collection}`,
+                  `Time taken to fetch document from ${bucket}.${scope}.${collection}: ${timeTaken}ms`,
                 );
-                results.push({
-                  bucket,
-                  scope,
-                  collection,
-                  data: null,
-                  timeTaken: Date.now() - start,
-                });
-              } else if (error instanceof connection.errors.CouchbaseError) {
-                err(
-                  `Couchbase error fetching document with key ${key} from ${bucket}.${scope}.${collection}:`,
-                  error,
-                );
-                results.push({
-                  bucket,
-                  scope,
-                  collection,
-                  data: null,
-                  timeTaken: Date.now() - start,
-                  error: error.message,
-                });
-              } else {
-                err(
-                  `Unexpected error fetching document with key ${key} from ${bucket}.${scope}.${collection}:`,
-                  error,
-                );
-                results.push({
-                  bucket,
-                  scope,
-                  collection,
-                  data: null,
-                  timeTaken: Date.now() - start,
-                  error: "Unexpected error occurred",
-                });
+              } catch (error) {
+                if (error instanceof connection.errors.DocumentNotFoundError) {
+                  log(
+                    `Document with key ${key} not found in ${bucket}.${scope}.${collection}`,
+                  );
+                  results.push({
+                    bucket,
+                    scope,
+                    collection,
+                    data: null,
+                    timeTaken: Date.now() - start,
+                  });
+                } else if (error instanceof connection.errors.CouchbaseError) {
+                  err(
+                    `Couchbase error fetching document with key ${key} from ${bucket}.${scope}.${collection}:`,
+                    error,
+                  );
+                  results.push({
+                    bucket,
+                    scope,
+                    collection,
+                    data: null,
+                    timeTaken: Date.now() - start,
+                    error: error.message,
+                  });
+                } else {
+                  err(
+                    `Unexpected error fetching document with key ${key} from ${bucket}.${scope}.${collection}:`,
+                    error,
+                  );
+                  results.push({
+                    bucket,
+                    scope,
+                    collection,
+                    data: null,
+                    timeTaken: Date.now() - start,
+                    error: "Unexpected error occurred",
+                  });
+                }
               }
             }
           }
-        }
 
-        return results;
-      } catch (error) {
-        err("Error:", error);
-        throw error;
-      }
+          return results;
+        } catch (error) {
+          err("Error in document search:", error);
+          throw error;
+        }
+      });
     },
   },
 };

@@ -1,7 +1,15 @@
 /* src/index.ts */
 
 import { Elysia } from "elysia";
-import { log, err } from "$utils/logger";
+import { 
+  log, 
+  err, 
+  initializeHttpMetrics,
+  recordHttpRequest,
+  recordHttpResponseTime,
+  getTelemetryHealth
+} from "./telemetry";
+import { metrics } from "@opentelemetry/api";
 
 import config from "./config";
 import { cors } from "@elysiajs/cors";
@@ -11,11 +19,6 @@ import resolvers from "./graphql/resolvers";
 // import { useResponseCache } from "@graphql-yoga/plugin-response-cache";
 import * as path from "path";
 import { fileURLToPath } from "url";
-import {
-  initializeHttpMetrics,
-  recordHttpRequest,
-  recordHttpResponseTime,
-} from "./instrumentation";
 import { ulid } from "ulid";
 import { isIP } from "net";
 import { context as otelContext, trace } from "@opentelemetry/api";
@@ -53,11 +56,24 @@ const SERVER_PORT = config.application["PORT"];
 //   : (config.application.ALLOWED_ORIGINS as string).split(',').map(origin => origin.trim());
 
 // console.log("Parsed ALLOWED_ORIGINS:", ALLOWED_ORIGINS);
-const IS_DEVELOPMENT =
-  config.openTelemetry.DEPLOYMENT_ENVIRONMENT === "development";
+const IS_DEVELOPMENT = 
+  process.env.DEPLOYMENT_ENVIRONMENT === "development" || process.env.NODE_ENV === "development";
 
 const RATE_LIMIT = 500;
 const RATE_LIMIT_WINDOW = 60 * 1000;
+
+// Create custom metrics for testing
+const meter = metrics.getMeter('capellaql-custom-metrics', '1.0.0');
+const requestCounter = meter.createCounter('custom_requests_total', {
+  description: 'Total number of requests processed',
+});
+const responseHistogram = meter.createHistogram('custom_response_duration', {
+  description: 'Response duration in milliseconds',
+  unit: 'ms'
+});
+const activeConnections = meter.createUpDownCounter('custom_active_connections', {
+  description: 'Number of active connections',
+});
 
 const rateLimitStore = new Map<string, { count: number; timestamp: number }>();
 
@@ -155,22 +171,32 @@ const createYogaOptions = () => ({
   ],
 });
 
-const healthCheck = new Elysia().get("/health", async () => {
-  log("Health check called");
+const healthCheck = new Elysia()
+  .get("/health", async () => {
+    log("Health check called");
 
-  // Example: Check database connection
-  // const isDatabaseConnected = await checkDatabaseConnection();
+    return {
+      status: "HEALTHY",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      version: "2.0.0",
+    };
+  })
+  .get("/health/telemetry", async () => {
+    log("Telemetry health check called");
 
-  // Example: Check external service
-  // const isExternalServiceAvailable = await checkExternalService();
-
-  // You can return a more detailed health status if needed
-  return {
-    status: "HEALTHY",
-    // database: isDatabaseConnected ? "Connected" : "Disconnected",
-    // externalService: isExternalServiceAvailable ? "Available" : "Unavailable",
-  };
-});
+    try {
+      const telemetryHealth = getTelemetryHealth();
+      return telemetryHealth;
+    } catch (error) {
+      err("Failed to get telemetry health", error);
+      return {
+        status: "unhealthy",
+        error: error instanceof Error ? error.message : String(error),
+        timestamp: Date.now(),
+      };
+    }
+  });
 
 const getClientIp = (request: Request): string => {
   const forwardedFor = request.headers.get("x-forwarded-for");
@@ -203,7 +229,6 @@ const getClientIp = (request: Request): string => {
 
 const app = new Elysia()
   .onStart(() => {
-    log("The server has started!");
     initializeHttpMetrics();
   })
   .use(
@@ -235,6 +260,14 @@ const app = new Elysia()
   })
   .onRequest(async (context) => {
     context.set.headers["Access-Control-Allow-Origin"] = "*";
+    
+    // Record custom metrics
+    requestCounter.add(1, { 
+      method: context.request.method,
+      path: new URL(context.request.url).pathname 
+    });
+    activeConnections.add(1);
+    
     log("Incoming request");
     log("Method:", context.request.method);
     log("Origin:", context.request.headers.get("origin"));
@@ -358,6 +391,13 @@ const app = new Elysia()
     const duration = endTime - startTime;
     recordHttpResponseTime(duration);
 
+    // Record custom metrics
+    responseHistogram.record(duration, {
+      method: context.request.method,
+      status_code: context.set.status?.toString() || '200'
+    });
+    activeConnections.add(-1); // Decrement active connections
+
     log("Outgoing response", {
       requestId: context.set.headers["X-Request-ID"],
       method: context.request.method,
@@ -368,7 +408,38 @@ const app = new Elysia()
   });
 
 const server = app.listen(SERVER_PORT);
-log(`GraphQL server running on port:${SERVER_PORT}`);
+
+// Show clear startup information
+const baseUrl = config.application.BASE_URL || "http://localhost";
+const graphqlUrl = `${baseUrl}:${SERVER_PORT}/graphql`;
+const healthUrl = `${baseUrl}:${SERVER_PORT}/health`;
+const telemetryHealthUrl = `${baseUrl}:${SERVER_PORT}/health/telemetry`;
+
+// Get OpenTelemetry endpoints from environment
+const tracesEndpoint = process.env.TRACES_ENDPOINT || "not configured";
+const metricsEndpoint = process.env.METRICS_ENDPOINT || "not configured";
+const logsEndpoint = process.env.LOGS_ENDPOINT || "not configured";
+const otelEnabled = process.env.ENABLE_OPENTELEMETRY === "true";
+
+console.log(`
+🚀 CapellaQL Server started successfully!
+
+📍 Server Information:
+   • Port: ${SERVER_PORT}
+   • Environment: ${process.env.DEPLOYMENT_ENVIRONMENT || "development"}
+   • GraphQL Playground: ${graphqlUrl}
+   • Health Check: ${healthUrl}
+   • Telemetry Health: ${telemetryHealthUrl}
+
+📊 OpenTelemetry Configuration:
+   • Status: ${otelEnabled ? "✅ Enabled" : "❌ Disabled"}
+   • Traces Endpoint: ${tracesEndpoint}
+   • Metrics Endpoint: ${metricsEndpoint}
+   • Logs Endpoint: ${logsEndpoint}
+   • Sampling Rate: ${process.env.SAMPLING_RATE || "0.15"} (${((parseFloat(process.env.SAMPLING_RATE || "0.15") * 100).toFixed(0))}%)
+
+🎯 Ready to accept requests!
+`);
 
 const gracefulShutdown = async (signal: string) => {
   log(`Received ${signal}. Starting graceful shutdown...`);
