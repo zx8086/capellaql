@@ -1,15 +1,10 @@
-/* src/utils/bunUtils.ts - Bun-specific utilities and optimizations */
+// Bun-specific utilities and optimizations
 
 import { promises as fs } from "fs";
 import config from "$config";
 
-/**
- * Bun-native sleep utility - replaces setTimeout Promise wrappers
- * Much cleaner and more performant than Promise + setTimeout patterns
- */
 export async function sleep(ms: number): Promise<void> {
   if (typeof Bun !== "undefined") {
-    // Use Bun's native sleep for optimal performance
     return Bun.sleep(ms);
   }
 
@@ -17,15 +12,8 @@ export async function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Bun-native file operations with enhanced error handling
- * Uses Bun.file() for better performance than fs operations
- */
-export class BunFile {
-  /**
-   * Read file using Bun.file() API for optimal performance
-   */
-  static async read(path: string): Promise<string> {
+export namespace BunFile {
+  export async function read(path: string): Promise<string> {
     if (typeof Bun !== "undefined") {
       try {
         const file = Bun.file(path);
@@ -39,10 +27,7 @@ export class BunFile {
     return fs.readFile(path, "utf8");
   }
 
-  /**
-   * Write file using Bun.write() for better performance
-   */
-  static async write(path: string, content: string): Promise<void> {
+  export async function write(path: string, content: string): Promise<void> {
     if (typeof Bun !== "undefined") {
       try {
         await Bun.write(path, content);
@@ -56,10 +41,7 @@ export class BunFile {
     return fs.writeFile(path, content, "utf8");
   }
 
-  /**
-   * Check if file exists using Bun.file().exists()
-   */
-  static async exists(path: string): Promise<boolean> {
+  export async function exists(path: string): Promise<boolean> {
     if (typeof Bun !== "undefined") {
       try {
         const file = Bun.file(path);
@@ -78,10 +60,7 @@ export class BunFile {
     }
   }
 
-  /**
-   * Get file size using Bun.file().size
-   */
-  static async size(path: string): Promise<number> {
+  export async function size(path: string): Promise<number> {
     if (typeof Bun !== "undefined") {
       const file = Bun.file(path);
       return file.size;
@@ -92,10 +71,7 @@ export class BunFile {
   }
 }
 
-/**
- * Retry pattern with exponential backoff using Bun.sleep()
- * Much cleaner implementation than setTimeout-based patterns
- */
+// Retry with exponential backoff
 export async function retryWithBackoff<T>(
   operation: () => Promise<T>,
   maxRetries = 3,
@@ -121,10 +97,7 @@ export async function retryWithBackoff<T>(
   throw new Error("Should never reach here");
 }
 
-/**
- * Circuit breaker pattern with Bun.sleep() integration
- * Provides reliable failure handling for external services
- */
+// Circuit breaker for external services
 export class CircuitBreaker {
   private failures = 0;
   private lastFailureTime = 0;
@@ -132,7 +105,7 @@ export class CircuitBreaker {
 
   constructor(
     private threshold = 5,
-    private timeout = 60000,
+    _timeout = 60000,
     private resetTimeout = 30000
   ) {}
 
@@ -179,15 +152,8 @@ export class CircuitBreaker {
   }
 }
 
-/**
- * Process spawning utilities using Bun.spawn() when available
- * Provides better process management than child_process
- */
-export class BunProcess {
-  /**
-   * Spawn process using Bun.spawn() for better performance
-   */
-  static async spawn(
+export namespace BunProcess {
+  export async function spawn(
     command: string[],
     options: {
       cwd?: string;
@@ -255,34 +221,22 @@ export class BunProcess {
   }
 }
 
-/**
- * Environment utilities optimized for Bun
- */
-export class BunEnv {
-  /**
-   * Get environment variable with Bun.env priority
-   */
-  static get(key: string): string | undefined {
+export namespace BunEnv {
+  export function get(key: string): string | undefined {
     if (typeof Bun !== "undefined") {
       return Bun.env[key];
     }
     return process.env[key];
   }
 
-  /**
-   * Check if running in Bun runtime
-   */
-  static isBun(): boolean {
+  export function isBun(): boolean {
     return typeof Bun !== "undefined";
   }
 
-  /**
-   * Get runtime information
-   */
-  static getRuntimeInfo() {
+  export function getRuntimeInfo() {
     if (typeof Bun !== "undefined") {
       return {
-        runtime: "bun",
+        runtime: "bun" as const,
         version: Bun.version,
         platform: process.platform,
         arch: process.arch,
@@ -290,7 +244,7 @@ export class BunEnv {
     }
 
     return {
-      runtime: "node",
+      runtime: "node" as const,
       version: process.version,
       platform: process.platform,
       arch: process.arch,
@@ -298,14 +252,11 @@ export class BunEnv {
   }
 }
 
-/**
- * Performance measurement utilities using Bun.nanoseconds()
- */
-export class BunPerf {
-  /**
-   * Measure execution time with high precision
-   */
-  static async measure<T>(operation: () => Promise<T>, label?: string): Promise<{ result: T; duration: number }> {
+export namespace BunPerf {
+  export async function measure<T>(
+    operation: () => Promise<T>,
+    label?: string
+  ): Promise<{ result: T; duration: number }> {
     const start = typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
 
     try {
@@ -330,10 +281,7 @@ export class BunPerf {
     }
   }
 
-  /**
-   * Create a performance timer
-   */
-  static createTimer(label: string) {
+  export function createTimer(label: string) {
     const start = typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
 
     return {
@@ -347,9 +295,6 @@ export class BunPerf {
   }
 }
 
-/**
- * Healthcheck utilities for monitoring
- */
 export async function createHealthcheck(): Promise<{
   status: string;
   timestamp: string;
@@ -374,9 +319,6 @@ export async function createHealthcheck(): Promise<{
   };
 }
 
-/**
- * Export all utilities as default object for easy importing
- */
 export default {
   sleep,
   BunFile,

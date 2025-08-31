@@ -40,7 +40,7 @@ export default function () {
       try {
         const body = JSON.parse(r.body);
         return body.status === "healthy" || body.status === "ok";
-      } catch (e) {
+      } catch (_e) {
         return false;
       }
     },

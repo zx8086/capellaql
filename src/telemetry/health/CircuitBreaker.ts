@@ -147,8 +147,4 @@ export class TelemetryCircuitBreaker {
   private resetFailures(): void {
     this.failures = 0;
   }
-
-  private isWithinTimeWindow(timestamp: number): boolean {
-    return Date.now() - timestamp <= this.config.timeWindowMs;
-  }
 }

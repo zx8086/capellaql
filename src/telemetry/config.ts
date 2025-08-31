@@ -153,7 +153,7 @@ function validateBusinessRules(config: TelemetryConfig): void {
     if (tracesUrl.host !== metricsUrl.host || tracesUrl.host !== logsUrl.host) {
       console.warn("Telemetry endpoints use different hosts - consider using the same OTLP collector");
     }
-  } catch (error) {
+  } catch (_error) {
     // URL parsing already validated by Zod, this is just for warnings
   }
 }
@@ -161,12 +161,12 @@ function validateBusinessRules(config: TelemetryConfig): void {
 // Remove this function - use unified config from $config instead
 // export function loadTelemetryConfigFromEnv(): TelemetryConfig { ... }
 
-function parseEnvBoolean(value: string | undefined): boolean | undefined {
+function _parseEnvBoolean(value: string | undefined): boolean | undefined {
   if (value === undefined) return undefined;
   return ["true", "1", "yes", "on"].includes(value.toLowerCase());
 }
 
-function parseEnvNumber(value: string | undefined): number | undefined {
+function _parseEnvNumber(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? undefined : parsed;

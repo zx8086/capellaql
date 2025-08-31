@@ -1,6 +1,6 @@
 /* test/k6/graphql-endpoints.js */
 
-import { check, sleep } from "k6";
+import { check } from "k6";
 import http from "k6/http";
 import { Counter } from "k6/metrics";
 
@@ -150,7 +150,7 @@ export function runLooksSummaryScenario() {
       try {
         JSON.parse(r.body);
         return true;
-      } catch (e) {
+      } catch (_e) {
         console.error(`Invalid JSON response for looksSummary: ${r.body}`);
         return false;
       }
@@ -159,7 +159,7 @@ export function runLooksSummaryScenario() {
       try {
         const jsonResponse = JSON.parse(r.body);
         return !jsonResponse.errors;
-      } catch (e) {
+      } catch (_e) {
         return false;
       }
     },
@@ -167,7 +167,7 @@ export function runLooksSummaryScenario() {
       try {
         const jsonResponse = JSON.parse(r.body);
         return jsonResponse.data && jsonResponse.data.looksSummary !== null;
-      } catch (e) {
+      } catch (_e) {
         return false;
       }
     },
@@ -205,7 +205,7 @@ export function runSeasonalAssignmentsScenario() {
       try {
         JSON.parse(r.body);
         return true;
-      } catch (e) {
+      } catch (_e) {
         console.error(`Invalid JSON response for getAllSeasonalAssignments: ${r.body}`);
         return false;
       }
@@ -214,7 +214,7 @@ export function runSeasonalAssignmentsScenario() {
       try {
         const jsonResponse = JSON.parse(r.body);
         return !jsonResponse.errors;
-      } catch (e) {
+      } catch (_e) {
         return false;
       }
     },
@@ -222,7 +222,7 @@ export function runSeasonalAssignmentsScenario() {
       try {
         const jsonResponse = JSON.parse(r.body);
         return jsonResponse.data && jsonResponse.data.getAllSeasonalAssignments !== null;
-      } catch (e) {
+      } catch (_e) {
         return false;
       }
     },
@@ -261,7 +261,7 @@ export function runImageUrlCheckScenario() {
       try {
         JSON.parse(r.body);
         return true;
-      } catch (e) {
+      } catch (_e) {
         console.error(`Invalid JSON response for getImageUrlCheck: ${r.body}`);
         return false;
       }
@@ -270,7 +270,7 @@ export function runImageUrlCheckScenario() {
       try {
         const jsonResponse = JSON.parse(r.body);
         return !jsonResponse.errors;
-      } catch (e) {
+      } catch (_e) {
         return false;
       }
     },
@@ -278,7 +278,7 @@ export function runImageUrlCheckScenario() {
       try {
         const jsonResponse = JSON.parse(r.body);
         return jsonResponse.data && jsonResponse.data.getImageUrlCheck !== null;
-      } catch (e) {
+      } catch (_e) {
         return false;
       }
     },

@@ -15,7 +15,7 @@ import {
 } from "couchbase";
 import config from "$config";
 import { CircuitBreaker, retryWithBackoff } from "$utils/bunUtils";
-import { error as err, log } from "../telemetry/logger";
+import { log } from "../telemetry/logger";
 
 interface QueryableCluster extends Cluster {
   query<TRow = any>(

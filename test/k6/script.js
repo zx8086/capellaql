@@ -3,7 +3,6 @@
 /* K6_WEB_DASHBOARD=true ./k6 run script.js -o output-elasticsearch */
 
 import { check, group, sleep } from "k6";
-import exec from "k6/execution";
 import http from "k6/http";
 
 export const options = {

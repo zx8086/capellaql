@@ -19,7 +19,9 @@ const missingVars = requiredEnvVars.filter((envVar) => !Bun.env[envVar]);
 
 if (missingVars.length > 0) {
   console.error("❌ Missing required environment variables:");
-  missingVars.forEach((envVar) => console.error(`   • ${envVar}`));
+  for (const envVar of missingVars) {
+    console.error(`   • ${envVar}`);
+  }
   console.log("\n💡 Copy .env.example to .env and configure your settings");
   console.log("🔗 Check CLAUDE.md for configuration details\n");
   process.exit(1);
@@ -67,7 +69,7 @@ async function checkHealth() {
       console.warn(`⚠️ Health check failed: ${response.status}`);
       return false;
     }
-  } catch (error) {
+  } catch (_error) {
     if (serverReady) {
       console.log("⏳ Server restarting...");
       serverReady = false;

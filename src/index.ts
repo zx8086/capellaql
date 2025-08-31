@@ -27,27 +27,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 declare global {
-  var globalThis: {
+  var global: {
     [key: string]: any;
-  };
+  } & typeof globalThis;
 }
 
 // Initialize global paths from unified configuration
-if (typeof globalThis["CN_ROOT"] === "undefined") {
-  globalThis["CN_ROOT"] = config.runtime.CN_ROOT || path.resolve(__dirname, "..");
+if (typeof globalThis.CN_ROOT === "undefined") {
+  globalThis.CN_ROOT = config.runtime.CN_ROOT || path.resolve(__dirname, "..");
 }
 
-if (typeof globalThis["CN_CXXCBC_CACHE_DIR"] === "undefined") {
-  globalThis["CN_CXXCBC_CACHE_DIR"] =
-    config.runtime.CN_CXXCBC_CACHE_DIR || path.join(globalThis["CN_ROOT"], "deps", "couchbase-cxx-cache");
+if (typeof globalThis.CN_CXXCBC_CACHE_DIR === "undefined") {
+  globalThis.CN_CXXCBC_CACHE_DIR =
+    config.runtime.CN_CXXCBC_CACHE_DIR || path.join(globalThis.CN_ROOT, "deps", "couchbase-cxx-cache");
 }
 
-if (typeof globalThis["ENV_TRUE"] === "undefined") {
-  globalThis["ENV_TRUE"] = ["true", "1", "y", "yes", "on"];
+if (typeof globalThis.ENV_TRUE === "undefined") {
+  globalThis.ENV_TRUE = ["true", "1", "y", "yes", "on"];
 }
 
-const SERVER_PORT = config.application["PORT"];
-const YOGA_RESPONSE_CACHE_TTL = config.application["YOGA_RESPONSE_CACHE_TTL"];
+const SERVER_PORT = config.application.PORT;
+const YOGA_RESPONSE_CACHE_TTL = config.application.YOGA_RESPONSE_CACHE_TTL;
 const ALLOWED_ORIGINS = Array.isArray(config.application.ALLOWED_ORIGINS)
   ? config.application.ALLOWED_ORIGINS
   : (config.application.ALLOWED_ORIGINS as string).split(",").map((origin) => origin.trim());
@@ -115,33 +115,33 @@ const createYogaOptions = () => ({
     limit: 10,
   },
   plugins: [
-    // Response cache plugin (separate for better performance)
-    useResponseCache({
-      session: () => null,
-      ttl: YOGA_RESPONSE_CACHE_TTL,
-      // Custom cache key for better cache hit rates
-      buildResponseCacheKey: ({ params }) => {
-        return `${params.operationName || "unnamed"}:${JSON.stringify(params.variableValues || {})}`;
-      },
-    }),
+    // Response cache disabled due to params issues
+    // useResponseCache({
+    //   session: () => null,
+    //   ttl: YOGA_RESPONSE_CACHE_TTL,
+    //   buildResponseCacheKey: ({ params }) => {
+    //     if (!params) return "no-params";
+    //     return `${params.operationName || "unnamed"}:${JSON.stringify(params.variableValues || {})}`;
+    //   },
+    // }),
     // Lifecycle hooks plugin (separate)
     {
       onExecute: ({ args }) => {
         log("GraphQL Execute", {
-          operation: args["operationName"],
-          variables: args["variableValues"],
+          operation: args.operationName,
+          variables: args.variableValues,
         });
       },
       onSubscribe: ({ args }) => {
         log("GraphQL Subscribe", {
-          operation: args["operationName"],
-          variables: args["variableValues"],
+          operation: args.operationName,
+          variables: args.variableValues,
         });
       },
       onError: ({ error }) => {
         err("GraphQL Error", {
-          error: error["message"],
-          stack: error["stack"],
+          error: error.message,
+          stack: error.stack,
         });
       },
     },
@@ -274,17 +274,17 @@ const app = new Elysia()
       }
     },
 
-    open(ws) {
+    open(_ws) {
       log("WebSocket connection opened");
       activeConnections.add(1);
     },
 
-    close(ws, code, reason) {
+    close(_ws, code, reason) {
       log("WebSocket connection closed", { code, reason });
       activeConnections.add(-1);
     },
 
-    error(ws, error) {
+    error(_ws, error) {
       err("WebSocket error", error);
     },
   })

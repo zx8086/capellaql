@@ -37,16 +37,16 @@ export class SmartSampler implements Sampler {
   }
 
   shouldSample(
-    context: Context,
-    traceId: string,
+    _context: Context,
+    _traceId: string,
     spanName: string,
-    spanKind: SpanKind,
+    _spanKind: SpanKind,
     attributes: Attributes,
-    links: Link[]
+    _links: Link[]
   ): SamplingResult {
     // Always sample errors (100% error retention - 2025 standard)
     const httpStatusCode = attributes["http.status_code"];
-    const hasError = attributes["error"] === true;
+    const hasError = attributes.error === true;
 
     if (hasError || (httpStatusCode && Number(httpStatusCode) >= 400)) {
       return {

@@ -32,7 +32,7 @@ console.log(BASE_URL);
 export default function () {
   const res = http.get(`${BASE_URL}/health`);
   check(res, {
-    "status was 200": (r) => r.status == 200,
+    "status was 200": (r) => r.status === 200,
     "response time < 2000ms": (r) => r.timings.duration < 2000, // 95% of requests should be below 2000ms
   });
   sleep(1);

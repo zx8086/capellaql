@@ -25,7 +25,7 @@ import {
 import { type TelemetryConfig, telemetryConfig } from "$config";
 import { BunPerf } from "$utils/bunUtils";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
-import { error, log, telemetryLogger, warn } from "./logger";
+import { log, telemetryLogger, warn } from "./logger";
 import { SmartSampler } from "./sampling/SmartSampler";
 
 let sdk: NodeSDK | undefined;

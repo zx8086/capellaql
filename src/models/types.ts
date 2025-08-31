@@ -22,9 +22,6 @@ export interface CapellaConfig {
   COUCHBASE_COLLECTION: string;
 }
 
-/**
- * Runtime configuration - Environment and runtime settings
- */
 export interface RuntimeConfig {
   NODE_ENV: string;
   CN_ROOT: string;
@@ -34,9 +31,6 @@ export interface RuntimeConfig {
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: number;
 }
 
-/**
- * Deployment configuration - Service identification and deployment metadata
- */
 export interface DeploymentConfig {
   BASE_URL: string;
   HOSTNAME: string;
@@ -46,10 +40,6 @@ export interface DeploymentConfig {
   K8S_NAMESPACE?: string;
 }
 
-/**
- * Telemetry configuration - OpenTelemetry observability settings
- * Consolidated from src/telemetry/config.ts for unified configuration management
- */
 export interface TelemetryConfig {
   ENABLE_OPENTELEMETRY: boolean;
   SERVICE_NAME: string;
@@ -69,9 +59,6 @@ export interface TelemetryConfig {
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
 }
 
-/**
- * Unified configuration interface - All configuration sections consolidated
- */
 export interface Config {
   application: ApplicationConfig;
   capella: CapellaConfig;
@@ -93,9 +80,6 @@ const EnvArray = z.string().transform((val) =>
     .filter(Boolean)
 );
 
-/**
- * Application configuration schema - Core application settings
- */
 const ApplicationConfigSchema = z.object({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
   LOG_MAX_SIZE: z.string().default("20m"),
@@ -112,9 +96,6 @@ const ApplicationConfigSchema = z.object({
   BASE_URL: z.string().url("BASE_URL must be a valid URL").default("http://localhost"),
 });
 
-/**
- * Capella (Couchbase) configuration schema - Database connection settings
- */
 const CapellaConfigSchema = z.object({
   COUCHBASE_URL: z.string().url("Must be a valid Couchbase connection URL"),
   COUCHBASE_USERNAME: z.string().min(1, "Username cannot be empty"),
@@ -124,9 +105,6 @@ const CapellaConfigSchema = z.object({
   COUCHBASE_COLLECTION: z.string().min(1, "Collection name cannot be empty").default("_default"),
 });
 
-/**
- * Runtime configuration schema - Environment and system runtime settings
- */
 const RuntimeConfigSchema = z.object({
   NODE_ENV: z.enum(["development", "staging", "production", "test"]).default("development"),
   CN_ROOT: z.string().min(1).default("/usr/src/app"),
@@ -141,9 +119,6 @@ const RuntimeConfigSchema = z.object({
     .refine((val) => !Number.isNaN(val), "DNS TTL cannot be NaN"),
 });
 
-/**
- * Deployment configuration schema - Service identification and deployment metadata
- */
 const DeploymentConfigSchema = z.object({
   BASE_URL: z.string().url().default("http://localhost"),
   HOSTNAME: z.string().default("localhost"),
@@ -153,10 +128,7 @@ const DeploymentConfigSchema = z.object({
   K8S_NAMESPACE: z.string().optional(),
 });
 
-/**
- * Telemetry configuration schema - OpenTelemetry observability settings
- * 2025-compliant with strict validation for production deployment
- */
+// OpenTelemetry settings with 2025 compliance
 const TelemetryConfigSchema = z.object({
   ENABLE_OPENTELEMETRY: z.coerce.boolean().default(true),
   SERVICE_NAME: z.string().min(1, "SERVICE_NAME is required and cannot be empty").default("CapellaQL Service"),
@@ -210,10 +182,7 @@ const TelemetryConfigSchema = z.object({
     .default(60000), // 1 minute
 });
 
-/**
- * Unified configuration schema - Comprehensive validation for all configuration sections
- * Includes production security checks, runtime safety validations, and business rule enforcement
- */
+// Configuration schema with production security checks
 const ConfigSchema = z
   .object({
     application: ApplicationConfigSchema,
@@ -278,7 +247,7 @@ const ConfigSchema = z
     // RUNTIME SAFETY VALIDATIONS (All Environments)
 
     // Validate cache TTL is reasonable (not NaN or infinite)
-    if (isNaN(data.application.YOGA_RESPONSE_CACHE_TTL)) {
+    if (Number.isNaN(data.application.YOGA_RESPONSE_CACHE_TTL)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Cache TTL cannot be NaN - this would cause runtime errors",
@@ -287,7 +256,7 @@ const ConfigSchema = z
     }
 
     // Validate telemetry intervals are not NaN (prevents infinite loops)
-    if (isNaN(data.telemetry.METRIC_READER_INTERVAL)) {
+    if (Number.isNaN(data.telemetry.METRIC_READER_INTERVAL)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "METRIC_READER_INTERVAL is NaN - this will cause infinite loops",
@@ -295,7 +264,7 @@ const ConfigSchema = z
       });
     }
 
-    if (isNaN(data.telemetry.SUMMARY_LOG_INTERVAL)) {
+    if (Number.isNaN(data.telemetry.SUMMARY_LOG_INTERVAL)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "SUMMARY_LOG_INTERVAL is NaN - this will cause infinite loops",
@@ -327,7 +296,7 @@ const ConfigSchema = z
       if (tracesUrl.host !== metricsUrl.host || tracesUrl.host !== logsUrl.host) {
         console.warn("Telemetry endpoints use different hosts - consider using the same OTLP collector");
       }
-    } catch (error) {
+    } catch (_error) {
       // URL parsing already validated by schema, this is just for warnings
     }
 
@@ -337,156 +306,152 @@ const ConfigSchema = z
     }
   });
 
-/**
- * Configuration health checker for comprehensive runtime validation
- * Performs deep validation of all configuration sections for production readiness
- */
-export class ConfigHealthChecker {
-  static validate(config: Config): { healthy: boolean; issues: string[]; warnings: string[] } {
-    const issues: string[] = [];
-    const warnings: string[] = [];
+// Validates configuration for production readiness
+export function validateConfig(config: Config): { healthy: boolean; issues: string[]; warnings: string[] } {
+  const issues: string[] = [];
+  const warnings: string[] = [];
 
-    const isProduction =
-      config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+  const isProduction =
+    config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
-    // APPLICATION SECTION VALIDATION
+  // APPLICATION SECTION VALIDATION
 
-    // Check for NaN values that cause runtime issues
-    if (isNaN(config.application.YOGA_RESPONSE_CACHE_TTL)) {
-      issues.push("YOGA_RESPONSE_CACHE_TTL is NaN - will cause runtime errors");
-    }
-
-    // Check for reasonable timeout values
-    if (config.application.YOGA_RESPONSE_CACHE_TTL <= 0 || config.application.YOGA_RESPONSE_CACHE_TTL > 3600000) {
-      issues.push(`YOGA_RESPONSE_CACHE_TTL value is unreasonable: ${config.application.YOGA_RESPONSE_CACHE_TTL}ms`);
-    }
-
-    // CAPELLA SECTION VALIDATION
-
-    // Production-specific security checks
-    if (isProduction) {
-      if (config.capella.COUCHBASE_PASSWORD === "password") {
-        issues.push("CRITICAL: Using default password in production - security risk");
-      }
-
-      if (config.application.ALLOWED_ORIGINS.some((origin) => origin.includes("localhost"))) {
-        issues.push("Production CORS origins should not include localhost");
-      }
-
-      if (config.capella.COUCHBASE_USERNAME === "Administrator") {
-        warnings.push("Using default Administrator username in production is not recommended");
-      }
-    }
-
-    // RUNTIME SECTION VALIDATION
-
-    // Check DNS TTL is reasonable
-    if (isNaN(config.runtime.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS)) {
-      issues.push("BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS is NaN - will cause DNS caching issues");
-    }
-
-    if (config.runtime.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS > 3600) {
-      warnings.push("DNS TTL exceeds 1 hour - may cause stale DNS resolution");
-    }
-
-    // TELEMETRY SECTION VALIDATION
-
-    // Check for NaN values in telemetry intervals (prevents infinite loops)
-    if (isNaN(config.telemetry.METRIC_READER_INTERVAL)) {
-      issues.push("METRIC_READER_INTERVAL is NaN - will cause infinite loops");
-    }
-
-    if (isNaN(config.telemetry.SUMMARY_LOG_INTERVAL)) {
-      issues.push("SUMMARY_LOG_INTERVAL is NaN - will cause infinite loops");
-    }
-
-    // 2025 compliance validations
-    if (config.telemetry.EXPORT_TIMEOUT_MS > 30000) {
-      issues.push("EXPORT_TIMEOUT_MS exceeds 30 seconds - violates 2025 OpenTelemetry standards");
-    }
-
-    if (config.telemetry.BATCH_SIZE > 4096) {
-      warnings.push("BATCH_SIZE exceeds recommended 4096 - may impact memory usage");
-    }
-
-    if (config.telemetry.SAMPLING_RATE > 0.5 && isProduction) {
-      warnings.push("SAMPLING_RATE above 50% may impact production performance");
-    }
-
-    // DEPLOYMENT SECTION VALIDATION
-
-    // Check for missing deployment metadata in production
-    if (isProduction) {
-      if (config.deployment.HOSTNAME === "localhost") {
-        warnings.push("HOSTNAME is set to localhost in production - consider setting actual hostname");
-      }
-
-      if (config.deployment.INSTANCE_ID === "unknown") {
-        warnings.push("INSTANCE_ID is unknown in production - consider setting for better observability");
-      }
-    }
-
-    // CROSS-SECTION VALIDATIONS
-
-    // Environment consistency checks
-    if (config.runtime.NODE_ENV !== config.telemetry.DEPLOYMENT_ENVIRONMENT) {
-      warnings.push(
-        `Environment mismatch: NODE_ENV=${config.runtime.NODE_ENV} vs DEPLOYMENT_ENVIRONMENT=${config.telemetry.DEPLOYMENT_ENVIRONMENT}`
-      );
-    }
-
-    // URL consistency checks
-    try {
-      const baseUrl = new URL(config.application.BASE_URL);
-      const deploymentUrl = new URL(config.deployment.BASE_URL);
-
-      if (baseUrl.origin !== deploymentUrl.origin) {
-        warnings.push("BASE_URL mismatch between application and deployment sections");
-      }
-    } catch (error) {
-      // URL validation already handled by schema
-    }
-
-    return {
-      healthy: issues.length === 0,
-      issues,
-      warnings,
-    };
+  // Check for NaN values that cause runtime issues
+  if (Number.isNaN(config.application.YOGA_RESPONSE_CACHE_TTL)) {
+    issues.push("YOGA_RESPONSE_CACHE_TTL is NaN - will cause runtime errors");
   }
 
-  /**
-   * Generate a configuration health report for debugging
-   */
-  static generateHealthReport(config: Config): string {
-    const result = ConfigHealthChecker.validate(config);
-    const isProduction =
-      config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
-
-    let report = `\n=== CONFIGURATION HEALTH REPORT ===\n`;
-    report += `Environment: ${config.runtime.NODE_ENV} / ${config.telemetry.DEPLOYMENT_ENVIRONMENT}\n`;
-    report += `Production Mode: ${isProduction ? "YES" : "NO"}\n`;
-    report += `Overall Health: ${result.healthy ? "✅ HEALTHY" : "❌ UNHEALTHY"}\n\n`;
-
-    if (result.issues.length > 0) {
-      report += `CRITICAL ISSUES (${result.issues.length}):\n`;
-      result.issues.forEach((issue) => (report += `  ❌ ${issue}\n`));
-      report += `\n`;
-    }
-
-    if (result.warnings.length > 0) {
-      report += `WARNINGS (${result.warnings.length}):\n`;
-      result.warnings.forEach((warning) => (report += `  ⚠️  ${warning}\n`));
-      report += `\n`;
-    }
-
-    if (result.healthy && result.warnings.length === 0) {
-      report += `🎉 Configuration is fully optimized and ready for ${isProduction ? "production" : "development"}!\n`;
-    }
-
-    report += `=== END HEALTH REPORT ===\n`;
-
-    return report;
+  // Check for reasonable timeout values
+  if (config.application.YOGA_RESPONSE_CACHE_TTL <= 0 || config.application.YOGA_RESPONSE_CACHE_TTL > 3600000) {
+    issues.push(`YOGA_RESPONSE_CACHE_TTL value is unreasonable: ${config.application.YOGA_RESPONSE_CACHE_TTL}ms`);
   }
+
+  // CAPELLA SECTION VALIDATION
+
+  // Production-specific security checks
+  if (isProduction) {
+    if (config.capella.COUCHBASE_PASSWORD === "password") {
+      issues.push("CRITICAL: Using default password in production - security risk");
+    }
+
+    if (config.application.ALLOWED_ORIGINS.some((origin) => origin.includes("localhost"))) {
+      issues.push("Production CORS origins should not include localhost");
+    }
+
+    if (config.capella.COUCHBASE_USERNAME === "Administrator") {
+      warnings.push("Using default Administrator username in production is not recommended");
+    }
+  }
+
+  // RUNTIME SECTION VALIDATION
+
+  // Check DNS TTL is reasonable
+  if (Number.isNaN(config.runtime.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS)) {
+    issues.push("BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS is NaN - will cause DNS caching issues");
+  }
+
+  if (config.runtime.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS > 3600) {
+    warnings.push("DNS TTL exceeds 1 hour - may cause stale DNS resolution");
+  }
+
+  // TELEMETRY SECTION VALIDATION
+
+  // Check for NaN values in telemetry intervals (prevents infinite loops)
+  if (Number.isNaN(config.telemetry.METRIC_READER_INTERVAL)) {
+    issues.push("METRIC_READER_INTERVAL is NaN - will cause infinite loops");
+  }
+
+  if (Number.isNaN(config.telemetry.SUMMARY_LOG_INTERVAL)) {
+    issues.push("SUMMARY_LOG_INTERVAL is NaN - will cause infinite loops");
+  }
+
+  // 2025 compliance validations
+  if (config.telemetry.EXPORT_TIMEOUT_MS > 30000) {
+    issues.push("EXPORT_TIMEOUT_MS exceeds 30 seconds - violates 2025 OpenTelemetry standards");
+  }
+
+  if (config.telemetry.BATCH_SIZE > 4096) {
+    warnings.push("BATCH_SIZE exceeds recommended 4096 - may impact memory usage");
+  }
+
+  if (config.telemetry.SAMPLING_RATE > 0.5 && isProduction) {
+    warnings.push("SAMPLING_RATE above 50% may impact production performance");
+  }
+
+  // DEPLOYMENT SECTION VALIDATION
+
+  // Check for missing deployment metadata in production
+  if (isProduction) {
+    if (config.deployment.HOSTNAME === "localhost") {
+      warnings.push("HOSTNAME is set to localhost in production - consider setting actual hostname");
+    }
+
+    if (config.deployment.INSTANCE_ID === "unknown") {
+      warnings.push("INSTANCE_ID is unknown in production - consider setting for better observability");
+    }
+  }
+
+  // CROSS-SECTION VALIDATIONS
+
+  // Environment consistency checks
+  if (config.runtime.NODE_ENV !== config.telemetry.DEPLOYMENT_ENVIRONMENT) {
+    warnings.push(
+      `Environment mismatch: NODE_ENV=${config.runtime.NODE_ENV} vs DEPLOYMENT_ENVIRONMENT=${config.telemetry.DEPLOYMENT_ENVIRONMENT}`
+    );
+  }
+
+  // URL consistency checks
+  try {
+    const baseUrl = new URL(config.application.BASE_URL);
+    const deploymentUrl = new URL(config.deployment.BASE_URL);
+
+    if (baseUrl.origin !== deploymentUrl.origin) {
+      warnings.push("BASE_URL mismatch between application and deployment sections");
+    }
+  } catch (_error) {
+    // URL validation already handled by schema
+  }
+
+  return {
+    healthy: issues.length === 0,
+    issues,
+    warnings,
+  };
+}
+
+export function generateConfigHealthReport(config: Config): string {
+  const result = validateConfig(config);
+  const isProduction =
+    config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+
+  let report = `\n=== CONFIGURATION HEALTH REPORT ===\n`;
+  report += `Environment: ${config.runtime.NODE_ENV} / ${config.telemetry.DEPLOYMENT_ENVIRONMENT}\n`;
+  report += `Production Mode: ${isProduction ? "YES" : "NO"}\n`;
+  report += `Overall Health: ${result.healthy ? "✅ HEALTHY" : "❌ UNHEALTHY"}\n\n`;
+
+  if (result.issues.length > 0) {
+    report += `CRITICAL ISSUES (${result.issues.length}):\n`;
+    for (const issue of result.issues) {
+      report += `  ❌ ${issue}\n`;
+    }
+    report += `\n`;
+  }
+
+  if (result.warnings.length > 0) {
+    report += `WARNINGS (${result.warnings.length}):\n`;
+    for (const warning of result.warnings) {
+      report += `  ⚠️  ${warning}\n`;
+    }
+    report += `\n`;
+  }
+
+  if (result.healthy && result.warnings.length === 0) {
+    report += `🎉 Configuration is fully optimized and ready for ${isProduction ? "production" : "development"}!\n`;
+  }
+
+  report += `=== END HEALTH REPORT ===\n`;
+
+  return report;
 }
 
 // Type exports for external usage

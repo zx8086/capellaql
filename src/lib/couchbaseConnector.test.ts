@@ -1,6 +1,6 @@
 /* src/lib/couchbaseConnector.test.ts - Test Couchbase connection logic */
 
-import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 // Mock the couchbase module
 const mockConnect = mock(() =>
@@ -59,11 +59,11 @@ mock.module("../telemetry/logger", () => ({
 
 // Mock bunUtils
 mock.module("$utils/bunUtils", () => ({
-  retryWithBackoff: mock(async (operation: Function) => {
+  retryWithBackoff: mock(async (operation: () => Promise<any>) => {
     return await operation();
   }),
   CircuitBreaker: mock().mockImplementation(() => ({
-    execute: mock(async (operation: Function) => {
+    execute: mock(async (operation: () => Promise<any>) => {
       return await operation();
     }),
   })),

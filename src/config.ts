@@ -1,25 +1,8 @@
-/* src/config.ts - Unified Configuration System with Comprehensive Validation */
+// Unified configuration with validation
 
-import * as path from "path";
 import type { z } from "zod";
-import { type Config, ConfigHealthChecker, ConfigSchema } from "$models/types";
+import { type Config, ConfigSchema, generateConfigHealthReport, validateConfig } from "$models/types";
 
-/**
- * UNIFIED CONFIGURATION SYSTEM FOR CAPELLAQL
- *
- * This configuration system consolidates ALL environment variables into a single,
- * validated configuration structure with the following sections:
- * - application: Core application settings (port, logging, CORS)
- * - capella: Couchbase database connection settings
- * - runtime: Environment and runtime settings (NODE_ENV, paths)
- * - deployment: Service identification and deployment metadata
- * - telemetry: OpenTelemetry observability settings (consolidated)
- */
-
-/**
- * Comprehensive environment variable mapping for all configuration sections
- * This mapping defines how environment variables map to configuration properties
- */
 const envVarMapping = {
   application: {
     LOG_LEVEL: "LOG_LEVEL",
@@ -74,9 +57,6 @@ const envVarMapping = {
   },
 } as const;
 
-/**
- * Configuration error class with enhanced error reporting
- */
 class ConfigurationError extends Error {
   constructor(
     message: string,
@@ -217,10 +197,7 @@ const defaultConfig: Config = {
   },
 };
 
-/**
- * Enhanced environment variable parser with comprehensive NaN protection and type coercion
- * Handles all data types used across the unified configuration system
- */
+// Environment variable parser with NaN protection
 function parseEnvVar(
   value: string | undefined,
   type: "string" | "number" | "boolean" | "array" | "json",
@@ -239,7 +216,7 @@ function parseEnvVar(
       case "number": {
         // Special handling for floating point numbers
         const parsed = Number(value);
-        if (isNaN(parsed) || !isFinite(parsed)) {
+        if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
           console.warn(
             `Warning: Environment variable ${fieldName} has invalid number value: '${value}'. Using default.`
           );
@@ -274,13 +251,11 @@ function parseEnvVar(
       case "json": {
         try {
           return JSON.parse(value);
-        } catch (jsonError) {
+        } catch (_jsonError) {
           console.warn(`Warning: Environment variable ${fieldName} contains invalid JSON: '${value}'. Using default.`);
           return undefined;
         }
       }
-
-      case "string":
       default:
         return value;
     }
@@ -290,10 +265,6 @@ function parseEnvVar(
   }
 }
 
-/**
- * Get environment variable with optimized Bun-first approach
- * Prioritizes Bun.env for performance while maintaining fallback compatibility
- */
 function getEnvVar(key: string): string | undefined {
   // Bun-first approach - check if we're in Bun runtime
   if (typeof Bun !== "undefined") {
@@ -310,17 +281,14 @@ function getEnvVar(key: string): string | undefined {
     if (value !== undefined && value !== null && value !== "") {
       return String(value);
     }
-  } catch (error) {
+  } catch (_error) {
     // Silent fallback in case process is not available
   }
 
   return undefined;
 }
 
-/**
- * Load comprehensive configuration from environment variables with enhanced error handling
- * This function consolidates ALL environment variable loading into a single place
- */
+// Load configuration from environment variables
 function loadConfigFromEnv(): Partial<Config> {
   const config: Partial<Config> = {};
 
@@ -540,10 +508,7 @@ function loadConfigFromEnv(): Partial<Config> {
   return config;
 }
 
-/**
- * Comprehensive sanitization for safe logging across all configuration sections
- * Removes/masks sensitive data while preserving structure for debugging
- */
+// Sanitize config for safe logging
 function sanitizeConfigForLogging(config: Config): any {
   return JSON.parse(
     JSON.stringify(config, (key, value) => {
@@ -588,14 +553,14 @@ function sanitizeConfigForLogging(config: Config): any {
             url.password = url.password ? "REDACTED" : "";
           }
           // Clear potentially sensitive query parameters
-          const sensitiveParams = ["token", "key", "secret", "auth"];
+          const _sensitiveParams = ["token", "key", "secret", "auth"];
           for (const [paramKey] of url.searchParams) {
             if (sensitiveKeys.some((k) => paramKey.toLowerCase().includes(k))) {
               url.searchParams.set(paramKey, "REDACTED");
             }
           }
           return url.toString();
-        } catch (error) {
+        } catch (_error) {
           // If URL parsing fails, return original value (not a URL after all)
           return value;
         }
@@ -632,7 +597,7 @@ try {
 
     // Enhanced error reporting
     process.stderr.write(`\n=== CONFIGURATION VALIDATION FAILED ===\n`);
-    process.stderr.write(configError.toDetailedString() + "\n");
+    process.stderr.write(`${configError.toDetailedString()}\n`);
 
     // Check for critical issues
     const criticalIssues = result.error.issues.filter(
@@ -653,10 +618,10 @@ try {
   config = result.data;
 
   // Perform comprehensive health check
-  const healthCheck = ConfigHealthChecker.validate(config);
+  const healthCheck = validateConfig(config);
   if (!healthCheck.healthy || healthCheck.warnings.length > 0) {
     // Generate and log full health report
-    const healthReport = ConfigHealthChecker.generateHealthReport(config);
+    const healthReport = generateConfigHealthReport(config);
     process.stderr.write(healthReport);
 
     // Fail fast if there are critical health issues
@@ -671,7 +636,7 @@ try {
   // Log successful configuration load (with sensitive data redacted)
   const sanitizedConfig = sanitizeConfigForLogging(config);
   process.stderr.write("\n=== CONFIGURATION LOADED SUCCESSFULLY ===\n");
-  process.stderr.write(JSON.stringify(sanitizedConfig, null, 2) + "\n");
+  process.stderr.write(`${JSON.stringify(sanitizedConfig, null, 2)}\n`);
 
   // Environment-specific logging
   const isProduction =
@@ -698,7 +663,7 @@ try {
     process.exit(1);
   } else {
     process.stderr.write(
-      "❌ Unexpected configuration error: " + (error instanceof Error ? error.message : String(error)) + "\n"
+      `❌ Unexpected configuration error: ${error instanceof Error ? error.message : String(error)}\n`
     );
     process.stderr.write("\n=== CONFIGURATION SYSTEM FAILURE ===\n");
     process.stderr.write("The unified configuration system encountered a critical error.\n");
@@ -706,14 +671,12 @@ try {
       "This may indicate:\n - Invalid environment variable values\n - Missing required configuration\n - System-level environment access issues\n"
     );
     process.stderr.write("=== STARTUP BLOCKED ===\n\n");
-    throw new Error(
-      "Unified configuration system failure: " + (error instanceof Error ? error.message : String(error))
-    );
+    throw new Error(`Unified configuration system failure: ${error instanceof Error ? error.message : String(error)}`);
   }
 }
 
 // Export the comprehensive validated configuration
-export { config, ConfigHealthChecker };
+export { config, generateConfigHealthReport, validateConfig };
 export type { Config };
 export { ConfigSchema } from "./models/types";
 export default config;

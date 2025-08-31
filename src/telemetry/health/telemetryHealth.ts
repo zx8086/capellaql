@@ -93,7 +93,7 @@ class TelemetryHealthMonitor {
     this.circuitBreaker.recordSuccess();
   }
 
-  public recordExporterFailure(exporterName: string, error?: Error): void {
+  public recordExporterFailure(exporterName: string, _error?: Error): void {
     const exporter = this.exporters.get(exporterName);
     if (exporter) {
       exporter.failureCount++;
@@ -133,9 +133,9 @@ class TelemetryHealthMonitor {
       timestamp: Date.now(),
       status: overallStatus,
       exporters: {
-        traces: this.exporters.get("traces")!,
-        metrics: this.exporters.get("metrics")!,
-        logs: this.exporters.get("logs")!,
+        traces: this.exporters.get("traces") || { healthy: false, lastError: "Exporter not found" },
+        metrics: this.exporters.get("metrics") || { healthy: false, lastError: "Exporter not found" },
+        logs: this.exporters.get("logs") || { healthy: false, lastError: "Exporter not found" },
       },
       circuitBreaker: {
         state: circuitBreakerStats.state,

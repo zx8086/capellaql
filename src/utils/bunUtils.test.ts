@@ -82,14 +82,14 @@ describe("BunUtils", () => {
       // First failure
       try {
         await circuitBreaker.execute(mockOperation);
-      } catch (error) {
+      } catch (_error) {
         // Expected
       }
 
       // Second failure - should open circuit
       try {
         await circuitBreaker.execute(mockOperation);
-      } catch (error) {
+      } catch (_error) {
         // Expected
       }
 

@@ -1,7 +1,7 @@
 /* src/config.test.ts - Test unified configuration system */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import { ConfigHealthChecker, ConfigSchema } from "./models/types";
+import { ConfigSchema, validateConfig } from "./models/types";
 
 describe("Configuration System", () => {
   let originalEnv: Record<string, string | undefined>;
@@ -107,7 +107,7 @@ describe("Configuration System", () => {
       telemetry: { DEPLOYMENT_ENVIRONMENT: "development" },
     } as any;
 
-    const health = ConfigHealthChecker.validate(mockConfig);
+    const health = validateConfig(mockConfig);
     expect(health).toBeDefined();
     expect(typeof health.healthy).toBe("boolean");
     expect(Array.isArray(health.warnings)).toBe(true);
@@ -126,7 +126,7 @@ describe("Configuration System", () => {
       telemetry: { DEPLOYMENT_ENVIRONMENT: "production" },
     } as any;
 
-    const health = ConfigHealthChecker.validate(productionConfig);
+    const health = validateConfig(productionConfig);
     // The health checker should detect this as production and flag issues
     expect(health).toBeDefined();
     expect(typeof health.healthy).toBe("boolean");

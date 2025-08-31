@@ -5,7 +5,7 @@ import { createHealthcheck } from "./utils/bunUtils";
 
 async function main() {
   try {
-    const health = await createHealthcheck();
+    const _health = await createHealthcheck();
 
     // Simple HTTP check to the health endpoint
     const healthUrl = `${config.application.BASE_URL}:${config.application.PORT}/health`;
