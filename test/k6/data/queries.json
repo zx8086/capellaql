@@ -1,0 +1,73 @@
+{
+  "looksSummary": {
+    "query": "query looksSummary($brand: String!, $division: String!, $season: String!) {\n  looksSummary(brand: $brand, division: $division, season: $season) {\n    hasDeliveryName\n    hasDescription\n    hasGender\n    hasRelatedStyles\n    hasTag\n    hasTitle\n    hasTrend\n    totalLooks\n  }\n}",
+    "variables": {
+      "brand": "${brand}",
+      "division": "${division}",
+      "season": "${season}"
+    },
+    "complexity": "simple",
+    "expectedFields": ["looksSummary.totalLooks"]
+  },
+  "looks": {
+    "query": "query looks($brand: String!, $season: String!, $division: String!) {\n  looks(brand: $brand, season: $season, division: $division) {\n    documentKey\n    divisionCode\n    lookType\n    assetUrl\n    title\n    trend\n    relatedStyles\n    isDeleted\n  }\n}",
+    "variables": {
+      "brand": "${brand}",
+      "division": "${division}",
+      "season": "${season}"
+    },
+    "complexity": "simple",
+    "expectedFields": ["looks"]
+  },
+  "getAllSeasonalAssignments": {
+    "query": "query getAllSeasonalAssignments($styleSeasonCode: String!) {\n  getAllSeasonalAssignments(styleSeasonCode: $styleSeasonCode) {\n    brand\n    brandName\n    channels\n    companyCode\n    createdOn\n    divisions {\n      code\n      isActive\n      name\n    }\n    fms {\n      season {\n        code\n        name\n      }\n      year\n    }\n    modifiedOn\n    name\n    salesOrganizationCodes\n    styleSeasonCode\n  }\n}",
+    "variables": {
+      "styleSeasonCode": "${season}"
+    },
+    "complexity": "complex",
+    "expectedFields": ["getAllSeasonalAssignments"]
+  },
+  "getImageUrlCheck": {
+    "query": "query getImageUrlCheck($divisions: [String!]!, $season: String!) {\n  getImageUrlCheck(divisions: $divisions, season: $season) {\n    divisionCode\n    urls\n  }\n}",
+    "variables": {
+      "divisions": "${divisions}",
+      "season": "${season}"
+    },
+    "complexity": "simple",
+    "expectedFields": ["getImageUrlCheck"]
+  },
+  "optionsSummary": {
+    "query": "query optionsSummary($SalesOrganizationCode: String!, $StyleSeasonCode: String!, $DivisionCode: String!, $ActiveOption: Boolean!, $SalesChannels: [SalesChannel!]!) {\n  optionsSummary(SalesOrganizationCode: $SalesOrganizationCode, StyleSeasonCode: $StyleSeasonCode, DivisionCode: $DivisionCode, ActiveOption: $ActiveOption, SalesChannels: $SalesChannels) {\n    totalOptions\n    hasImages\n    hasFrontImageUrl\n    isActive\n    isAvailable\n    isCancelled\n    isClosed\n    isInvalid\n    isLicensed\n    isNew\n    isSoldOut\n    isUpdated\n    isOpenForEcom\n    hasDeliveryDates\n  }\n}",
+    "variables": {
+      "SalesOrganizationCode": "${salesOrgCode}",
+      "StyleSeasonCode": "${season}",
+      "DivisionCode": "${division}",
+      "ActiveOption": true,
+      "SalesChannels": ["SELLIN", "B2B"]
+    },
+    "complexity": "complex",
+    "expectedFields": ["optionsSummary.totalOptions"]
+  },
+  "optionsProductView": {
+    "query": "query optionsProductView($BrandCode: String!, $SalesOrganizationCode: String!, $StyleSeasonCode: String!, $DivisionCode: String!, $ActiveOption: Boolean!, $SalesChannels: [SalesChannel!]!) {\n  optionsProductView(BrandCode: $BrandCode, SalesOrganizationCode: $SalesOrganizationCode, StyleSeasonCode: $StyleSeasonCode, DivisionCode: $DivisionCode, ActiveOption: $ActiveOption, SalesChannels: $SalesChannels) {\n    optionKey\n    brand\n    companyCode\n    createdOn\n    divisions {\n      code\n      isActive\n      name\n    }\n    imageUrls\n    isActive\n    isAvailable\n    isCancelled\n    modifiedOn\n    productName\n    productType\n    styleNumber\n  }\n}",
+    "variables": {
+      "BrandCode": "${brand}",
+      "SalesOrganizationCode": "${salesOrgCode}",
+      "StyleSeasonCode": "${season}",
+      "DivisionCode": "${division}",
+      "ActiveOption": true,
+      "SalesChannels": ["SELLIN", "B2B"]
+    },
+    "complexity": "complex",
+    "expectedFields": ["optionsProductView"]
+  },
+  "imageDetails": {
+    "query": "query imageDetails($divisionCode: String!, $styleSeasonCode: String!) {\n  imageDetails(divisionCode: $divisionCode, styleSeasonCode: $styleSeasonCode) {\n    imageKey\n    divisionCode\n    styleSeasonCode\n    imageUrl\n    imageType\n    isActive\n    createdOn\n    modifiedOn\n  }\n}",
+    "variables": {
+      "divisionCode": "${division}",
+      "styleSeasonCode": "${season}"
+    },
+    "complexity": "simple",
+    "expectedFields": ["imageDetails"]
+  }
+}

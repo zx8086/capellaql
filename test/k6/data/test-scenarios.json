@@ -1,0 +1,95 @@
+{
+  "fashionBuyer": {
+    "name": "Fashion Buyer Journey",
+    "description": "Typical workflow of a fashion buyer browsing looks and options",
+    "steps": [
+      {
+        "operation": "looksSummary",
+        "weight": 40,
+        "description": "Check looks overview for season/brand"
+      },
+      {
+        "operation": "looks",
+        "weight": 30,
+        "description": "Browse detailed looks"
+      },
+      {
+        "operation": "optionsSummary",
+        "weight": 20,
+        "description": "Check options availability"
+      },
+      {
+        "operation": "imageDetails",
+        "weight": 10,
+        "description": "View product images"
+      }
+    ]
+  },
+  "dataAnalyst": {
+    "name": "Data Analyst Workflow",
+    "description": "Data analyst gathering insights across multiple divisions",
+    "steps": [
+      {
+        "operation": "getAllSeasonalAssignments",
+        "weight": 30,
+        "description": "Get seasonal assignment data"
+      },
+      {
+        "operation": "looksSummary",
+        "weight": 25,
+        "description": "Aggregate looks data"
+      },
+      {
+        "operation": "optionsSummary",
+        "weight": 25,
+        "description": "Aggregate options data"
+      },
+      {
+        "operation": "getImageUrlCheck",
+        "weight": 20,
+        "description": "Validate image availability"
+      }
+    ]
+  },
+  "systemIntegration": {
+    "name": "System Integration Pattern",
+    "description": "Mixed workload simulating various system integrations",
+    "steps": [
+      {
+        "operation": "looksSummary",
+        "weight": 20,
+        "description": "Basic looks data"
+      },
+      {
+        "operation": "looks",
+        "weight": 15,
+        "description": "Detailed looks"
+      },
+      {
+        "operation": "optionsSummary",
+        "weight": 20,
+        "description": "Options overview"
+      },
+      {
+        "operation": "optionsProductView",
+        "weight": 15,
+        "description": "Product details"
+      },
+      {
+        "operation": "getAllSeasonalAssignments",
+        "weight": 15,
+        "description": "Assignment data"
+      },
+      {
+        "operation": "imageDetails",
+        "weight": 10,
+        "description": "Image metadata"
+      },
+      {
+        "operation": "getImageUrlCheck",
+        "weight": 5,
+        "description": "Image validation"
+      }
+    ]
+  }
+}

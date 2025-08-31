@@ -19,21 +19,42 @@ export const options = {
     { duration: "1m", target: 0 }, // Ramp-down to 0 users over 1 minute
   ],
   thresholds: {
-    http_req_duration: ["p(95)<500"], // 95% of requests should be below 500ms
-    http_req_failed: ["rate<0.1"], // Less than 10% of requests should fail
+    http_req_duration: performanceThresholds.health.stress,
+    http_req_failed: performanceThresholds.errors.stress,
   },
-  userAgent: "K6StressTestAgent/1.0",
+  tags: {
+    test_type: 'stress',
+    component: 'health'
+  }
 };
 
-const PORT = 4000;
-const BASE_URL = `http://localhost:${PORT}`;
-console.log(BASE_URL);
+import { getConfig, performanceThresholds, getHealthEndpoint } from './utils/config.js';
+
+const config = getConfig();
+console.log(`Base URL: ${config.baseUrl}`);
 
 export default function () {
-  const res = http.get(`${BASE_URL}/health`);
+  const params = {
+    tags: { 
+      testType: 'stress-test', 
+      endpoint: '/health',
+      component: 'health'
+    },
+    timeout: config.timeout
+  };
+
+  const res = http.get(getHealthEndpoint(), params);
   check(res, {
     "status was 200": (r) => r.status === 200,
-    "response time < 2000ms": (r) => r.timings.duration < 2000, // 95% of requests should be below 2000ms
+    "response time < 500ms": (r) => r.timings.duration < 500,
+    "response is valid": (r) => {
+      try {
+        const body = JSON.parse(r.body);
+        return ['healthy', 'ok', 'up'].includes(body.status?.toLowerCase());
+      } catch {
+        return false;
+      }
+    }
   });
   sleep(1);
 }

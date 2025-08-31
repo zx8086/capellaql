@@ -1,0 +1,16 @@
+[
+  {
+    "name": "TH",
+    "fullName": "Tommy Hilfiger",
+    "divisions": ["01", "02", "03", "04", "05", "07", "08", "09", "10", "11", "18"],
+    "primaryDivisions": ["01", "02", "03"],
+    "seasons": ["C51", "C52"]
+  },
+  {
+    "name": "CK",
+    "fullName": "Calvin Klein",
+    "divisions": ["61", "62", "63", "64", "65", "67", "68", "69", "70", "71", "72", "77", "96"],
+    "primaryDivisions": ["61", "62", "63"],
+    "seasons": ["C51", "C52"]
+  }
+]
