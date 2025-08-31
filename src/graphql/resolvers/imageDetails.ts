@@ -1,7 +1,7 @@
 /* src/graphql/resolvers/imageDetails.ts */
 
-import { log, error as err, debug } from "../../telemetry/logger";
 import { getCluster } from "$lib/clusterProvider";
+import { debug, error as err, log } from "../../telemetry/logger";
 
 const imageDetails = {
   Query: {
@@ -11,7 +11,7 @@ const imageDetails = {
         divisionCode: string;
         styleSeasonCode: string;
         styleCode: string;
-      },
+      }
     ): Promise<any> => {
       try {
         const { divisionCode, styleSeasonCode, styleCode } = args;
@@ -32,7 +32,7 @@ const imageDetails = {
 
         log("Query executed", { query, queryOptions });
 
-        let result = await cluster.cluster.query(query, queryOptions);
+        const result = await cluster.cluster.query(query, queryOptions);
 
         debug(JSON.stringify(result, null, 2));
 

@@ -30,36 +30,44 @@ const TelemetryConfigSchema = z.object({
   TRACES_ENDPOINT: z.string().url("TRACES_ENDPOINT must be a valid URL"),
   METRICS_ENDPOINT: z.string().url("METRICS_ENDPOINT must be a valid URL"),
   LOGS_ENDPOINT: z.string().url("LOGS_ENDPOINT must be a valid URL"),
-  METRIC_READER_INTERVAL: z.number()
+  METRIC_READER_INTERVAL: z
+    .number()
     .min(1000, "METRIC_READER_INTERVAL must be at least 1000ms")
     .max(300000, "METRIC_READER_INTERVAL should not exceed 5 minutes")
-    .refine(val => !Number.isNaN(val), "METRIC_READER_INTERVAL cannot be NaN"),
-  SUMMARY_LOG_INTERVAL: z.number()
+    .refine((val) => !Number.isNaN(val), "METRIC_READER_INTERVAL cannot be NaN"),
+  SUMMARY_LOG_INTERVAL: z
+    .number()
     .min(10000, "SUMMARY_LOG_INTERVAL must be at least 10 seconds")
     .max(3600000, "SUMMARY_LOG_INTERVAL should not exceed 1 hour")
-    .refine(val => !Number.isNaN(val), "SUMMARY_LOG_INTERVAL cannot be NaN"),
+    .refine((val) => !Number.isNaN(val), "SUMMARY_LOG_INTERVAL cannot be NaN"),
   // 2025 compliance settings
-  EXPORT_TIMEOUT_MS: z.number()
+  EXPORT_TIMEOUT_MS: z
+    .number()
     .min(5000, "EXPORT_TIMEOUT_MS must be at least 5 seconds")
     .max(30000, "EXPORT_TIMEOUT_MS must not exceed 30 seconds (2025 standard)")
     .default(30000),
-  BATCH_SIZE: z.number()
+  BATCH_SIZE: z
+    .number()
     .min(1, "BATCH_SIZE must be at least 1")
     .max(4096, "BATCH_SIZE should not exceed 4096")
     .default(2048), // 2025 standard
-  MAX_QUEUE_SIZE: z.number()
+  MAX_QUEUE_SIZE: z
+    .number()
     .min(100, "MAX_QUEUE_SIZE must be at least 100")
     .max(20000, "MAX_QUEUE_SIZE should not exceed 20000")
     .default(10000), // 2025 standard
-  SAMPLING_RATE: z.number()
+  SAMPLING_RATE: z
+    .number()
     .min(0.01, "SAMPLING_RATE must be at least 1%")
     .max(1.0, "SAMPLING_RATE cannot exceed 100%")
     .default(0.15), // 15% (2025 standard)
-  CIRCUIT_BREAKER_THRESHOLD: z.number()
+  CIRCUIT_BREAKER_THRESHOLD: z
+    .number()
     .min(1, "CIRCUIT_BREAKER_THRESHOLD must be at least 1")
     .max(20, "CIRCUIT_BREAKER_THRESHOLD should not exceed 20")
     .default(5),
-  CIRCUIT_BREAKER_TIMEOUT_MS: z.number()
+  CIRCUIT_BREAKER_TIMEOUT_MS: z
+    .number()
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
     .default(60000), // 1 minute
@@ -106,14 +114,14 @@ export function validateTelemetryConfig(config: Partial<TelemetryConfig>): Telem
   // Now validate with Zod schema
   try {
     const validatedConfig = TelemetryConfigSchema.parse(config);
-    
+
     // Additional business logic validation
     validateBusinessRules(validatedConfig);
-    
+
     return validatedConfig;
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const issues = error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);
+      const issues = error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`);
       throw new Error(`Telemetry configuration validation failed: ${issues.join(", ")}`);
     }
     throw error;
@@ -141,7 +149,7 @@ function validateBusinessRules(config: TelemetryConfig): void {
     const tracesUrl = new URL(config.TRACES_ENDPOINT);
     const metricsUrl = new URL(config.METRICS_ENDPOINT);
     const logsUrl = new URL(config.LOGS_ENDPOINT);
-    
+
     if (tracesUrl.host !== metricsUrl.host || tracesUrl.host !== logsUrl.host) {
       console.warn("Telemetry endpoints use different hosts - consider using the same OTLP collector");
     }
@@ -150,27 +158,8 @@ function validateBusinessRules(config: TelemetryConfig): void {
   }
 }
 
-export function loadTelemetryConfigFromEnv(): TelemetryConfig {
-  const envConfig = {
-    ENABLE_OPENTELEMETRY: parseEnvBoolean(Bun.env.ENABLE_OPENTELEMETRY),
-    SERVICE_NAME: Bun.env.SERVICE_NAME,
-    SERVICE_VERSION: Bun.env.SERVICE_VERSION,
-    DEPLOYMENT_ENVIRONMENT: Bun.env.DEPLOYMENT_ENVIRONMENT,
-    TRACES_ENDPOINT: Bun.env.TRACES_ENDPOINT,
-    METRICS_ENDPOINT: Bun.env.METRICS_ENDPOINT,
-    LOGS_ENDPOINT: Bun.env.LOGS_ENDPOINT,
-    METRIC_READER_INTERVAL: parseEnvNumber(Bun.env.METRIC_READER_INTERVAL),
-    SUMMARY_LOG_INTERVAL: parseEnvNumber(Bun.env.SUMMARY_LOG_INTERVAL),
-    EXPORT_TIMEOUT_MS: parseEnvNumber(Bun.env.EXPORT_TIMEOUT_MS),
-    BATCH_SIZE: parseEnvNumber(Bun.env.BATCH_SIZE),
-    MAX_QUEUE_SIZE: parseEnvNumber(Bun.env.MAX_QUEUE_SIZE),
-    SAMPLING_RATE: parseEnvNumber(Bun.env.SAMPLING_RATE),
-    CIRCUIT_BREAKER_THRESHOLD: parseEnvNumber(Bun.env.CIRCUIT_BREAKER_THRESHOLD),
-    CIRCUIT_BREAKER_TIMEOUT_MS: parseEnvNumber(Bun.env.CIRCUIT_BREAKER_TIMEOUT_MS),
-  };
-
-  return validateTelemetryConfig(envConfig);
-}
+// Remove this function - use unified config from $config instead
+// export function loadTelemetryConfigFromEnv(): TelemetryConfig { ... }
 
 function parseEnvBoolean(value: string | undefined): boolean | undefined {
   if (value === undefined) return undefined;

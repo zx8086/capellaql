@@ -1,5 +1,6 @@
 /* src/telemetry/health/telemetryHealth.ts */
 
+import config from "$config";
 import { TelemetryCircuitBreaker } from "./CircuitBreaker";
 
 export interface TelemetryHealthData {
@@ -47,24 +48,20 @@ class TelemetryHealthMonitor {
   private config: any;
 
   constructor() {
-    // Use environment variables for circuit breaker configuration (2025 standard)
-    const failureThreshold = parseInt(
-      (typeof Bun !== "undefined" ? Bun.env.CIRCUIT_BREAKER_THRESHOLD : process.env.CIRCUIT_BREAKER_THRESHOLD) || "5"
-    );
-    const recoveryTimeoutMs = parseInt(
-      (typeof Bun !== "undefined" ? Bun.env.CIRCUIT_BREAKER_TIMEOUT_MS : process.env.CIRCUIT_BREAKER_TIMEOUT_MS) || "60000"
-    );
-    
+    // Use unified configuration for circuit breaker (2025 standard)
+    const failureThreshold = config.telemetry.CIRCUIT_BREAKER_THRESHOLD;
+    const recoveryTimeoutMs = config.telemetry.CIRCUIT_BREAKER_TIMEOUT_MS;
+
     this.circuitBreaker = new TelemetryCircuitBreaker({
-      failureThreshold,          // From environment (default: 5 per 2025 standards)
-      recoveryTimeoutMs,         // From environment (default: 60000 per 2025 standards)
-      successThreshold: 3,       // 2025 standard
+      failureThreshold, // From environment (default: 5 per 2025 standards)
+      recoveryTimeoutMs, // From environment (default: 60000 per 2025 standards)
+      successThreshold: 3, // 2025 standard
     });
-    
+
     this.exporters = new Map([
       ["traces", this.createInitialExporterHealth("traces")],
       ["metrics", this.createInitialExporterHealth("metrics")],
-      ["logs", this.createInitialExporterHealth("logs")]
+      ["logs", this.createInitialExporterHealth("logs")],
     ]);
   }
 
@@ -82,7 +79,7 @@ class TelemetryHealthMonitor {
       exporter.lastExportTime = Date.now();
       exporter.exportCount++;
       exporter.successRate = ((exporter.exportCount - exporter.failureCount) / exporter.exportCount) * 100;
-      
+
       // Update exporter status
       if (exporter.successRate >= 95) {
         exporter.status = "healthy";
@@ -92,7 +89,7 @@ class TelemetryHealthMonitor {
         exporter.status = "unhealthy";
       }
     }
-    
+
     this.circuitBreaker.recordSuccess();
   }
 
@@ -102,7 +99,7 @@ class TelemetryHealthMonitor {
       exporter.failureCount++;
       exporter.exportCount++;
       exporter.successRate = ((exporter.exportCount - exporter.failureCount) / exporter.exportCount) * 100;
-      
+
       // Update exporter status
       if (exporter.successRate >= 95) {
         exporter.status = "healthy";
@@ -112,21 +109,21 @@ class TelemetryHealthMonitor {
         exporter.status = "unhealthy";
       }
     }
-    
+
     this.circuitBreaker.recordFailure();
   }
 
   public getHealthData(): TelemetryHealthData {
     const circuitBreakerStats = this.circuitBreaker.getHealthStatus();
     const memoryUsage = process.memoryUsage();
-    
+
     // Determine overall status
-    const exporterStatuses = Array.from(this.exporters.values()).map(e => e.status);
+    const exporterStatuses = Array.from(this.exporters.values()).map((e) => e.status);
     let overallStatus: "healthy" | "degraded" | "unhealthy";
-    
-    if (exporterStatuses.every(s => s === "healthy") && circuitBreakerStats.isHealthy) {
+
+    if (exporterStatuses.every((s) => s === "healthy") && circuitBreakerStats.isHealthy) {
       overallStatus = "healthy";
-    } else if (exporterStatuses.some(s => s === "unhealthy") || !circuitBreakerStats.isHealthy) {
+    } else if (exporterStatuses.some((s) => s === "unhealthy") || !circuitBreakerStats.isHealthy) {
       overallStatus = "unhealthy";
     } else {
       overallStatus = "degraded";
@@ -157,7 +154,7 @@ class TelemetryHealthMonitor {
       runtime: {
         memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
         uptimeMs: process.uptime() * 1000,
-        environment: process.env.DEPLOYMENT_ENVIRONMENT || "unknown",
+        environment: config.telemetry.DEPLOYMENT_ENVIRONMENT,
         version: this.config?.serviceVersion || "unknown",
       },
     };

@@ -1,39 +1,49 @@
 {
   "compilerOptions": {
-    // Enable latest features
-    "lib": ["ESNext"], // Keep only actual TypeScript libraries here
-    "target": "ESNext",
+    // Latest TypeScript features
+    "lib": ["ES2023", "DOM"],
+    "target": "ES2023",
     "module": "ESNext",
     "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
-    "typeRoots": ["./node_modules/@types", "./src/types"], // Add a types directory
+    "typeRoots": ["./node_modules/@types", "./src/types"],
 
-    // Bundler mode
-    "moduleResolution": "bundler", // Changed from "node" to "bundler"
-    "verbatimModuleSyntax": true,
+    // Bun-optimized bundler mode
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": false,
+    "verbatimModuleSyntax": false,
     "noEmit": false,
     "noImplicitAny": false,
 
-    // Source Map Configuration
+    // Enhanced source map configuration for Bun
     "sourceMap": true,
     "inlineSources": true,
     "sourceRoot": "/",
     "declaration": true,
     "declarationMap": true,
 
-    // Best practices
+    // Strict type checking (Bun recommended)
     "strict": true,
-    "skipLibCheck": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+
+    // Module system optimizations
     "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
 
     // Output configuration
     "outDir": "./dist",
     "rootDir": "./src",
     "baseUrl": ".",
 
-    // Path aliases - updated with index files
+    // Enhanced path aliases for Bun
     "paths": {
       "$lib": ["src/lib/index"],
       "$lib/*": ["src/lib/*"],
@@ -43,19 +53,25 @@
       "$models/*": ["src/models/*"],
       "$config": ["src/config"],
       "$telemetry": ["src/telemetry/index"],
-      "$telemetry/*": ["src/telemetry/*"]
+      "$telemetry/*": ["src/telemetry/*"],
+      "$graphql": ["src/graphql/index"],
+      "$graphql/*": ["src/graphql/*"]
     },
 
-    // Some stricter flags
+    // Production-ready settings
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noPropertyAccessFromIndexSignature": true,
 
-    // Additional recommended settings
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true
+    // Bun-specific optimizations
+    "useDefineForClassFields": true,
+    "experimentalDecorators": false,
+    "emitDecoratorMetadata": false
   },
-  "include": ["src/**/*", "src/global.d.ts", "__tests__/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "include": ["src/**/*", "src/global.d.ts", "**/*.test.ts"],
+  "exclude": ["node_modules", "dist", ".bun-cache", "coverage", "test/k6/**/*.js", "tools/**/*"],
+  "ts-node": {
+    "esm": true
+  },
+  "bun-types": "latest"
 }

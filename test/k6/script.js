@@ -2,18 +2,18 @@
 
 /* K6_WEB_DASHBOARD=true ./k6 run script.js -o output-elasticsearch */
 
-import http from 'k6/http';
-import { sleep, group, check } from 'k6';
-import exec from 'k6/execution';
+import { check, group, sleep } from "k6";
+import exec from "k6/execution";
+import http from "k6/http";
 
 export const options = {
   vus: 10,
-  duration: '30s',
+  duration: "30s",
   thresholds: {
-    http_req_failed: ['rate<0.01'], // http errors should be less than 1%
-    http_req_duration: ['p(95)<100'], // 95% of requests should be below 100ms
+    http_req_failed: ["rate<0.01"], // http errors should be less than 1%
+    http_req_duration: ["p(95)<100"], // 95% of requests should be below 100ms
   },
-  userAgent: 'MyK6UserAgentString/1.0',
+  userAgent: "MyK6UserAgentString/1.0",
   throw: true,
   // httpDebug: 'full',
   // insecureSkipTLSVerify: true,
@@ -21,7 +21,7 @@ export const options = {
   // noConnectionReuse: true,
 };
 
-export default function() {
+export default function () {
   // console.log(`Execution context
 
   //   Instance info
@@ -33,7 +33,7 @@ export default function() {
   //   Iterations active:  ${exec.instance.vusActive}
   //   Initialized vus:  ${exec.instance.vusInitialized}
   //   Time passed from start of run(ms):  ${exec.instance.currentTestRunDuration}
-    
+
   //   Scenario info
   //   -------------
   //   Name of the running scenario: ${exec.scenario.name}
@@ -42,11 +42,11 @@ export default function() {
   //   Percenatage complete: ${exec.scenario.progress}
   //   Iteration in instance: ${exec.scenario.iterationInInstance}
   //   Iteration in test: ${exec.scenario.iterationInTest}
-    
+
   //   Test info
   //   ---------
   //   All test options: ${exec.test.options}
-    
+
   //   VU info
   //   -------
   //   Iteration id: ${exec.vu.iterationInInstance}
@@ -56,15 +56,15 @@ export default function() {
   //   VU tags: ${exec.vu.tags}`);
   //   }
 
-  group('Health Check', function() {
-    const res = http.get('http://localhost:4000/health', {
-      tags: { name: 'Localhost - HealthCheck' }
+  group("Health Check", () => {
+    const res = http.get("http://localhost:4000/health", {
+      tags: { name: "Localhost - HealthCheck" },
     });
-    
+
     check(res, {
-      'is status 200': (r) => r.status === 200,
-      'body contains HEALTHY': (r) => r.body.includes('HEALTHY'),
-      'body size is less than 25 bytes': (r) => r.body.length < 25,
+      "is status 200": (r) => r.status === 200,
+      "body contains HEALTHY": (r) => r.body.includes("HEALTHY"),
+      "body size is less than 25 bytes": (r) => r.body.length < 25,
     });
   });
   sleep(1);

@@ -1,147 +1,145 @@
 # syntax=docker/dockerfile:1.4
 
-# Base stage
+# Base stage with Bun canary for latest features
 FROM oven/bun:canary-alpine AS base
 
-# Set common environment variables
+# Set common environment variables optimized for Bun
 ENV CN_ROOT=/usr/src/app \
     CN_CXXCBC_CACHE_DIR=/usr/src/app/deps/couchbase-cxx-cache \
-    NODE_ENV=production
+    NODE_ENV=production \
+    BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=120 \
+    BUN_INSTALL_CACHE_DIR=/usr/src/app/.bun-cache
 
 WORKDIR /usr/src/app
 
-# Create directories (move to respective stages where needed)
-RUN mkdir -p /usr/src/app/logs /usr/src/app/deps/couchbase-cxx-cache /usr/src/app/.sourcemaps && \
+# Create directories with proper permissions
+RUN mkdir -p /usr/src/app/logs \
+             /usr/src/app/deps/couchbase-cxx-cache \
+             /usr/src/app/.sourcemaps \
+             /usr/src/app/.bun-cache && \
     chown -R bun:bun /usr/src/app
 
-# Dependencies stage - Optimized for caching
+# Dependencies stage - Enhanced for Bun caching
 FROM base AS deps
 
-# Copy only package files needed for installation
-COPY --chown=bun:bun package.json bun.lock tsconfig.json ./
+# Copy package files for dependency resolution
+COPY --chown=bun:bun package.json bun.lock* bunfig.toml tsconfig.json ./
 
-# Single RUN command for better caching
-RUN --mount=type=cache,target=/root/.bun,sharing=locked \
-    bun install --frozen-lockfile --production && \
+# Install dependencies with optimized Bun caching
+RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
+    --mount=type=cache,target=/root/.bun,sharing=locked \
+    bun install --frozen-lockfile --production --verbose && \
     mkdir -p node_modules && \
     chown -R bun:bun node_modules
 
-# Development stage
+# Development stage with full tooling
 FROM deps AS development
 ENV NODE_ENV=development
 
-# Install development dependencies
-RUN bun install --frozen-lockfile
-
-# Copy source files after dependencies
-COPY --chown=bun:bun . .
-CMD ["bun", "run", "dev"]
-
-# Build stage
-FROM deps AS builder
-
-# Copy source files all at once
-COPY --chown=bun:bun src/ ./src/
-COPY --chown=bun:bun tsconfig.json ./
-
-# Combine mkdir and build operations
-RUN --mount=type=cache,target=/usr/src/app/.build \
-    mkdir -p dist dist/maps && \
-    bun build ./src/index.ts \
-    --target=node \
-    --outdir ./dist \
-    --sourcemap \
-    --external dns \
-    --external bun \
-    --manifest && \
-    find dist -name "*.map" -exec mv {} dist/maps/ \; || true
-
-# Final release stage
-FROM base AS release
-
-# Copy package files and install dependencies in one layer
-COPY --chown=bun:bun package.json bun.lock ./
-RUN --mount=type=cache,target=/root/.bun,sharing=locked \
-    bun install --frozen-lockfile
+# Install all dependencies including dev dependencies
+RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
+    bun install --frozen-lockfile --verbose
 
 # Copy source files
 COPY --chown=bun:bun . .
 
-# Combine build operations into a single layer
-RUN set -e && \
+# Use Bun's hot reload in development
+CMD ["bun", "run", "dev"]
+
+# Build stage optimized for Bun
+FROM deps AS builder
+
+# Copy source files for building
+COPY --chown=bun:bun src/ ./src/
+COPY --chown=bun:bun tsconfig.json bunfig.toml ./
+
+# Build with Bun's native bundler and optimizations
+RUN --mount=type=cache,target=/usr/src/app/.build \
+    mkdir -p dist dist/maps && \
     bun build ./src/index.ts \
-    --target=node \
+    --target=bun \
     --outdir ./dist \
     --sourcemap \
+    --minify \
+    --splitting \
     --external dns \
     --external bun \
-    --manifest && \
-    mkdir -p /usr/src/app/dist/maps && \
-    find /usr/src/app/dist -name "*.map" -exec mv {} /usr/src/app/dist/maps/ \; || true && \
-    bun install --frozen-lockfile --production && \
-    chown -R bun:bun .
+    --root ./src \
+    --entry-naming '[dir]/[name].[ext]' \
+    --chunk-naming '[name]-[hash].[ext]' \
+    --asset-naming '[name]-[hash].[ext]' && \
+    find dist -name "*.map" -exec mv {} dist/maps/ \; || true && \
+    ls -la dist/
 
-# Set production variables
+# Production release stage
+FROM base AS release
+
+# Copy package files and install production dependencies
+COPY --chown=bun:bun package.json bun.lock* bunfig.toml ./
+RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
+    --mount=type=cache,target=/root/.bun,sharing=locked \
+    bun install --frozen-lockfile --production --verbose
+
+# Copy built application from builder stage
+COPY --from=builder --chown=bun:bun /usr/src/app/dist ./dist
+COPY --chown=bun:bun src/telemetry ./src/telemetry
+
+# Set optimized production environment variables
 ENV ENABLE_OPENTELEMETRY=true \
     SOURCE_MAP_SUPPORT=true \
     PRESERVE_SOURCE_MAPS=true \
-    NODE_ENV=production
+    NODE_ENV=production \
+    BUN_CONFIG_VERBOSE_FETCH=false \
+    BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=120
 
-# Consolidate all labels in the final stage
+# Enhanced container metadata
 LABEL org.opencontainers.image.title="capellaql" \
-    org.opencontainers.image.description="CapellaQL is a high-performance GraphQL service built with Bun that provides a modern API interface for Couchbase Capella databases. It features advanced monitoring, caching, and observability capabilities." \
-    org.opencontainers.image.created="${BUILD_DATE}" \
-    org.opencontainers.image.version="${BUILD_VERSION}" \
-    org.opencontainers.image.revision="${COMMIT_HASH}" \
-    org.opencontainers.image.authors="Simon Owusu <simonowusupvh@gmail.com>" \
-    org.opencontainers.image.vendor="Siobytes" \
-    org.opencontainers.image.licenses="MIT" \
-    org.opencontainers.image.url="https://github.com/zx8086/capellaql" \
-    org.opencontainers.image.source="https://github.com/zx8086/capellaql" \
-    org.opencontainers.image.documentation="https://github.com/zx8086/capellaql/README.md" \
-    org.opencontainers.image.base.name="oven/bun:canary-alpine" \
-    org.opencontainers.image.source.repository="github.com/zx8086/capellaql" \
-    org.opencontainers.image.source.branch="${GITHUB_REF_NAME:-master}" \
-    org.opencontainers.image.source.commit="${COMMIT_HASH}" \
-    com.capellaql.maintainer="Simon Owusu <simonowusupvh@gmail.com>" \
-    com.capellaql.release-date="${BUILD_DATE}" \
-    com.capellaql.version.is-production="true" \
-    org.opencontainers.image.ref.name="${GITHUB_REF_NAME:-master}" \
-    org.opencontainers.image.version.semver="${BUILD_VERSION}" \
-    org.opencontainers.image.version.major="2" \
-    org.opencontainers.image.version.minor="0" \
-    org.opencontainers.image.version.patch="0"
+      org.opencontainers.image.description="CapellaQL: High-performance GraphQL service built with Bun for Couchbase Capella. Features advanced monitoring, caching, and observability." \
+      org.opencontainers.image.created="${BUILD_DATE:-unknown}" \
+      org.opencontainers.image.version="${BUILD_VERSION:-2.0.0}" \
+      org.opencontainers.image.revision="${COMMIT_HASH:-unknown}" \
+      org.opencontainers.image.authors="Simon Owusu <simonowusupvh@gmail.com>" \
+      org.opencontainers.image.vendor="Siobytes" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.url="https://github.com/zx8086/capellaql" \
+      org.opencontainers.image.source="https://github.com/zx8086/capellaql" \
+      org.opencontainers.image.documentation="https://github.com/zx8086/capellaql/README.md" \
+      org.opencontainers.image.base.name="oven/bun:canary-alpine" \
+      com.capellaql.runtime="bun" \
+      com.capellaql.maintainer="Simon Owusu <simonowusupvh@gmail.com>" \
+      com.capellaql.release-date="${BUILD_DATE:-unknown}" \
+      com.capellaql.version.is-production="true" \
+      com.capellaql.build.optimized="true"
 
-# Set runtime environment variables
+# Environment variables for runtime configuration
 ENV BASE_URL="" \
-    PORT="" \
-    LOG_LEVEL="" \
-    LOG_MAX_SIZE="" \
-    LOG_MAX_FILES="" \
-    YOGA_RESPONSE_CACHE_TTL="" \
+    PORT="4000" \
+    LOG_LEVEL="info" \
+    LOG_MAX_SIZE="20m" \
+    LOG_MAX_FILES="14d" \
+    YOGA_RESPONSE_CACHE_TTL="900000" \
     COUCHBASE_URL="" \
     COUCHBASE_USERNAME="" \
     COUCHBASE_BUCKET="" \
     COUCHBASE_SCOPE="" \
     COUCHBASE_COLLECTION="" \
-    SERVICE_NAME="" \
-    SERVICE_VERSION="" \
-    DEPLOYMENT_ENVIRONMENT="" \
+    SERVICE_NAME="CapellaQL Service" \
+    SERVICE_VERSION="2.0" \
+    DEPLOYMENT_ENVIRONMENT="production" \
     TRACES_ENDPOINT="" \
     METRICS_ENDPOINT="" \
     LOGS_ENDPOINT="" \
-    METRIC_READER_INTERVAL="" \
-    CONSOLE_METRIC_READER_INTERVAL="" \
-    BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS="" \
-    ENABLE_FILE_LOGGING="" \
-    SUMMARY_LOG_INTERVAL="" \
+    METRIC_READER_INTERVAL="60000" \
+    SUMMARY_LOG_INTERVAL="300000" \
+    ENABLE_FILE_LOGGING="false" \
     ALLOWED_ORIGINS=""
 
 USER bun
 EXPOSE 4000/tcp
 
-# Modify healthcheck to use the correct script
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+# Enhanced healthcheck using our Bun-optimized script
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD bun run healthcheck || exit 1
 
+# Use Bun's native runtime for optimal performance
 CMD ["bun", "run", "start"]

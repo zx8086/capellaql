@@ -1,28 +1,26 @@
 /* src/index.ts */
 
-import { Elysia } from "elysia";
-import { 
-  log, 
-  err, 
-  initializeHttpMetrics,
-  recordHttpRequest,
-  recordHttpResponseTime,
-  getTelemetryHealth
-} from "./telemetry";
-import { metrics } from "@opentelemetry/api";
-
-import config from "./config";
 import { cors } from "@elysiajs/cors";
 import { yoga } from "@elysiajs/graphql-yoga";
-import typeDefs from "./graphql/typeDefs";
-import resolvers from "./graphql/resolvers";
-// import { useResponseCache } from "@graphql-yoga/plugin-response-cache";
-import * as path from "path";
-import { fileURLToPath } from "url";
-import { ulid } from "ulid";
+import { useResponseCache } from "@graphql-yoga/plugin-response-cache";
+import { metrics, context as otelContext, SpanStatusCode, trace } from "@opentelemetry/api";
+import { Elysia } from "elysia";
 import { isIP } from "net";
-import { context as otelContext, trace } from "@opentelemetry/api";
-import { SpanStatusCode } from "@opentelemetry/api";
+import * as path from "path";
+import { ulid } from "ulid";
+import { fileURLToPath } from "url";
+import config from "./config";
+import resolvers from "./graphql/resolvers";
+import typeDefs from "./graphql/typeDefs";
+import {
+  err,
+  getTelemetryHealth,
+  initializeHttpMetrics,
+  log,
+  recordHttpRequest,
+  recordHttpResponseTime,
+} from "./telemetry";
+import { createHealthcheck } from "./utils/bunUtils";
 import "source-map-support/register";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -34,15 +32,14 @@ declare global {
   };
 }
 
+// Initialize global paths from unified configuration
 if (typeof globalThis["CN_ROOT"] === "undefined") {
-  globalThis["CN_ROOT"] =
-    process.env["CN_ROOT"] || path.resolve(__dirname, "..");
+  globalThis["CN_ROOT"] = config.runtime.CN_ROOT || path.resolve(__dirname, "..");
 }
 
 if (typeof globalThis["CN_CXXCBC_CACHE_DIR"] === "undefined") {
   globalThis["CN_CXXCBC_CACHE_DIR"] =
-    process.env["CN_CXXCBC_CACHE_DIR"] ||
-    path.join(globalThis["CN_ROOT"], "deps", "couchbase-cxx-cache");
+    config.runtime.CN_CXXCBC_CACHE_DIR || path.join(globalThis["CN_ROOT"], "deps", "couchbase-cxx-cache");
 }
 
 if (typeof globalThis["ENV_TRUE"] === "undefined") {
@@ -50,38 +47,35 @@ if (typeof globalThis["ENV_TRUE"] === "undefined") {
 }
 
 const SERVER_PORT = config.application["PORT"];
-// const YOGA_RESPONSE_CACHE_TTL = config.application["YOGA_RESPONSE_CACHE_TTL"];
-// const ALLOWED_ORIGINS = Array.isArray(config.application.ALLOWED_ORIGINS)
-//   ? config.application.ALLOWED_ORIGINS
-//   : (config.application.ALLOWED_ORIGINS as string).split(',').map(origin => origin.trim());
+const YOGA_RESPONSE_CACHE_TTL = config.application["YOGA_RESPONSE_CACHE_TTL"];
+const ALLOWED_ORIGINS = Array.isArray(config.application.ALLOWED_ORIGINS)
+  ? config.application.ALLOWED_ORIGINS
+  : (config.application.ALLOWED_ORIGINS as string).split(",").map((origin) => origin.trim());
 
-// console.log("Parsed ALLOWED_ORIGINS:", ALLOWED_ORIGINS);
-const IS_DEVELOPMENT = 
-  process.env.DEPLOYMENT_ENVIRONMENT === "development" || process.env.NODE_ENV === "development";
+console.log("Parsed ALLOWED_ORIGINS:", ALLOWED_ORIGINS);
+const IS_DEVELOPMENT =
+  config.telemetry.DEPLOYMENT_ENVIRONMENT === "development" || config.runtime.NODE_ENV === "development";
 
 const RATE_LIMIT = 500;
 const RATE_LIMIT_WINDOW = 60 * 1000;
 
 // Create custom metrics for testing
-const meter = metrics.getMeter('capellaql-custom-metrics', '1.0.0');
-const requestCounter = meter.createCounter('custom_requests_total', {
-  description: 'Total number of requests processed',
+const meter = metrics.getMeter("capellaql-custom-metrics", "1.0.0");
+const requestCounter = meter.createCounter("custom_requests_total", {
+  description: "Total number of requests processed",
 });
-const responseHistogram = meter.createHistogram('custom_response_duration', {
-  description: 'Response duration in milliseconds',
-  unit: 'ms'
+const responseHistogram = meter.createHistogram("custom_response_duration", {
+  description: "Response duration in milliseconds",
+  unit: "ms",
 });
-const activeConnections = meter.createUpDownCounter('custom_active_connections', {
-  description: 'Number of active connections',
+const activeConnections = meter.createUpDownCounter("custom_active_connections", {
+  description: "Number of active connections",
 });
 
 const rateLimitStore = new Map<string, { count: number; timestamp: number }>();
 
 function getRateLimitKey(request: Request): string {
-  const clientIp =
-    request.headers.get("x-forwarded-for") ||
-    request.headers.get("cf-connecting-ip") ||
-    "unknown";
+  const clientIp = request.headers.get("x-forwarded-for") || request.headers.get("cf-connecting-ip") || "unknown";
 
   const url = new URL(request.url);
   const path = url.pathname;
@@ -121,23 +115,29 @@ const createYogaOptions = () => ({
     limit: 10,
   },
   plugins: [
+    // Response cache plugin (separate for better performance)
+    useResponseCache({
+      session: () => null,
+      ttl: YOGA_RESPONSE_CACHE_TTL,
+      // Custom cache key for better cache hit rates
+      buildResponseCacheKey: ({ params }) => {
+        return `${params.operationName || "unnamed"}:${JSON.stringify(params.variableValues || {})}`;
+      },
+    }),
+    // Lifecycle hooks plugin (separate)
     {
-      // useResponseCache({
-      //   session: () => null,
-      //   ttl: YOGA_RESPONSE_CACHE_TTL,
-      // }),
-      // onExecute: ({ args }) => {
-        // log("GraphQL Execute", {
-        //   operation: args["operationName"],
-        //   variables: args["variableValues"],
-        // });
-      // },
-      // onSubscribe: ({ args }) => {
-        // log("GraphQL Subscribe", {
-        //   operation: args["operationName"],
-        //   variables: args["variableValues"],
-        // });
-      // },
+      onExecute: ({ args }) => {
+        log("GraphQL Execute", {
+          operation: args["operationName"],
+          variables: args["variableValues"],
+        });
+      },
+      onSubscribe: ({ args }) => {
+        log("GraphQL Subscribe", {
+          operation: args["operationName"],
+          variables: args["variableValues"],
+        });
+      },
       onError: ({ error }) => {
         err("GraphQL Error", {
           error: error["message"],
@@ -149,10 +149,7 @@ const createYogaOptions = () => ({
       onParse: ({ params }) => {
         const span = trace.getActiveSpan();
         if (span) {
-          span.setAttribute(
-            "graphql.operation_name",
-            params.operationName || "Unknown",
-          );
+          span.setAttribute("graphql.operation_name", params.operationName || "Unknown");
           span.setAttribute("graphql.query", params.source);
         }
       },
@@ -163,7 +160,7 @@ const createYogaOptions = () => ({
             "graphql.operation_name",
             document.definitions[0]?.kind === "OperationDefinition"
               ? document.definitions[0].name?.value || "Unknown"
-              : "Unknown",
+              : "Unknown"
           );
         }
       },
@@ -175,12 +172,18 @@ const healthCheck = new Elysia()
   .get("/health", async () => {
     log("Health check called");
 
-    return {
-      status: "HEALTHY",
-      timestamp: new Date().toISOString(),
-      uptime: process.uptime(),
-      version: "2.0.0",
-    };
+    try {
+      const healthStatus = await createHealthcheck();
+      return healthStatus;
+    } catch (error) {
+      err("Health check failed", error);
+      return {
+        status: "unhealthy",
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+        version: "2.0.0",
+      };
+    }
   })
   .get("/health/telemetry", async () => {
     log("Telemetry health check called");
@@ -236,21 +239,60 @@ const app = new Elysia()
       origin: ["*"],
       methods: ["GET", "POST", "OPTIONS"],
       allowedHeaders: ["Content-Type"],
-    }),
+    })
   )
   .use(healthCheck)
   .use(yoga(createYogaOptions()))
+  .ws("/graphql", {
+    // WebSocket handler for GraphQL subscriptions using Bun's native WebSocket
+    message(ws, message) {
+      try {
+        const data = JSON.parse(message.toString());
+        log("WebSocket GraphQL message received", {
+          type: data.type,
+          id: data.id,
+          operation: data.payload?.operationName || "unknown",
+        });
+
+        // Handle GraphQL over WebSocket protocol
+        if (data.type === "connection_init") {
+          ws.send(JSON.stringify({ type: "connection_ack" }));
+        } else if (data.type === "start") {
+          // This would typically integrate with your GraphQL subscription system
+          log("GraphQL subscription started", { id: data.id });
+        } else if (data.type === "stop") {
+          log("GraphQL subscription stopped", { id: data.id });
+        }
+      } catch (error) {
+        err("WebSocket message handling error", error);
+        ws.send(
+          JSON.stringify({
+            type: "error",
+            payload: { message: "Invalid message format" },
+          })
+        );
+      }
+    },
+
+    open(ws) {
+      log("WebSocket connection opened");
+      activeConnections.add(1);
+    },
+
+    close(ws, code, reason) {
+      log("WebSocket connection closed", { code, reason });
+      activeConnections.add(-1);
+    },
+
+    error(ws, error) {
+      err("WebSocket error", error);
+    },
+  })
   .options("*", ({ set, request }) => {
     log("Handling OPTIONS request");
     log("Origin:", request.headers.get("origin"));
-    log(
-      "Access-Control-Request-Method:",
-      request.headers.get("access-control-request-method"),
-    );
-    log(
-      "Access-Control-Request-Headers:",
-      request.headers.get("access-control-request-headers"),
-    );
+    log("Access-Control-Request-Method:", request.headers.get("access-control-request-method"));
+    log("Access-Control-Request-Headers:", request.headers.get("access-control-request-headers"));
 
     set.headers["Access-Control-Allow-Origin"] = "*";
     set.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
@@ -260,25 +302,19 @@ const app = new Elysia()
   })
   .onRequest(async (context) => {
     context.set.headers["Access-Control-Allow-Origin"] = "*";
-    
+
     // Record custom metrics
-    requestCounter.add(1, { 
+    requestCounter.add(1, {
       method: context.request.method,
-      path: new URL(context.request.url).pathname 
+      path: new URL(context.request.url).pathname,
     });
     activeConnections.add(1);
-    
+
     log("Incoming request");
     log("Method:", context.request.method);
     log("Origin:", context.request.headers.get("origin"));
-    log(
-      "Access-Control-Request-Method:",
-      context.request.headers.get("access-control-request-method"),
-    );
-    log(
-      "Access-Control-Request-Headers:",
-      context.request.headers.get("access-control-request-headers"),
-    );
+    log("Access-Control-Request-Method:", context.request.headers.get("access-control-request-method"));
+    log("Access-Control-Request-Headers:", context.request.headers.get("access-control-request-headers"));
     if (checkRateLimit(context.request)) {
       context.set.status = 429;
       return { error: "Too Many Requests" };
@@ -309,14 +345,12 @@ const app = new Elysia()
         }
 
         // Set CSP header
-        context.set.headers["Content-Security-Policy"] =
-          cspDirectives.join("; ");
+        context.set.headers["Content-Security-Policy"] = cspDirectives.join("; ");
 
         context.set.headers["X-XSS-Protection"] = "1; mode=block";
         context.set.headers["X-Frame-Options"] = "SAMEORIGIN";
         context.set.headers["X-Content-Type-Options"] = "nosniff";
-        context.set.headers["Referrer-Policy"] =
-          "strict-origin-when-cross-origin";
+        context.set.headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
 
         const startTime = Date.now();
         context.store = { startTime };
@@ -358,19 +392,13 @@ const app = new Elysia()
             if (body && typeof body === "object") {
               if (body.operationName) {
                 span?.updateName(`GraphQL: ${body.operationName}`);
-                span?.setAttribute(
-                  "graphql.operation_name",
-                  body.operationName,
-                );
+                span?.setAttribute("graphql.operation_name", body.operationName);
               }
               if (body.query) {
                 span?.setAttribute("graphql.query", body.query);
               }
               if (body.variables) {
-                span?.setAttribute(
-                  "graphql.variables",
-                  JSON.stringify(body.variables),
-                );
+                span?.setAttribute("graphql.variables", JSON.stringify(body.variables));
               }
             }
           }
@@ -394,7 +422,7 @@ const app = new Elysia()
     // Record custom metrics
     responseHistogram.record(duration, {
       method: context.request.method,
-      status_code: context.set.status?.toString() || '200'
+      status_code: context.set.status?.toString() || "200",
     });
     activeConnections.add(-1); // Decrement active connections
 
@@ -415,18 +443,18 @@ const graphqlUrl = `${baseUrl}:${SERVER_PORT}/graphql`;
 const healthUrl = `${baseUrl}:${SERVER_PORT}/health`;
 const telemetryHealthUrl = `${baseUrl}:${SERVER_PORT}/health/telemetry`;
 
-// Get OpenTelemetry endpoints from environment
-const tracesEndpoint = process.env.TRACES_ENDPOINT || "not configured";
-const metricsEndpoint = process.env.METRICS_ENDPOINT || "not configured";
-const logsEndpoint = process.env.LOGS_ENDPOINT || "not configured";
-const otelEnabled = process.env.ENABLE_OPENTELEMETRY === "true";
+// Get OpenTelemetry endpoints from unified configuration
+const tracesEndpoint = config.telemetry.TRACES_ENDPOINT;
+const metricsEndpoint = config.telemetry.METRICS_ENDPOINT;
+const logsEndpoint = config.telemetry.LOGS_ENDPOINT;
+const otelEnabled = config.telemetry.ENABLE_OPENTELEMETRY;
 
 console.log(`
 🚀 CapellaQL Server started successfully!
 
 📍 Server Information:
    • Port: ${SERVER_PORT}
-   • Environment: ${process.env.DEPLOYMENT_ENVIRONMENT || "development"}
+   • Environment: ${config.telemetry.DEPLOYMENT_ENVIRONMENT}
    • GraphQL Playground: ${graphqlUrl}
    • Health Check: ${healthUrl}
    • Telemetry Health: ${telemetryHealthUrl}
@@ -436,7 +464,7 @@ console.log(`
    • Traces Endpoint: ${tracesEndpoint}
    • Metrics Endpoint: ${metricsEndpoint}
    • Logs Endpoint: ${logsEndpoint}
-   • Sampling Rate: ${process.env.SAMPLING_RATE || "0.15"} (${((parseFloat(process.env.SAMPLING_RATE || "0.15") * 100).toFixed(0))}%)
+   • Sampling Rate: ${config.telemetry.SAMPLING_RATE} (${(config.telemetry.SAMPLING_RATE * 100).toFixed(0)}%)
 
 🎯 Ready to accept requests!
 `);

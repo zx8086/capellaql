@@ -1,16 +1,16 @@
 /* src/telemetry/health/CircuitBreaker.ts */
 
 export enum CircuitBreakerState {
-  CLOSED = "CLOSED",   // Normal operation
-  OPEN = "OPEN",       // Failing, blocking requests
-  HALF_OPEN = "HALF_OPEN" // Testing if service recovered
+  CLOSED = "CLOSED", // Normal operation
+  OPEN = "OPEN", // Failing, blocking requests
+  HALF_OPEN = "HALF_OPEN", // Testing if service recovered
 }
 
 export interface CircuitBreakerConfig {
-  failureThreshold: number;    // Number of failures before opening (default: 5)
-  recoveryTimeoutMs: number;   // Time to wait before trying HALF_OPEN (default: 60000)
-  successThreshold: number;    // Successes needed in HALF_OPEN to close (default: 3)
-  timeWindowMs: number;        // Time window for failure counting (default: 60000)
+  failureThreshold: number; // Number of failures before opening (default: 5)
+  recoveryTimeoutMs: number; // Time to wait before trying HALF_OPEN (default: 60000)
+  successThreshold: number; // Successes needed in HALF_OPEN to close (default: 3)
+  timeWindowMs: number; // Time window for failure counting (default: 60000)
 }
 
 export interface CircuitBreakerStats {
@@ -46,11 +46,11 @@ export class TelemetryCircuitBreaker {
 
   public canExecute(): boolean {
     this.totalAttempts++;
-    
+
     switch (this.state) {
       case CircuitBreakerState.CLOSED:
         return true;
-        
+
       case CircuitBreakerState.OPEN:
         if (this.shouldAttemptReset()) {
           this.state = CircuitBreakerState.HALF_OPEN;
@@ -58,10 +58,10 @@ export class TelemetryCircuitBreaker {
           return true;
         }
         return false;
-        
+
       case CircuitBreakerState.HALF_OPEN:
         return true;
-        
+
       default:
         return false;
     }
@@ -70,12 +70,12 @@ export class TelemetryCircuitBreaker {
   public recordSuccess(): void {
     this.lastSuccessTime = Date.now();
     this.totalSuccesses++;
-    
+
     switch (this.state) {
       case CircuitBreakerState.CLOSED:
         this.resetFailures();
         break;
-        
+
       case CircuitBreakerState.HALF_OPEN:
         this.successes++;
         if (this.successes >= this.config.successThreshold) {
@@ -90,14 +90,14 @@ export class TelemetryCircuitBreaker {
     this.lastFailureTime = Date.now();
     this.failures++;
     this.totalFailures++;
-    
+
     switch (this.state) {
       case CircuitBreakerState.CLOSED:
         if (this.failures >= this.config.failureThreshold) {
           this.state = CircuitBreakerState.OPEN;
         }
         break;
-        
+
       case CircuitBreakerState.HALF_OPEN:
         this.state = CircuitBreakerState.OPEN;
         break;
@@ -123,9 +123,8 @@ export class TelemetryCircuitBreaker {
     state: CircuitBreakerState;
     canExecute: boolean;
   } {
-    const successRate = this.totalAttempts > 0 ? 
-      (this.totalSuccesses / this.totalAttempts) * 100 : 0;
-    
+    const successRate = this.totalAttempts > 0 ? (this.totalSuccesses / this.totalAttempts) * 100 : 0;
+
     return {
       isHealthy: this.state === CircuitBreakerState.CLOSED,
       successRate: Math.round(successRate * 100) / 100, // Round to 2 decimals
@@ -142,7 +141,7 @@ export class TelemetryCircuitBreaker {
 
   private shouldAttemptReset(): boolean {
     if (!this.lastFailureTime) return false;
-    return (Date.now() - this.lastFailureTime) >= this.config.recoveryTimeoutMs;
+    return Date.now() - this.lastFailureTime >= this.config.recoveryTimeoutMs;
   }
 
   private resetFailures(): void {
@@ -150,6 +149,6 @@ export class TelemetryCircuitBreaker {
   }
 
   private isWithinTimeWindow(timestamp: number): boolean {
-    return (Date.now() - timestamp) <= this.config.timeWindowMs;
+    return Date.now() - timestamp <= this.config.timeWindowMs;
   }
 }

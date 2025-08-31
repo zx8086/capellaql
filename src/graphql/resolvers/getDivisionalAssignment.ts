@@ -1,17 +1,17 @@
 /* src/graphql/resolvers/getDivisionalAssignment.ts */
 
-import { log, error as err, debug } from "../../telemetry/logger";
 import { getCluster } from "$lib/clusterProvider";
+import { debug, error as err, log } from "../../telemetry/logger";
 
 const getDivisionAssignment = {
   Query: {
     getDivisionAssignment: async (
       _: unknown,
       args: {
-        styleSeasonCode: String;
-        companyCode: String;
-        divisionCode: String;
-      },
+        styleSeasonCode: string;
+        companyCode: string;
+        divisionCode: string;
+      }
     ): Promise<any> => {
       try {
         const { styleSeasonCode, companyCode, divisionCode } = args;
@@ -32,7 +32,7 @@ const getDivisionAssignment = {
 
         log("Query executed", { query, queryOptions });
 
-        let result = await cluster.cluster.query(query, queryOptions);
+        const result = await cluster.cluster.query(query, queryOptions);
 
         debug(JSON.stringify(result, null, 2));
 

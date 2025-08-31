@@ -1,30 +1,32 @@
 /* src/telemetry/sampling/SmartSampler.ts */
 
 import {
-  Sampler,
-  SamplingResult,
-  SamplingDecision,
+  type Attributes,
   type Context,
   type Link,
-  type Attributes,
-  SpanKind,
+  type Sampler,
+  SamplingDecision,
+  type SamplingResult,
+  type SpanKind,
 } from "@opentelemetry/api";
 
 export interface SmartSamplingConfig {
   defaultSamplingRate: number; // 0.15 for 15% (2025 standard)
-  errorSamplingRate: number;   // 1.0 for 100% (2025 standard)
+  errorSamplingRate: number; // 1.0 for 100% (2025 standard)
   enabledEndpoints?: string[]; // Optional specific endpoint sampling
 }
 
 export class SmartSampler implements Sampler {
   private readonly config: SmartSamplingConfig;
 
-  constructor(config: SmartSamplingConfig = {
-    defaultSamplingRate: 0.15, // 15% default sampling (2025 standard)
-    errorSamplingRate: 1.0,    // 100% error retention (2025 standard)
-  }) {
+  constructor(
+    config: SmartSamplingConfig = {
+      defaultSamplingRate: 0.15, // 15% default sampling (2025 standard)
+      errorSamplingRate: 1.0, // 100% error retention (2025 standard)
+    }
+  ) {
     this.config = config;
-    
+
     // Validate configuration
     if (config.defaultSamplingRate < 0 || config.defaultSamplingRate > 1) {
       throw new Error("Default sampling rate must be between 0 and 1");
@@ -45,7 +47,7 @@ export class SmartSampler implements Sampler {
     // Always sample errors (100% error retention - 2025 standard)
     const httpStatusCode = attributes["http.status_code"];
     const hasError = attributes["error"] === true;
-    
+
     if (hasError || (httpStatusCode && Number(httpStatusCode) >= 400)) {
       return {
         decision: SamplingDecision.RECORD_AND_SAMPLED,
@@ -59,8 +61,7 @@ export class SmartSampler implements Sampler {
     // Check for specific endpoint sampling rules
     if (this.config.enabledEndpoints) {
       const httpRoute = attributes["http.route"] || attributes["http.target"];
-      if (httpRoute && this.config.enabledEndpoints.some(endpoint => 
-        String(httpRoute).includes(endpoint))) {
+      if (httpRoute && this.config.enabledEndpoints.some((endpoint) => String(httpRoute).includes(endpoint))) {
         return {
           decision: SamplingDecision.RECORD_AND_SAMPLED,
           attributes: {
@@ -76,27 +77,27 @@ export class SmartSampler implements Sampler {
       const healthSamplingRate = this.config.defaultSamplingRate * 0.1; // 1.5% for health checks
       const shouldSample = Math.random() < healthSamplingRate;
       return {
-        decision: shouldSample ? 
-          SamplingDecision.RECORD_AND_SAMPLED : 
-          SamplingDecision.NOT_RECORD,
-        attributes: shouldSample ? {
-          "sampling.reason": "health_check",
-          "sampling.rate": healthSamplingRate,
-        } : undefined,
+        decision: shouldSample ? SamplingDecision.RECORD_AND_SAMPLED : SamplingDecision.NOT_RECORD,
+        attributes: shouldSample
+          ? {
+              "sampling.reason": "health_check",
+              "sampling.rate": healthSamplingRate,
+            }
+          : undefined,
       };
     }
 
     // Default sampling (15% - 2025 standard)
     const shouldSample = Math.random() < this.config.defaultSamplingRate;
-    
+
     return {
-      decision: shouldSample ? 
-        SamplingDecision.RECORD_AND_SAMPLED : 
-        SamplingDecision.NOT_RECORD,
-      attributes: shouldSample ? {
-        "sampling.reason": "default_sampling",
-        "sampling.rate": this.config.defaultSamplingRate,
-      } : undefined,
+      decision: shouldSample ? SamplingDecision.RECORD_AND_SAMPLED : SamplingDecision.NOT_RECORD,
+      attributes: shouldSample
+        ? {
+            "sampling.reason": "default_sampling",
+            "sampling.rate": this.config.defaultSamplingRate,
+          }
+        : undefined,
     };
   }
 

@@ -3,7 +3,12 @@
 // DEPRECATED: This file is deprecated. Use ../telemetry/logger.ts instead.
 // Re-exporting for backward compatibility.
 
-import { log as telemetryLog, err as telemetryErr, warn as telemetryWarn, debug as telemetryDebug } from '../telemetry/logger';
+import {
+  debug as telemetryDebug,
+  err as telemetryErr,
+  log as telemetryLog,
+  warn as telemetryWarn,
+} from "../telemetry/logger";
 
 console.warn("DEPRECATED: src/utils/logger.ts is deprecated. Use ../telemetry module instead.");
 

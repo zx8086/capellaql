@@ -1,18 +1,43 @@
 # scripts to run before `bun run`-ing a file or script
 # register plugins by adding them to this list
 preload = ['src/telemetry/instrumentation.ts']
-logLevel = "debug"
+logLevel = "warn"  # Changed from "debug" for production readiness
 
 [run]
 # equivalent to `bun --bun` for all `bun run` commands
 bun = true
+silent = false
+
+[install]
+exact = true
+auto = "fallback"
+globalThis.CN_ROOT = "/usr/src/app"
+globalThis.CXXCBC_CACHE_DIR = "/usr/src/app/deps/couchbase-cxx-cache"
 
 [install.lockfile]
 path = "bun.lockb"
 
-[install]
-globalThis.CN_ROOT = "/usr/src/app"
-globalThis.CXXCBC_CACHE_DIR = "/usr/src/app/deps/couchbase-cxx-cache"
+[install.cache]
+dir = ".bun-cache"
+
+[test]
+# Enable test coverage and set reasonable threshold
+coverage = true
+coverageThreshold = 75
 
 [build]
 target = "bun"
+outdir = "dist"
+# Enable minification for production builds
+minify = true
+sourcemap = true
+
+# Performance optimizations
+[dns]
+cache = true
+ttl = 120
+
+# Development server configuration
+[dev]
+hot = true
+watch = true

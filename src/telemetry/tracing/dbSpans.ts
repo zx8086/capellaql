@@ -1,6 +1,6 @@
 /* src/telemetry/tracing/dbSpans.ts */
 
-import { trace, SpanStatusCode, type Span, type Attributes } from "@opentelemetry/api";
+import { type Attributes, type Span, SpanStatusCode, trace } from "@opentelemetry/api";
 
 export interface CouchbaseSpanOptions {
   bucket: string;
@@ -11,12 +11,9 @@ export interface CouchbaseSpanOptions {
   query?: string;
 }
 
-export async function createDatabaseSpan<T>(
-  options: CouchbaseSpanOptions,
-  operation: () => Promise<T>
-): Promise<T> {
+export async function createDatabaseSpan<T>(options: CouchbaseSpanOptions, operation: () => Promise<T>): Promise<T> {
   const tracer = trace.getTracer("couchbase-client", "1.0.0");
-  
+
   const spanName = `couchbase.${options.operation}`;
   const spanAttributes: Attributes = {
     "db.system": "couchbase",
@@ -40,26 +37,25 @@ export async function createDatabaseSpan<T>(
 
   return await tracer.startActiveSpan(spanName, { attributes: spanAttributes }, async (span: Span) => {
     const startTime = Date.now();
-    
+
     try {
       const result = await operation();
-      
+
       const duration = Date.now() - startTime;
       span.setAttributes({
         "db.operation.duration_ms": duration,
         "db.operation.success": true,
       });
-      
+
       span.setStatus({ code: SpanStatusCode.OK });
       return result;
-      
     } catch (error) {
       const duration = Date.now() - startTime;
       span.setAttributes({
         "db.operation.duration_ms": duration,
         "db.operation.success": false,
       });
-      
+
       if (error instanceof Error) {
         span.setAttributes({
           "db.operation.error_name": error.name,
@@ -67,12 +63,12 @@ export async function createDatabaseSpan<T>(
         });
         span.recordException(error);
       }
-      
+
       span.setStatus({
         code: SpanStatusCode.ERROR,
         message: error instanceof Error ? error.message : String(error),
       });
-      
+
       throw error;
     } finally {
       span.end();
@@ -87,13 +83,16 @@ export async function createCouchbaseGetSpan<T>(
   key: string,
   operation: () => Promise<T>
 ): Promise<T> {
-  return createDatabaseSpan({
-    bucket,
-    scope,
-    collection,
-    operation: "get",
-    key,
-  }, operation);
+  return createDatabaseSpan(
+    {
+      bucket,
+      scope,
+      collection,
+      operation: "get",
+      key,
+    },
+    operation
+  );
 }
 
 export async function createCouchbaseQuerySpan<T>(
@@ -101,11 +100,14 @@ export async function createCouchbaseQuerySpan<T>(
   query: string,
   operation: () => Promise<T>
 ): Promise<T> {
-  return createDatabaseSpan({
-    bucket,
-    operation: "query",
-    query,
-  }, operation);
+  return createDatabaseSpan(
+    {
+      bucket,
+      operation: "query",
+      query,
+    },
+    operation
+  );
 }
 
 export async function createCouchbaseSearchSpan<T>(
@@ -114,53 +116,56 @@ export async function createCouchbaseSearchSpan<T>(
   operation: () => Promise<T>
 ): Promise<T> {
   const tracer = trace.getTracer("couchbase-client", "1.0.0");
-  
+
   const spanAttributes: Attributes = {
     "db.system": "couchbase",
     "db.operation": "search",
     "db.couchbase.collections_count": collections.length,
     "db.couchbase.keys_count": keys.length,
-    "db.couchbase.collections": collections.map(c => `${c.bucket}.${c.scope}.${c.collection}`).join(","),
+    "db.couchbase.collections": collections.map((c) => `${c.bucket}.${c.scope}.${c.collection}`).join(","),
   };
 
-  return await tracer.startActiveSpan("couchbase.multi_collection_search", { attributes: spanAttributes }, async (span: Span) => {
-    const startTime = Date.now();
-    
-    try {
-      const result = await operation();
-      
-      const duration = Date.now() - startTime;
-      span.setAttributes({
-        "db.operation.duration_ms": duration,
-        "db.operation.success": true,
-      });
-      
-      span.setStatus({ code: SpanStatusCode.OK });
-      return result;
-      
-    } catch (error) {
-      const duration = Date.now() - startTime;
-      span.setAttributes({
-        "db.operation.duration_ms": duration,
-        "db.operation.success": false,
-      });
-      
-      if (error instanceof Error) {
+  return await tracer.startActiveSpan(
+    "couchbase.multi_collection_search",
+    { attributes: spanAttributes },
+    async (span: Span) => {
+      const startTime = Date.now();
+
+      try {
+        const result = await operation();
+
+        const duration = Date.now() - startTime;
         span.setAttributes({
-          "db.operation.error_name": error.name,
-          "db.operation.error_message": error.message,
+          "db.operation.duration_ms": duration,
+          "db.operation.success": true,
         });
-        span.recordException(error);
+
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (error) {
+        const duration = Date.now() - startTime;
+        span.setAttributes({
+          "db.operation.duration_ms": duration,
+          "db.operation.success": false,
+        });
+
+        if (error instanceof Error) {
+          span.setAttributes({
+            "db.operation.error_name": error.name,
+            "db.operation.error_message": error.message,
+          });
+          span.recordException(error);
+        }
+
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.message : String(error),
+        });
+
+        throw error;
+      } finally {
+        span.end();
       }
-      
-      span.setStatus({
-        code: SpanStatusCode.ERROR,
-        message: error instanceof Error ? error.message : String(error),
-      });
-      
-      throw error;
-    } finally {
-      span.end();
     }
-  });
+  );
 }

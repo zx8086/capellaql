@@ -1,14 +1,11 @@
 /* src/graphql/resolvers/looks.ts */
 
-import { log, error as err, debug } from "../../telemetry/logger";
 import { getCluster } from "$lib/clusterProvider";
+import { debug, error as err, log } from "../../telemetry/logger";
 
 const looks = {
   Query: {
-    looks: async (
-      _: unknown,
-      args: { brand: string; season: string; division: string },
-    ): Promise<any> => {
+    looks: async (_: unknown, args: { brand: string; season: string; division: string }): Promise<any> => {
       try {
         const { brand, season, division } = args;
 
@@ -28,7 +25,7 @@ const looks = {
 
         log("Query executed", { query, queryOptions });
 
-        let result = await cluster.cluster.query(query, queryOptions);
+        const result = await cluster.cluster.query(query, queryOptions);
 
         debug(JSON.stringify(result.rows[0], null, 2));
 

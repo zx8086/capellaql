@@ -1,7 +1,7 @@
 /* src/graphql/resolvers/documentSearch.ts */
 
-import { log, err, createCouchbaseSearchSpan } from "../../telemetry";
 import { getCluster } from "$lib/clusterProvider";
+import { createCouchbaseSearchSpan, err, log } from "../../telemetry";
 
 interface SearchResult {
   bucket: string;
@@ -19,10 +19,10 @@ const documentSearch = {
       args: {
         collections: { bucket: string; scope: string; collection: string }[];
         keys: string[];
-      },
+      }
     ): Promise<SearchResult[]> => {
       const { collections, keys } = args;
-      
+
       return await createCouchbaseSearchSpan(collections, keys, async () => {
         try {
           const connection = await getCluster();
@@ -52,11 +52,7 @@ const documentSearch = {
               });
 
               try {
-                const collectionRef = connection.collection(
-                  bucket,
-                  scope,
-                  collection,
-                );
+                const collectionRef = connection.collection(bucket, scope, collection);
                 const result = await collectionRef.get(key);
                 const timeTaken = Date.now() - start;
 
@@ -68,14 +64,10 @@ const documentSearch = {
                   timeTaken,
                 });
 
-                log(
-                  `Time taken to fetch document from ${bucket}.${scope}.${collection}: ${timeTaken}ms`,
-                );
+                log(`Time taken to fetch document from ${bucket}.${scope}.${collection}: ${timeTaken}ms`);
               } catch (error) {
                 if (error instanceof connection.errors.DocumentNotFoundError) {
-                  log(
-                    `Document with key ${key} not found in ${bucket}.${scope}.${collection}`,
-                  );
+                  log(`Document with key ${key} not found in ${bucket}.${scope}.${collection}`);
                   results.push({
                     bucket,
                     scope,
@@ -86,7 +78,7 @@ const documentSearch = {
                 } else if (error instanceof connection.errors.CouchbaseError) {
                   err(
                     `Couchbase error fetching document with key ${key} from ${bucket}.${scope}.${collection}:`,
-                    error,
+                    error
                   );
                   results.push({
                     bucket,
@@ -99,7 +91,7 @@ const documentSearch = {
                 } else {
                   err(
                     `Unexpected error fetching document with key ${key} from ${bucket}.${scope}.${collection}:`,
-                    error,
+                    error
                   );
                   results.push({
                     bucket,

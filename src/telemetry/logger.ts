@@ -1,6 +1,6 @@
 /* src/telemetry/logger.ts */
 
-import { trace, context, type SpanContext } from "@opentelemetry/api";
+import { context, type SpanContext, trace } from "@opentelemetry/api";
 import * as api from "@opentelemetry/api-logs";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 
@@ -73,14 +73,17 @@ class TelemetryLogger {
   }
 
   public error(message: string, error?: Error | unknown, meta?: Record<string, any>): void {
-    const errorMeta = error instanceof Error ? {
-      error: {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      },
-      ...meta
-    } : { error: String(error), ...meta };
+    const errorMeta =
+      error instanceof Error
+        ? {
+            error: {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+            },
+            ...meta,
+          }
+        : { error: String(error), ...meta };
 
     this.log(LogLevel.ERROR, message, errorMeta);
   }
@@ -101,10 +104,12 @@ class TelemetryLogger {
       const span = trace.getSpan(ctx);
       const spanContext: SpanContext | undefined = span?.spanContext();
 
-      return spanContext ? {
-        traceId: spanContext.traceId,
-        spanId: spanContext.spanId,
-      } : {};
+      return spanContext
+        ? {
+            traceId: spanContext.traceId,
+            spanId: spanContext.spanId,
+          }
+        : {};
     } catch {
       return {};
     }
@@ -113,7 +118,7 @@ class TelemetryLogger {
   private emit(logData: StructuredLogData): void {
     // Check circuit breaker
     const circuitBreaker = telemetryHealthMonitor.getCircuitBreaker();
-    
+
     if (!circuitBreaker.canExecute()) {
       // Circuit breaker is open, fall back to console
       this.fallbackToConsole(logData);
@@ -136,7 +141,6 @@ class TelemetryLogger {
         // Record successful log emission
         telemetryHealthMonitor.recordExporterSuccess("logs");
         circuitBreaker.recordSuccess();
-
       } catch (error) {
         // Record failure and fall back to console
         telemetryHealthMonitor.recordExporterFailure("logs", error as Error);
@@ -156,12 +160,12 @@ class TelemetryLogger {
 
   private fallbackToConsole(logData: StructuredLogData, error?: unknown): void {
     const timestamp = new Date(logData.timestamp).toISOString();
-    const contextStr = logData.context ? 
-      `[${logData.context.traceId?.slice(0, 8)}:${logData.context.spanId?.slice(0, 8)}]` : 
-      "";
-    
+    const contextStr = logData.context
+      ? `[${logData.context.traceId?.slice(0, 8)}:${logData.context.spanId?.slice(0, 8)}]`
+      : "";
+
     const logMessage = `${timestamp} ${logData.level.toUpperCase()} ${contextStr} ${logData.message}`;
-    
+
     switch (logData.level) {
       case LogLevel.DEBUG:
         console.debug(logMessage, logData.meta || "");
@@ -184,11 +188,11 @@ class TelemetryLogger {
   private flushFallbackLogs(): void {
     if (this.fallbackLogs.length > 0 && this.isInitialized && this.logger) {
       console.info(`Flushing ${this.fallbackLogs.length} fallback logs to OpenTelemetry`);
-      
+
       for (const logData of this.fallbackLogs) {
         this.emit(logData);
       }
-      
+
       this.fallbackLogs = [];
     }
   }

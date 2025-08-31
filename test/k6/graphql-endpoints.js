@@ -1,7 +1,7 @@
 /* test/k6/graphql-endpoints.js */
 
-import http from "k6/http";
 import { check, sleep } from "k6";
+import http from "k6/http";
 import { Counter } from "k6/metrics";
 
 const errors = new Counter("errors");
@@ -63,37 +63,11 @@ query getImageUrlCheck($divisions: [String!]!, $season: String!) {
 const brands = [
   {
     name: "TH",
-    divisions: [
-      "01",
-      "02",
-      "03",
-      "04",
-      "05",
-      "07",
-      "08",
-      "09",
-      "10",
-      "11",
-      "18",
-    ],
+    divisions: ["01", "02", "03", "04", "05", "07", "08", "09", "10", "11", "18"],
   },
   {
     name: "CK",
-    divisions: [
-      "61",
-      "62",
-      "63",
-      "64",
-      "65",
-      "67",
-      "68",
-      "69",
-      "70",
-      "71",
-      "72",
-      "77",
-      "96",
-    ],
+    divisions: ["61", "62", "63", "64", "65", "67", "68", "69", "70", "71", "72", "77", "96"],
   },
 ];
 
@@ -147,8 +121,7 @@ export const options = {
 
 export function runLooksSummaryScenario() {
   const brand = brands[Math.floor(Math.random() * brands.length)];
-  const division =
-    brand.divisions[Math.floor(Math.random() * brand.divisions.length)];
+  const division = brand.divisions[Math.floor(Math.random() * brand.divisions.length)];
   const season = seasons[Math.floor(Math.random() * seasons.length)];
 
   const payload = JSON.stringify({
@@ -233,9 +206,7 @@ export function runSeasonalAssignmentsScenario() {
         JSON.parse(r.body);
         return true;
       } catch (e) {
-        console.error(
-          `Invalid JSON response for getAllSeasonalAssignments: ${r.body}`,
-        );
+        console.error(`Invalid JSON response for getAllSeasonalAssignments: ${r.body}`);
         return false;
       }
     },
@@ -250,10 +221,7 @@ export function runSeasonalAssignmentsScenario() {
     "has getAllSeasonalAssignments data": (r) => {
       try {
         const jsonResponse = JSON.parse(r.body);
-        return (
-          jsonResponse.data &&
-          jsonResponse.data.getAllSeasonalAssignments !== null
-        );
+        return jsonResponse.data && jsonResponse.data.getAllSeasonalAssignments !== null;
       } catch (e) {
         return false;
       }
@@ -261,17 +229,13 @@ export function runSeasonalAssignmentsScenario() {
   });
 
   if (response.status !== 200) {
-    console.error(
-      `HTTP ${response.status} for getAllSeasonalAssignments: ${response.body}`,
-    );
+    console.error(`HTTP ${response.status} for getAllSeasonalAssignments: ${response.body}`);
   }
 }
 
 export function runImageUrlCheckScenario() {
   const allDivisions = brands.flatMap((brand) => brand.divisions);
-  const randomDivisions = allDivisions
-    .sort(() => 0.5 - Math.random())
-    .slice(0, 3);
+  const randomDivisions = allDivisions.sort(() => 0.5 - Math.random()).slice(0, 3);
 
   const payload = JSON.stringify({
     query: GET_IMAGE_URL_CHECK_QUERY,
@@ -321,8 +285,6 @@ export function runImageUrlCheckScenario() {
   });
 
   if (response.status !== 200) {
-    console.error(
-      `HTTP ${response.status} for getImageUrlCheck: ${response.body}`,
-    );
+    console.error(`HTTP ${response.status} for getImageUrlCheck: ${response.body}`);
   }
 }

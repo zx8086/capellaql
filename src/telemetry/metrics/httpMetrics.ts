@@ -1,6 +1,6 @@
 /* src/telemetry/metrics/httpMetrics.ts */
 
-import { metrics, type Counter, type Histogram, context, trace } from "@opentelemetry/api";
+import { type Counter, context, type Histogram, metrics, trace } from "@opentelemetry/api";
 
 let httpRequestCounter: Counter | undefined;
 let httpResponseTimeHistogram: Histogram | undefined;
@@ -22,13 +22,10 @@ export function initializeHttpMetrics(): void {
     });
 
     // HTTP response time histogram with proper UCUM units
-    httpResponseTimeHistogram = meter.createHistogram(
-      "http_response_time_seconds",
-      {
-        description: "HTTP request response time in seconds",
-        unit: "s", // UCUM unit for seconds (2025 compliance)
-      }
-    );
+    httpResponseTimeHistogram = meter.createHistogram("http_response_time_seconds", {
+      description: "HTTP request response time in seconds",
+      unit: "s", // UCUM unit for seconds (2025 compliance)
+    });
 
     isInitialized = true;
     console.log("HTTP metrics initialized successfully");
@@ -47,7 +44,7 @@ export function recordHttpRequest(method: string, route: string, statusCode?: nu
     const labels = {
       method: method.toUpperCase(),
       route,
-      ...(statusCode && { status_code: statusCode.toString() })
+      ...(statusCode && { status_code: statusCode.toString() }),
     };
 
     httpRequestCounter.add(1, labels);
@@ -65,13 +62,13 @@ export function recordHttpResponseTime(durationMs: number, method?: string, rout
   try {
     // Convert milliseconds to seconds for UCUM compliance
     const durationSeconds = durationMs / 1000;
-    
+
     const labels: Record<string, string> = {};
-    
+
     if (method) labels.method = method.toUpperCase();
     if (route) labels.route = route;
     if (statusCode) labels.status_code = statusCode.toString();
-    
+
     // Add trace context if available
     const activeContext = context.active();
     const span = trace.getSpan(activeContext);
@@ -105,14 +102,19 @@ export function recordGraphQLRequest(operationName: string, operationType: strin
   }
 }
 
-export function recordGraphQLResponseTime(durationMs: number, operationName: string, operationType: string, hasErrors: boolean): void {
+export function recordGraphQLResponseTime(
+  durationMs: number,
+  operationName: string,
+  operationType: string,
+  hasErrors: boolean
+): void {
   if (!isInitialized || !httpResponseTimeHistogram) {
     return;
   }
 
   try {
     const durationSeconds = durationMs / 1000;
-    
+
     httpResponseTimeHistogram.record(durationSeconds, {
       method: "POST",
       route: "/graphql",

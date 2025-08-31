@@ -1,14 +1,11 @@
 /* src/graphql/resolvers/looksUrlCheck.ts */
 
-import { log, error as err, debug } from "../../telemetry/logger";
 import { getCluster } from "$lib/clusterProvider";
+import { debug, error as err, log } from "../../telemetry/logger";
 
 const looksUrlCheck = {
   Query: {
-    getLooksUrlCheck: async (
-      _: unknown,
-      args: { divisions: string[]; season: string },
-    ): Promise<any> => {
+    getLooksUrlCheck: async (_: unknown, args: { divisions: string[]; season: string }): Promise<any> => {
       try {
         const { divisions, season } = args;
 
@@ -27,7 +24,7 @@ const looksUrlCheck = {
 
         log("Query executed", { query, queryOptions });
 
-        let result = await cluster.cluster.query(query, queryOptions);
+        const result = await cluster.cluster.query(query, queryOptions);
 
         debug(JSON.stringify(result, null, 2));
 

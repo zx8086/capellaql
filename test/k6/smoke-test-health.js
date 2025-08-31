@@ -10,16 +10,16 @@ This can be shorter or just a few iterations
 
 */
 
-import http from 'k6/http';
-import { check, sleep } from 'k6';
+import { check, sleep } from "k6";
+import http from "k6/http";
 
 export const options = {
   vus: 3,
-  duration: '3m',
+  duration: "3m",
   thresholds: {
-    http_req_duration: ['p(95)<50'],
+    http_req_duration: ["p(95)<50"],
   },
-  userAgent: 'K6TestAgent/1.0',
+  userAgent: "K6TestAgent/1.0",
 };
 
 // Add environment variable support for PORT
@@ -29,21 +29,21 @@ console.log(BASE_URL);
 
 export default function () {
   const params = {
-    tags: { testType: 'smoke-test', endpoint: '/health' }
+    tags: { testType: "smoke-test", endpoint: "/health" },
   };
-  
+
   const res = http.get(`${BASE_URL}/health`, params);
-  check(res, { 
-    'status was 200': (r) => r.status === 200,
-    'response time < 50ms': (r) => r.timings.duration < 50,
-    'response is valid': (r) => {
+  check(res, {
+    "status was 200": (r) => r.status === 200,
+    "response time < 50ms": (r) => r.timings.duration < 50,
+    "response is valid": (r) => {
       try {
         const body = JSON.parse(r.body);
-        return body.status === 'healthy' || body.status === 'ok';
+        return body.status === "healthy" || body.status === "ok";
       } catch (e) {
         return false;
       }
-    }
+    },
   });
   sleep(1);
 }

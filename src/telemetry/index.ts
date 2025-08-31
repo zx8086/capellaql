@@ -1,35 +1,32 @@
 /* src/telemetry/index.ts */
 
+// Re-export telemetry config from unified system
+export { loadTelemetryConfigFromEnv, telemetryConfig } from "$config";
+// Configuration exports (now unified - use $config instead)
+// @deprecated Use unified config.telemetry instead of these exports
+export { type TelemetryConfig, validateTelemetryConfig } from "./config";
+export { CircuitBreakerState, TelemetryCircuitBreaker } from "./health/CircuitBreaker";
+// Health monitoring exports
+export { getTelemetryHealth, telemetryHealthMonitor } from "./health/telemetryHealth";
 // Main telemetry exports and initialization
-export { initializeTelemetry, getTelemetrySDK, shutdownTelemetry } from './instrumentation';
-
+export { getTelemetrySDK, initializeTelemetry, shutdownTelemetry } from "./instrumentation";
 // Logging exports
-export { log, debug, warn, err, error, telemetryLogger } from './logger';
-
+export { debug, err, error, log, telemetryLogger, warn } from "./logger";
 // Metrics exports
 export {
+  getMetricsStatus,
   initializeHttpMetrics,
-  recordHttpRequest,
-  recordHttpResponseTime,
   recordGraphQLRequest,
   recordGraphQLResponseTime,
-  getMetricsStatus
-} from './metrics/httpMetrics';
-
+  recordHttpRequest,
+  recordHttpResponseTime,
+} from "./metrics/httpMetrics";
+// Sampling exports
+export { SmartSampler, type SmartSamplingConfig } from "./sampling/SmartSampler";
 // Tracing exports
 export {
-  createDatabaseSpan,
   createCouchbaseGetSpan,
   createCouchbaseQuerySpan,
-  createCouchbaseSearchSpan
-} from './tracing/dbSpans';
-
-// Health monitoring exports
-export { getTelemetryHealth, telemetryHealthMonitor } from './health/telemetryHealth';
-export { TelemetryCircuitBreaker, CircuitBreakerState } from './health/CircuitBreaker';
-
-// Configuration exports
-export { validateTelemetryConfig, loadTelemetryConfigFromEnv, type TelemetryConfig } from './config';
-
-// Sampling exports
-export { SmartSampler, type SmartSamplingConfig } from './sampling/SmartSampler';
+  createCouchbaseSearchSpan,
+  createDatabaseSpan,
+} from "./tracing/dbSpans";

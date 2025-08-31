@@ -1,7 +1,7 @@
 /* src/graphql/resolvers/optionsProductView.ts */
 
-import { log, error as err, debug } from "../../telemetry/logger";
 import { getCluster } from "$lib/clusterProvider";
+import { debug, error as err, log } from "../../telemetry/logger";
 
 const optionsProductView = {
   Query: {
@@ -14,17 +14,10 @@ const optionsProductView = {
         DivisionCode: string;
         ActiveOption: boolean;
         SalesChannels: string[];
-      },
+      }
     ): Promise<any> => {
       try {
-        const {
-          BrandCode,
-          SalesOrganizationCode,
-          StyleSeasonCode,
-          DivisionCode,
-          ActiveOption,
-          SalesChannels,
-        } = args;
+        const { BrandCode, SalesOrganizationCode, StyleSeasonCode, DivisionCode, ActiveOption, SalesChannels } = args;
 
         const cluster = await getCluster().catch((error) => {
           err("Error in getCluster:", error);
@@ -45,7 +38,7 @@ const optionsProductView = {
 
         log("Query executed", { query, queryOptions });
 
-        let result = await cluster.cluster.query(query, queryOptions);
+        const result = await cluster.cluster.query(query, queryOptions);
 
         debug(JSON.stringify(result.rows, null, 2));
 

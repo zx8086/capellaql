@@ -2,11 +2,21 @@
   "name": "capellaql",
   "version": "2.0.0",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "NODE_DEBUG=http BUN_CONFIG_VERBOSE_FETCH=true BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=120 bun run --watch src/index.ts",
-    "start": "BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=120 bun run src/index.ts",
-    "build": "bun build ./src/index.ts --target=node --outdir ./dist --sourcemap",
-    "build:dev": "bun build ./src/index.ts --target=node --outdir ./dist --sourcemap --watch",
+    "test": "bun test --coverage",
+    "test:watch": "bun test --watch",
+    "dev": "bun run tools/dev.ts",
+    "dev:simple": "BUN_CONFIG_VERBOSE_FETCH=true bun run --hot --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build ./src/index.ts --target=bun --outdir ./dist --sourcemap --minify",
+    "build:dev": "bun build ./src/index.ts --target=bun --outdir ./dist --sourcemap --watch",
+    "build:node": "bun build ./src/index.ts --target=node --outdir ./dist --sourcemap --minify",
+    "clean": "rm -rf dist node_modules/.cache .bun-cache",
+    "typecheck": "bun --bun tsc --noEmit",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "quality": "bun run typecheck && bun run lint",
+    "healthcheck": "bun run src/healthcheck.ts",
     "prepublish": "npm run snyk-protect",
     "snyk-protect": "snyk-protect"
   },
@@ -34,17 +44,18 @@
     "@snyk/protect": "^1.1297.1",
     "@types/k6": "^1.0.2",
     "couchbase": "^4.4.6",
-    "dotenv": "^16.5.0",
-    "elastic-apm-node": "^4.13.0",
     "elysia": "^1.3.3",
     "graphql": "^16.11.0",
     "graphql-tag": "^2.12.6",
     "graphql-yoga": "^5.13.5",
-    "net": "^1.0.2",
-    "os": "^0.1.2",
     "prom-client": "^15.1.3",
     "ulid": "^3.0.0",
-    "zod": "^3.25.43"
+    "zod": "^4.0.0"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.2.2",
+    "@types/bun": "^1.2.15",
+    "bun-types": "^1.2.15"
   },
   "overrides": {
     "*/graphql": "^16.9.0",
@@ -52,10 +63,8 @@
     "couchbase/cmake-js/axios": "^1.7.8",
     "**/axios": "^1.7.8"
   },
-  "devDependencies": {
-    "@types/bun": "^1.2.15",
-    "bun-types": "^1.2.15",
-    "source-map-support": "^0.5.21"
+  "engines": {
+    "bun": ">=1.0.0"
   },
   "module": "src/index.ts",
   "type": "module",
