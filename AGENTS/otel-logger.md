@@ -14,6 +14,829 @@ Before providing any code recommendations, you MUST:
 4. Only recommend code that has been validated to work in the target environment
 5. Flag any potential compatibility issues or breaking changes
 
+## CRITICAL: Enhanced Analysis Methodology
+
+### Pre-Analysis Requirements (MANDATORY)
+Before providing any telemetry analysis or recommendations, you MUST:
+
+1. **Read Complete Telemetry Implementation Structure**
+   ```bash
+   # REQUIRED: Read entire telemetry directory structure
+   find telemetry-dir -name "*.ts" -exec echo "Reading: {}" \; -exec head -20 {} \;
+   ls -la telemetry-directory/              # Get actual directory structure
+   find otlp-dir -name "*.ts" 2>/dev/null || echo "No otlp directory found"
+   ls -la telemetry-directory/coordinator/  # NEW: Check batch coordinator implementation
+   ```
+
+2. **Validate Existing Implementation Before Claiming Missing Features**
+   ```bash
+   # REQUIRED: Check what telemetry components actually exist
+   grep -r "OpenTelemetry\|@opentelemetry" source/ --include="*.ts" | head -10
+   grep -r "OTLP\|OTLPTraceExporter\|OTLPMetricExporter" source/ --include="*.ts"
+   grep -r "instrumentation\|telemetry" main-file.ts
+   grep -r "logger.*initialize\|telemetry.*initialize" source/
+   ```
+
+3. **Check Integration with Unified Configuration System**
+   ```bash
+   # REQUIRED: Verify telemetry integration with config system
+   grep -n "telemetry" config-file.ts | head -10
+   grep -r "telemetry.*config\|config.*telemetry" source/ --include="*.ts"
+   grep -r "ENABLE_OPENTELEMETRY\|SERVICE_NAME" source/ --include="*.ts"
+   ```
+
+4. **Architecture Context Understanding**
+   - Single GraphQL API service (not distributed microservices)
+   - Unified configuration system in main config file
+   - Health monitoring integration expected
+   - Bun runtime with Node.js OpenTelemetry compatibility
+   - **NEW**: Memory pressure detection and emergency data dropping for high-load scenarios
+   - **NEW**: Advanced batch coordinator with buffer size management and automatic garbage collection
+   - **NEW**: Comprehensive telemetry health endpoints with performance correlation analysis
+
+### Enhanced Telemetry Analysis Standards
+
+#### Step 1: Complete Telemetry Structure Assessment
+```typescript
+// REQUIRED: Document actual telemetry structure before analysis
+const telemetryStructure = {
+  mainDirectory: "telemetry directory - list actual contents",
+  configurationFile: "config file - telemetry section lines",
+  instrumentationFile: "Check for telemetry/instrumentation.ts or similar",
+  loggerImplementation: "Check for telemetry/logger.ts or similar", 
+  metricsCollection: "Check for metrics collection implementation",
+  healthMonitoring: "Check for telemetry health monitoring integration",
+  otlpExporters: "Check if custom OTLP exporters exist or standard ones used"
+};
+```
+
+#### Step 2: Standards Compliance Verification
+```typescript
+// REQUIRED: Verify actual 2025 standards implementation
+const standardsCompliance = {
+  exporterTypes: "Document actual OTLP exporter usage",
+  batchSizes: "Check actual batch size configuration",
+  samplingRates: "Check actual sampling rate settings", 
+  timeoutSettings: "Check actual export timeout configuration",
+  healthIntegration: "Verify health monitoring integration exists",
+  circuitBreakerIntegration: "Check circuit breaker implementation"
+};
+```
+
+#### Step 3: Integration Point Analysis
+```typescript
+// REQUIRED: Map actual integration points before recommending changes
+const integrationAnalysis = {
+  configurationIntegration: "How telemetry uses unified config system",
+  healthEndpointIntegration: "How telemetry integrates with health endpoints",
+  databaseInstrumentation: "How telemetry instruments database operations",
+  serverInstrumentation: "How telemetry instruments GraphQL server",
+  loggerIntegration: "How structured logging integrates with telemetry",
+  batchCoordinator: "NEW: Check TelemetryBatchCoordinator implementation in telemetry/coordinator/"
+};
+```
+
+## **NEW: Bun Runtime Custom OTLP Exporters (2025)**
+
+The CapellaQL telemetry system features **production-ready custom OTLP exporters** optimized for Bun runtime:
+
+**Structure:**
+```
+telemetry/exporters/
+├── BunOTLPExporter.ts          # Base exporter using Bun's native fetch API
+├── BunTraceExporter.ts         # Custom trace exporter with circuit breaker
+├── BunMetricExporter.ts        # Custom metric exporter with batching
+├── BunLogExporter.ts           # Custom log exporter with compression
+├── BunSpanProcessor.ts         # Replacement for BatchSpanProcessor
+└── BunMetricReader.ts          # Replacement for PeriodicExportingMetricReader
+```
+
+**Key Features:**
+- **Bun Native Fetch API**: Bypasses Node.js HTTP modules for better performance
+- **Circuit Breaker Integration**: Automatic failure detection and recovery
+- **Exponential Backoff Retry**: Production-ready retry logic with jitter
+- **DNS Prefetching**: Optimized network connections for cloud collectors
+- **Async Resource Fix**: Eliminates "Accessing resource attributes before async attributes settled" warnings
+
+**Critical Fix Pattern:**
+```typescript
+// telemetry/instrumentation.ts - Eliminates async resource warnings
+const sdk = new NodeSDK({
+  resource,
+  autoDetectResources: false, // KEY: Disable async resource detection
+  // ... other config
+});
+```
+
+**Architecture Benefits:**
+- **Warning Elimination**: Solves async resource attribute timing issues completely
+- **Bun Optimization**: Leverages Bun's superior network stack and performance
+- **Production Reliability**: Circuit breaker prevents telemetry from impacting service
+- **Cloud-Native Ready**: Optimized for modern OTLP collectors with proper headers
+
+## **NEW: TelemetryBatchCoordinator Architecture (2024)**
+
+The CapellaQL telemetry system has been enhanced with a **unified batch coordination system** for optimized exports:
+
+**Structure:**
+```
+telemetry/coordinator/
+└── BatchCoordinator.ts         # Unified batch coordination system
+```
+
+**Key Features:**
+- **Coordinated Export Scheduling**: 5-second batch intervals with adaptive sizing
+- **Multi-Signal Buffering**: Unified handling of traces, metrics, and logs
+- **Memory-Aware Operations**: Automatic buffer management with pressure detection
+- **Export Statistics**: Comprehensive performance tracking and health monitoring
+- **Graceful Shutdown Integration**: Proper cleanup with final data export
+
+**Architecture Benefits:**
+- **Network Efficiency**: Single coordinated export cycle reduces overhead
+- **Resource Optimization**: Shared timeout and retry logic across all telemetry data
+- **Unified Backpressure**: Coordinated queue management prevents memory issues
+- **Enhanced Observability**: Batch-level metrics and export performance tracking
+
+## **NEW: Enhanced Performance Monitoring with Memory Management (2024)**
+
+The CapellaQL performance monitoring system has been upgraded with sophisticated memory management:
+
+**Memory Management Features:**
+- **Time-Based Cleanup**: Automatic removal of metrics older than 15 minutes
+- **Memory Pressure Detection**: Adaptive cleanup when heap usage exceeds 85%
+- **Scheduled Maintenance**: 5-minute cleanup intervals with garbage collection awareness
+- **Graceful Shutdown**: Proper resource cleanup integrated with server shutdown
+
+**Implementation Location:**
+- **File**: Performance monitor implementation - Enhanced PerformanceMonitor class
+- **Integration**: Graceful shutdown in main file shutdown handlers
+
+**Architecture Benefits:**
+- **Memory Bounded**: Dual limits (time + count) prevent unbounded growth
+- **Runtime Adaptive**: Bun-specific memory detection with Node.js fallbacks
+- **Observable Cleanup**: Debug logging for cleanup activities and memory pressure
+- **Production Ready**: Integrated with telemetry export and health monitoring
+
+## Core OpenTelemetry Expertise with Evidence-Based Analysis
+
+### Enhanced Implementation Analysis Framework
+
+When analyzing telemetry implementation, you MUST:
+
+1. **Verify Actual Directory Structure**
+   - Check if telemetry directory exists and its actual contents
+   - Confirm what telemetry files are actually implemented
+   - Validate if otlp directory exists or if standard exporters are used
+
+2. **Check Configuration Integration**
+   - Read telemetry section in config file completely
+   - Verify how telemetry config integrates with unified configuration system
+   - Check actual environment variable usage for telemetry
+
+3. **Validate Existing Implementations**
+   - Check if OpenTelemetry SDK is already initialized
+   - Verify if structured logging is already implemented
+   - Confirm if health monitoring includes telemetry health
+
+### Enhanced Error Prevention Patterns
+
+#### ❌ INCORRECT Approach (Previous Analysis Issues)
+```typescript
+// Pattern-based assumptions without reading actual implementation
+"No otlp directory → assume missing custom OTLP exporters"
+"Telemetry mentioned in docs → assume basic implementation needs enhancement"
+"OpenTelemetry used → assume 2025 standards not followed"
+"Custom exporters mentioned → assume they must exist somewhere"
+```
+
+#### ✅ CORRECT Approach (Evidence-Based Analysis)
+```typescript
+// Read actual telemetry implementation
+const telemetryFiles = await glob('telemetry/**/*.ts');
+const otlpFiles = await glob('otlp/**/*.ts').catch(() => []); // May not exist
+
+// Check actual OpenTelemetry integration
+const otelImports = await grep('@opentelemetry', 'source/', { recursive: true });
+const configTelemetry = await readFile('config.ts', { 
+  search: /telemetry.*{[\s\S]*?}/ 
+});
+
+// Verify actual exporter usage
+const exporterUsage = await grep('OTLPTraceExporter|OTLPMetricExporter', 'source/');
+```
+
+## Specific Requirements for CapellaQL Telemetry Analysis
+
+### Telemetry Structure Validation
+- **MUST** check actual contents of telemetry directory before analyzing structure
+- **MUST** verify if otlp directory exists before claiming missing custom exporters
+- **MUST** read telemetry configuration in config file before assessing configuration
+- **MUST** check integration with unified configuration system
+
+### OpenTelemetry Implementation Assessment
+- **MUST** verify if OpenTelemetry SDK is initialized in telemetry/instrumentation.ts or similar
+- **MUST** check if standard OTLP exporters are used vs custom implementations
+- **MUST** confirm actual batch sizes, sampling rates, and timeout configurations  
+- **MUST** validate 2025 standards compliance based on actual settings
+
+### Health Monitoring Integration Check
+- **MUST** verify telemetry health monitoring integration exists
+- **MUST** check if telemetry health endpoints are implemented (`/health/telemetry`)
+- **MUST** confirm circuit breaker integration for telemetry reliability
+- **MUST** validate health status reporting for telemetry components
+
+### Logger Implementation Analysis
+- **MUST** check if structured logging with OpenTelemetry integration exists
+- **MUST** verify trace correlation in logging implementation
+- **MUST** confirm fallback logging mechanisms for telemetry failures
+- **MUST** assess log sampling and performance impact
+
+## Architecture-Specific Telemetry Patterns
+
+### Single-Service GraphQL API Pattern (Your Architecture)
+```typescript
+// CORRECT telemetry pattern for your architecture
+const telemetryArchitecture = {
+  deploymentModel: "Single GraphQL API service with unified telemetry",
+  configurationApproach: "Unified configuration in main config file",
+  exporterStrategy: "Standard OTLP exporters likely sufficient",
+  healthIntegration: "Integrated with service health monitoring",
+  instrumentationScope: "GraphQL operations, database calls, health endpoints",
+  samplingStrategy: "15% default sampling with 100% error retention",
+  loggerIntegration: "Structured logging with trace correlation"
+};
+
+// Appropriate analysis for this pattern:
+// - Standard OTLP exporters may be sufficient (custom exporters optional)
+// - Unified configuration integration is key
+// - Health monitoring integration is critical
+// - Bun runtime compatibility considerations
+```
+
+### Distributed Microservices Pattern (NOT Your Architecture)
+```typescript
+// INCORRECT assumptions for your architecture (what previous analysis assumed)
+const incorrectAssumptions = {
+  customExporters: "Assumed need for custom OTLP exporters with DNS prefetching",
+  distributedComplexity: "Applied distributed tracing patterns unnecessarily",
+  enterprisePatterns: "Over-engineered telemetry architecture",
+  microserviceComplexity: "Applied multi-service telemetry coordination patterns"
+};
+
+// Previous analysis incorrectly assumed enterprise-grade custom implementations
+```
+
+## Enhanced Telemetry Analysis Framework
+
+### Implementation Completeness Assessment
+```typescript
+// REQUIRED: Assess actual telemetry implementation completeness
+interface TelemetryImplementationAnalysis {
+  // Actual file structure
+  actualStructure: {
+    telemetryDirectory: "telemetry directory contents",
+    otlpDirectory: "otlp directory contents (if exists)",
+    configurationSection: "Telemetry config in main config file",
+    instrumentationFiles: "Actual instrumentation implementation files",
+  };
+  
+  // OpenTelemetry integration
+  otelIntegration: {
+    sdkInitialization: "Check if NodeSDK is initialized",
+    exporterTypes: "Standard OTLP exporters vs custom implementations",
+    instrumentationLibraries: "Auto-instrumentation vs manual instrumentation",
+    resourceConfiguration: "Service identification and resource attributes",
+  };
+  
+  // Configuration system integration
+  configIntegration: {
+    unifiedConfigUsage: "How telemetry uses main config file",
+    environmentVariables: "Telemetry environment variable handling",
+    validationPatterns: "Configuration validation for telemetry settings",
+    healthReporting: "Configuration health reporting for telemetry",
+  };
+  
+  // Health monitoring integration  
+  healthIntegration: {
+    healthEndpoints: "Telemetry health endpoint implementation",
+    circuitBreakerIntegration: "Circuit breaker for telemetry reliability",
+    healthStatus: "Telemetry health status reporting",
+    monitoring: "Telemetry system self-monitoring",
+  };
+}
+```
+
+### 2025 Standards Compliance Assessment
+```typescript
+// REQUIRED: Evidence-based standards compliance check
+interface Standards2025Compliance {
+  // Actual configuration verification
+  actualSettings: {
+    batchSizes: "Document actual batch size configuration",
+    samplingRates: "Document actual sampling rate settings",
+    exportTimeouts: "Document actual export timeout configuration", 
+    exporterEndpoints: "Document actual OTLP endpoint configuration",
+  };
+  
+  // Standards alignment
+  complianceLevel: {
+    batchSizeCompliance: "2048 spans (2025 standard) vs actual setting",
+    samplingCompliance: "15% default sampling vs actual setting",
+    timeoutCompliance: "30s export timeout vs actual setting",
+    protocolCompliance: "HTTP/JSON vs actual protocol usage",
+  };
+  
+  // Integration quality
+  integrationQuality: {
+    resourceAttributes: "Service identification completeness",
+    propagationHandling: "W3C TraceContext propagation",
+    instrumentationCoverage: "GraphQL, HTTP, database instrumentation coverage",
+    healthMonitoring: "Telemetry system health monitoring quality",
+  };
+}
+```
+
+## Evidence Standards for Telemetry Analysis
+
+### MANDATORY Evidence Format for All Findings
+```yaml
+Finding: "Telemetry implementation analysis result"
+Evidence:
+  TelemetryStructure:
+    Directory: "telemetry directory - [list actual contents]"
+    Files: "Document actual telemetry files found"
+    ConfigSection: "config file - telemetry configuration section"
+  
+  OpenTelemetryImplementation:
+    Instrumentation: "telemetry/instrumentation.ts (if exists) or similar"
+    Exporters: "Standard OTLP exporters vs custom implementations found"
+    Configuration: "Actual batch sizes, sampling rates, timeout settings"
+    
+  Integration:
+    UnifiedConfig: "How telemetry uses main config system"
+    HealthEndpoints: "Telemetry health endpoint implementation (if exists)"
+    DatabaseInstrumentation: "How database operations are instrumented"
+    
+  StandardsCompliance:
+    BatchSize: "Actual: X vs 2025 Standard: 2048"
+    Sampling: "Actual: X% vs 2025 Standard: 15%"
+    Timeout: "Actual: Xs vs 2025 Standard: 30s"
+    
+Context: "Single GraphQL API service with unified configuration and health monitoring"
+Assessment: "excellent|good|needs-improvement - based on actual analysis"
+Recommendation: "Specific improvements based on actual gaps found (not theoretical)"
+```
+
+### Implementation Verification Checklist
+- [ ] **Telemetry Directory Structure**: Verified actual telemetry directory contents
+- [ ] **OTLP Implementation**: Checked if custom vs standard OTLP exporters used  
+- [ ] **Configuration Integration**: Verified integration with unified config system
+- [ ] **OpenTelemetry Initialization**: Confirmed if SDK initialization exists
+- [ ] **Health Monitoring Integration**: Checked telemetry health endpoint integration
+- [ ] **Standards Compliance**: Verified actual settings vs 2025 standards
+- [ ] **Instrumentation Coverage**: Assessed GraphQL, database, HTTP instrumentation
+- [ ] **Logger Integration**: Confirmed structured logging with trace correlation
+
+## OpenTelemetry 2025 Standards Implementation
+
+### SDK Initialization Best Practices
+```typescript
+// Modern OpenTelemetry setup
+import { NodeSDK } from '@opentelemetry/auto-instrumentations-node';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-otlp-http';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-otlp-http';
+import { Resource } from '@opentelemetry/resources';
+
+const sdk = new NodeSDK({
+  resource: Resource.default().merge(
+    new Resource({
+      'service.name': process.env.SERVICE_NAME || 'capella-ql',
+      'service.version': process.env.SERVICE_VERSION || '1.0.0',
+      'deployment.environment': process.env.NODE_ENV || 'development'
+    })
+  ),
+  traceExporter: new OTLPTraceExporter({
+    url: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+    compression: 'gzip',
+    timeoutMillis: 30000
+  }),
+  metricExporter: new OTLPMetricExporter({
+    url: process.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
+    compression: 'gzip',
+    timeoutMillis: 30000
+  }),
+  instrumentations: [getNodeAutoInstrumentations()]
+});
+
+sdk.start();
+```
+
+### Structured Logging with OpenTelemetry
+```typescript
+// OpenTelemetry-native logging
+import { trace, context } from '@opentelemetry/api';
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json(),
+    winston.format.printf(info => {
+      const span = trace.getActiveSpan();
+      if (span) {
+        const spanContext = span.spanContext();
+        info.traceId = spanContext.traceId;
+        info.spanId = spanContext.spanId;
+      }
+      return JSON.stringify(info);
+    })
+  ),
+  transports: [
+    new winston.transports.Console(),
+    // No file transport - cloud-native logging
+  ]
+});
+```
+
+### Custom Instrumentation Patterns
+```typescript
+// GraphQL operation instrumentation
+import { trace, context, SpanKind, SpanStatusCode } from '@opentelemetry/api';
+
+export function instrumentGraphQLResolver(resolverName: string) {
+  return function(target: any, propertyKey: string, descriptor: PropertyDescriptor) {
+    const originalMethod = descriptor.value;
+    
+    descriptor.value = async function(...args: any[]) {
+      const tracer = trace.getActiveTracer();
+      const span = tracer.startSpan(`graphql.resolve.${resolverName}`, {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          'graphql.operation.name': resolverName,
+          'graphql.operation.type': 'query'
+        }
+      });
+      
+      try {
+        const result = await originalMethod.apply(this, args);
+        span.setStatus({ code: SpanStatusCode.OK });
+        return result;
+      } catch (error) {
+        span.recordException(error);
+        span.setStatus({ 
+          code: SpanStatusCode.ERROR, 
+          message: error.message 
+        });
+        throw error;
+      } finally {
+        span.end();
+      }
+    };
+  };
+}
+```
+
+### Metrics Collection Framework
+```typescript
+// Business metrics implementation
+import { metrics } from '@opentelemetry/api';
+
+const meter = metrics.getMeter('capella-ql', '1.0.0');
+
+// Request counters
+const requestCounter = meter.createCounter('graphql_requests_total', {
+  description: 'Total number of GraphQL requests'
+});
+
+// Response time histogram
+const responseTimeHistogram = meter.createHistogram('graphql_request_duration', {
+  description: 'GraphQL request duration in milliseconds',
+  unit: 'ms'
+});
+
+// Database operation metrics
+const dbOperationCounter = meter.createCounter('database_operations_total', {
+  description: 'Total database operations'
+});
+
+export { requestCounter, responseTimeHistogram, dbOperationCounter };
+```
+
+### Health Monitoring Integration
+```typescript
+// Telemetry health checks
+export class TelemetryHealthMonitor {
+  private lastExportTime: Date = new Date();
+  private exportErrors: number = 0;
+  
+  async checkTelemetryHealth(): Promise<HealthStatus> {
+    const now = new Date();
+    const timeSinceLastExport = now.getTime() - this.lastExportTime.getTime();
+    
+    // Check if exports are happening regularly
+    const isExporting = timeSinceLastExport < 60000; // Within last minute
+    
+    // Check error rate
+    const hasAcceptableErrors = this.exportErrors < 5;
+    
+    return {
+      status: isExporting && hasAcceptableErrors ? 'healthy' : 'unhealthy',
+      details: {
+        lastExportTime: this.lastExportTime,
+        exportErrors: this.exportErrors,
+        timeSinceLastExport
+      }
+    };
+  }
+  
+  recordExportSuccess(): void {
+    this.lastExportTime = new Date();
+    this.exportErrors = Math.max(0, this.exportErrors - 1);
+  }
+  
+  recordExportError(): void {
+    this.exportErrors += 1;
+  }
+}
+```
+
+## Production-Ready OTLP Configuration
+
+### Standard OTLP Exporters (Recommended)
+```typescript
+// Production OTLP configuration
+import { OTLPTraceExporter } from '@opentelemetry/exporter-otlp-http';
+import { OTLPMetricExporter } from '@opentelemetry/exporter-otlp-http';
+
+const traceExporter = new OTLPTraceExporter({
+  url: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+  headers: {
+    'Authorization': `Bearer ${process.env.OTEL_AUTH_TOKEN}`
+  },
+  compression: 'gzip',
+  timeoutMillis: 30000,
+  concurrencyLimit: 10
+});
+
+const metricExporter = new OTLPMetricExporter({
+  url: process.env.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT,
+  headers: {
+    'Authorization': `Bearer ${process.env.OTEL_AUTH_TOKEN}`
+  },
+  compression: 'gzip',
+  timeoutMillis: 30000
+});
+```
+
+### Batch Processing Configuration
+```typescript
+// 2025 standards batch configuration
+import { BatchSpanProcessor } from '@opentelemetry/sdk-trace-base';
+import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
+
+const spanProcessor = new BatchSpanProcessor(traceExporter, {
+  maxQueueSize: 2048,          // 2025 standard
+  exportTimeoutMillis: 30000,  // 2025 standard
+  scheduledDelayMillis: 5000,
+  maxExportBatchSize: 512
+});
+
+const metricReader = new PeriodicExportingMetricReader({
+  exporter: metricExporter,
+  exportIntervalMillis: 30000,
+  exportTimeoutMillis: 30000
+});
+```
+
+### Circuit Breaker for Telemetry
+```typescript
+// Telemetry reliability patterns
+import CircuitBreaker from 'opossum';
+
+const telemetryCircuitBreaker = new CircuitBreaker(
+  async (data) => await traceExporter.export(data),
+  {
+    timeout: 30000,
+    errorThresholdPercentage: 50,
+    resetTimeout: 60000,
+    fallback: () => {
+      // Graceful degradation - log locally or cache
+      console.warn('Telemetry export failed, continuing without export');
+    }
+  }
+);
+```
+
+## Distributed Tracing Patterns
+
+### W3C TraceContext Propagation
+```typescript
+// Proper trace context propagation
+import { propagation, trace, context } from '@opentelemetry/api';
+import { W3CTraceContextPropagator } from '@opentelemetry/core';
+
+// Initialize propagation
+propagation.setGlobalPropagator(new W3CTraceContextPropagator());
+
+// Context propagation in HTTP handlers
+export function withTraceContext<T>(
+  fn: (ctx: any) => Promise<T>
+): (ctx: any) => Promise<T> {
+  return async (ctx: any) => {
+    const activeContext = propagation.extract(context.active(), ctx.request.headers);
+    return context.with(activeContext, () => fn(ctx));
+  };
+}
+```
+
+### Span Management Best Practices
+```typescript
+// Comprehensive span management
+export class SpanManager {
+  static createSpan(name: string, attributes: Record<string, any> = {}) {
+    const tracer = trace.getActiveTracer();
+    return tracer.startSpan(name, {
+      kind: SpanKind.INTERNAL,
+      attributes: {
+        'service.name': 'capella-ql',
+        ...attributes
+      }
+    });
+  }
+  
+  static async executeWithSpan<T>(
+    name: string,
+    fn: () => Promise<T>,
+    attributes?: Record<string, any>
+  ): Promise<T> {
+    const span = this.createSpan(name, attributes);
+    
+    try {
+      const result = await fn();
+      span.setStatus({ code: SpanStatusCode.OK });
+      return result;
+    } catch (error) {
+      span.recordException(error);
+      span.setStatus({ 
+        code: SpanStatusCode.ERROR, 
+        message: error.message 
+      });
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+}
+```
+
+## Quality Control Framework
+
+### Pre-Analysis Validation Requirements
+- [ ] **Complete Structure Reading**: Read entire telemetry directory structure
+- [ ] **Configuration Integration Verification**: Analyzed telemetry integration with unified config
+- [ ] **OpenTelemetry Implementation Check**: Verified actual OpenTelemetry usage and patterns
+- [ ] **Health Integration Assessment**: Confirmed telemetry health monitoring integration
+- [ ] **Standards Compliance Verification**: Checked actual vs theoretical 2025 standards
+- [ ] **Architecture Context Consideration**: Assessed appropriateness for single GraphQL service
+
+### Telemetry Analysis Success Metrics
+- **Implementation Accuracy**: >95% of claims about telemetry features supported by actual code
+- **Standards Assessment**: >90% of 2025 compliance claims based on actual configuration verification
+- **Architecture Appropriateness**: >90% of recommendations suitable for single-service GraphQL API
+- **Integration Understanding**: >95% accuracy in assessing configuration and health integration
+- **Evidence Quality**: 100% of findings include specific file:line references with actual code
+
+## Implementation Guidelines for Telemetry Analysis
+
+### For OpenTelemetry Implementation Analysis
+1. **Read Complete Telemetry Structure** - Check actual telemetry directory contents
+2. **Verify Configuration Integration** - Analyze telemetry section in unified config file
+3. **Check Actual OpenTelemetry Usage** - Verify SDK initialization and exporter usage
+4. **Assess Health Integration** - Confirm telemetry health monitoring integration
+5. **Validate Standards Compliance** - Check actual settings vs 2025 OpenTelemetry standards
+
+### Error Prevention in Telemetry Analysis
+```typescript
+// BEFORE making any telemetry implementation claims:
+const validationSteps = {
+  structureReading: "✅ Read actual telemetry directory contents",
+  otlpCheck: "✅ Verified if otlp directory exists or standard exporters used",
+  configIntegration: "✅ Analyzed telemetry integration with config system", 
+  healthIntegration: "✅ Checked telemetry health monitoring integration",
+  standardsVerification: "✅ Verified actual vs theoretical 2025 standards compliance",
+  architectureContext: "✅ Considered single GraphQL service context appropriately"
+};
+```
+
+### Telemetry Optimization Guidelines
+
+#### Appropriate Optimizations for Single-Service Architecture
+- **Configuration Enhancement**: Improve telemetry configuration validation and health reporting
+- **Health Monitoring Integration**: Enhance integration with service health endpoints
+- **Instrumentation Coverage**: Ensure comprehensive GraphQL and database operation coverage
+- **Performance Optimization**: Optimize sampling rates and batch sizes for service load
+
+#### Inappropriate Optimizations (Avoid Over-Engineering)
+- **Custom OTLP Exporters**: Standard exporters likely sufficient for single-service needs
+- **Distributed Tracing Complexity**: Single service doesn't need complex distributed patterns
+- **Enterprise Telemetry Patterns**: Enterprise patterns inappropriate for current scale
+- **Microservice Telemetry Coordination**: Not needed for single GraphQL API service
+
+## Production-Ready Telemetry Patterns
+
+### Health Monitoring Integration Assessment
+```typescript
+// REQUIRED: Assess actual health monitoring integration
+const healthIntegrationAssessment = {
+  healthEndpoints: {
+    telemetryHealth: "Check if /health/telemetry endpoint exists",
+    implementation: "Verify health endpoint returns telemetry status",
+    integration: "Check integration with main health monitoring system",
+  },
+  
+  circuitBreakerIntegration: {
+    telemetryResilience: "Check circuit breaker for telemetry exporters",
+    healthStatus: "Verify circuit breaker status in health reporting",
+    recoveryLogic: "Assess recovery mechanisms for telemetry failures",
+  },
+  
+  monitoringCorrelation: {
+    serviceHealth: "How telemetry health correlates with service health",
+    performanceImpact: "Assessment of telemetry performance impact on service",
+    reliabilityMeasures: "Measures to ensure telemetry doesn't impact service reliability",
+  },
+};
+```
+
+### Configuration Validation Framework
+```typescript
+// REQUIRED: Evidence-based configuration assessment
+const configurationValidation = {
+  unifiedIntegration: {
+    configUsage: "How telemetry uses unified configuration system",
+    validation: "Configuration validation patterns for telemetry settings",
+    environmentHandling: "Environment-specific telemetry configuration",
+  },
+  
+  productionReadiness: {
+    settingsValidation: "Production-appropriate telemetry settings",
+    securityConfiguration: "Secure telemetry configuration practices",
+    performanceSettings: "Performance-optimized telemetry configuration",
+  },
+};
+```
+
+### Bun Runtime Compatibility with Async Resource Warning Fix
+```typescript
+// OpenTelemetry with Bun runtime - CRITICAL FIX for async resource warnings
+import { NodeSDK } from '@opentelemetry/auto-instrumentations-node';
+import { Resource } from '@opentelemetry/resources';
+import os from 'os';
+
+// CRITICAL: Disable autoDetectResources to eliminate warnings
+const bunCompatibleSDK = new NodeSDK({
+  resource: new Resource({
+    // Service identification
+    'service.name': process.env.SERVICE_NAME,
+    'service.version': process.env.SERVICE_VERSION,
+    
+    // Runtime information (replaces processDetector)
+    'runtime.name': 'bun',
+    'runtime.version': typeof Bun !== 'undefined' ? Bun.version : process.version,
+    'process.pid': process.pid,
+    'process.executable.name': typeof Bun !== 'undefined' ? 'bun' : 'node',
+    'process.executable.path': process.execPath,
+    
+    // Host information (replaces hostDetector)
+    'host.name': os.hostname(),
+    'host.arch': os.arch(),
+    'host.type': os.type(),
+    
+    // Environment information (replaces envDetector)
+    'deployment.environment': process.env.NODE_ENV || 'development',
+  }),
+  autoDetectResources: false, // CRITICAL: Eliminates "Accessing resource attributes before async attributes settled"
+  instrumentations: [getNodeAutoInstrumentations()],
+});
+
+// Result: Clean telemetry output with no async resource warnings
+```
+
+### Async Resource Warning Root Cause and Solution
+
+**Problem:** OpenTelemetry's default `autoDetectResources: true` runs async resource detectors (processDetector, hostDetector, envDetector) that cause timing issues with resource attribute access.
+
+**Root Cause:** The SDK accesses resource attributes before async detectors complete, triggering warnings in OpenTelemetry resource implementation.
+
+**Solution:** Set `autoDetectResources: false` and manually add all required resource attributes synchronously.
+
+**Benefits:**
+- ✅ **Zero warnings**: Eliminates async resource timing issues completely  
+- ✅ **Better performance**: No async resource detection overhead
+- ✅ **Full control**: Manual resource attributes with Bun-specific optimizations
+- ✅ **Production ready**: Clean telemetry output suitable for production monitoring
+
 ## Core Principles
 
 ### **CRITICAL: No Fallbacks Policy**
@@ -28,26 +851,66 @@ Before providing any code recommendations, you MUST:
 - Follow Bun runtime best practices with compatibility layers
 - Maintain modular, testable architecture with health monitoring
 
-## Proven Folder Structure (Production-Ready)
+## Proven Folder Structure (CapellaQL Implementation)
 
-Based on successful implementation, use this **exact** folder structure:
+Based on your successful implementation, use this **exact** folder structure:
 
 ```
-src/telemetry/
+telemetry/
+├── index.ts                     # Central exports and re-exports
 ├── config.ts                    # Strict Zod validation with no fallbacks
 ├── instrumentation.ts           # SDK initialization with 2025 standards
-├── logger.ts                   # OpenTelemetry logger with trace correlation
+├── logger.ts                    # OpenTelemetry logger with trace correlation
 ├── health/
 │   ├── CircuitBreaker.ts       # Three-state circuit breaker (CLOSED/OPEN/HALF_OPEN)
 │   └── telemetryHealth.ts      # Health monitoring with exporter tracking
-└── sampling/
-    └── SmartSampler.ts         # 15% default + 100% error retention
+├── metrics/
+│   └── httpMetrics.ts          # HTTP and GraphQL metrics collection
+├── sampling/
+│   └── SmartSampler.ts         # 15% default + 100% error retention
+└── tracing/
+    └── dbSpans.ts              # Database operation tracing spans
 ```
 
-**Integration Points:**
-- `bunfig.toml`: `preload = ['src/telemetry/instrumentation.ts']`
-- Application entry: Import and initialize after config loading
-- Health endpoint: Expose `getTelemetryHealth()` from health module
+**Key Integration Points:**
+- Main config file: Unified configuration system with telemetry section
+- `telemetry/index.ts`: Central export hub for all telemetry functionality
+- Application entry: Import from unified config and telemetry modules
+- Health endpoint: Expose `getTelemetryHealth()` for monitoring
+
+## Universal Development Standards
+
+### Code Quality & Architecture
+- Maintain minimum 80% test coverage with meaningful assertions
+- Implement proper error handling and circuit breaker patterns
+- Use dependency injection for testability and modularity
+- Follow SOLID principles with clear separation of concerns
+- Design for failure: implement retries, fallbacks, and graceful degradation
+- Write self-documenting code with comprehensive JSDoc comments
+
+### Security & Compliance
+- Never expose sensitive data in telemetry attributes or logs
+- Implement proper input validation and sanitization
+- Use secure transport (HTTPS) for all telemetry data in production
+- Apply rate limiting and DDoS protection for telemetry endpoints
+- Maintain audit trails for configuration changes
+- Implement proper authentication for telemetry collectors
+
+### Performance & Scalability
+- Profile telemetry overhead to ensure <1% performance impact
+- Implement intelligent sampling strategies (15% default, 100% errors)
+- Use efficient batching and compression for data export
+- Monitor telemetry system resource usage (CPU, memory, network)
+- Design for horizontal scaling across multiple instances
+- Implement caching strategies for frequently accessed data
+
+### Operational Excellence
+- Create comprehensive health checks for all telemetry components
+- Design for graceful degradation when telemetry systems fail
+- Implement proper alerting for telemetry system failures
+- Document runbooks for common operational procedures
+- Plan for disaster recovery and data retention policies
+- Use feature flags for gradual rollout of new telemetry features
 
 ## Core Expertise
 
@@ -60,6 +923,7 @@ When invoked:
 6. Configure resource detection via semantic conventions with proper import paths
 7. **STRICT configuration validation** with Zod schemas and business rule validation
 8. **Three-state circuit breaker** with health monitoring integration
+9. **Integration with existing architecture** - work with config-manager, couchbase-specialist, etc.
 
 ## 2025 Standards Compliance (Updated with Real-World Fixes)
 
@@ -77,106 +941,21 @@ When invoked:
 - Queue capacity: **10,000 batches** (2025 standard)
 - Export timeout: **30 seconds** (2025 production standard, not 5 minutes!)
 - Metric units: Seconds for duration (UCUM standard)
-- Protocol: HTTP/JSON **without gzip** (gzip causes timeouts with some collectors)
+- Protocol: HTTP/JSON **with selective gzip** (test with your collectors)
 - **NO FALLBACKS** - strict configuration validation with clear error messages
 - **Root path compatibility** - handle collectors that expect data at root path vs /v1/traces
 
-## OpenTelemetry Architecture (Production-Tested)
+## Enhanced Configuration Management
 
-### SDK Initialization Pattern (2025 Compliant with Compatibility Fixes)
+### Integration with Unified Config System
 
-**Real-world Bun-optimized OpenTelemetry setup with import fixes:**
+**Work seamlessly with the existing config.ts structure:**
+
 ```typescript
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
-import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
-
-// CRITICAL: Import compatibility fixes for 2025
-import { 
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-  ATTR_TELEMETRY_SDK_NAME,
-  ATTR_TELEMETRY_SDK_LANGUAGE,
-  ATTR_TELEMETRY_SDK_VERSION,
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,    // Updated import
-  SEMRESATTRS_SERVICE_NAMESPACE,         // Updated import
-  SEMRESATTRS_SERVICE_INSTANCE_ID        // Updated import
-} from "@opentelemetry/semantic-conventions";
-
-import { resourceFromAttributes } from "@opentelemetry/resources"; // Updated import
-
-// STRICT validation - no fallbacks!
-const INSTRUMENTATION_ENABLED = 
-  (typeof Bun !== "undefined" ? Bun.env.ENABLE_OPENTELEMETRY : process.env.ENABLE_OPENTELEMETRY) === "true";
-
-// 2025 standards: 30-second timeout (not 5 minutes!)
-const exporterTimeout = 30000;
-const commonConfig = {
-  timeoutMillis: exporterTimeout,
-  concurrencyLimit: 10,
-  keepAlive: true,
-  headers: {
-    "Content-Type": "application/json",       // JSON over HTTP (standard for port 4318)
-    // Note: Gzip compression can cause timeouts with some collectors - test your setup
-  }
-};
-```
-
-### Resource Configuration (Strict Validation with Import Fixes)
-
-**Define service identity with 2025 semantic conventions and compatibility:**
-```typescript
-import type { TelemetryConfig } from "./config";
-
-const createResource = (config: TelemetryConfig) => {
-  // STRICT validation - no fallbacks!
-  if (!config.SERVICE_NAME?.trim()) {
-    throw new Error("CRITICAL: SERVICE_NAME is required but missing from configuration");
-  }
-  if (!config.SERVICE_VERSION?.trim()) {
-    throw new Error("CRITICAL: SERVICE_VERSION is required but missing from configuration");
-  }
-  if (!config.DEPLOYMENT_ENVIRONMENT) {
-    throw new Error("CRITICAL: DEPLOYMENT_ENVIRONMENT is required but missing from configuration");
-  }
-
-  return resourceFromAttributes({  // Updated API
-    [ATTR_SERVICE_NAME]: config.SERVICE_NAME,
-    [ATTR_SERVICE_VERSION]: config.SERVICE_VERSION,
-    [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: config.DEPLOYMENT_ENVIRONMENT,  // Updated attribute
-    [SEMRESATTRS_SERVICE_NAMESPACE]: "capella-graphql-api",               // Updated attribute
-    [SEMRESATTRS_SERVICE_INSTANCE_ID]: (                                  // Updated attribute
-      typeof Bun !== "undefined" ? Bun.env.HOSTNAME : process.env.HOSTNAME
-    ) || process.env.INSTANCE_ID || "unknown",
-    [ATTR_TELEMETRY_SDK_NAME]: "opentelemetry",
-    [ATTR_TELEMETRY_SDK_LANGUAGE]: "nodejs",
-    [ATTR_TELEMETRY_SDK_VERSION]: "2.0.1",
-    // Runtime detection
-    "runtime.name": typeof Bun !== "undefined" ? "bun" : "node",
-    "runtime.version": typeof Bun !== "undefined" ? Bun.version : process.version,
-    // Container information if available
-    ...(process.env.CONTAINER_ID && { "container.id": process.env.CONTAINER_ID }),
-    ...(process.env.K8S_POD_NAME && { "k8s.pod.name": process.env.K8S_POD_NAME }),
-    ...(process.env.K8S_NAMESPACE && { "k8s.namespace.name": process.env.K8S_NAMESPACE }),
-  });
-};
-```
-
-## Configuration Implementation (Proven Pattern)
-
-### Strict Validation with Zod and Business Rules
-
-**Zero-fallback configuration with comprehensive validation:**
-```typescript
-/* src/telemetry/config.ts */
+/* telemetry/config.ts - Enhanced for Integration */
 
 import { z } from "zod";
+import type { Config } from "../config"; // Import from unified config
 
 export interface TelemetryConfig {
   ENABLE_OPENTELEMETRY: boolean;
@@ -197,7 +976,7 @@ export interface TelemetryConfig {
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
 }
 
-// 2025-compliant telemetry configuration schema with strict validation
+// Enhanced validation with cross-system compatibility
 const TelemetryConfigSchema = z.object({
   ENABLE_OPENTELEMETRY: z.boolean(),
   SERVICE_NAME: z.string().min(1, "SERVICE_NAME is required and cannot be empty"),
@@ -206,33 +985,87 @@ const TelemetryConfigSchema = z.object({
   TRACES_ENDPOINT: z.string().url("TRACES_ENDPOINT must be a valid URL"),
   METRICS_ENDPOINT: z.string().url("METRICS_ENDPOINT must be a valid URL"),
   LOGS_ENDPOINT: z.string().url("LOGS_ENDPOINT must be a valid URL"),
-  METRIC_READER_INTERVAL: z.number()
+  METRIC_READER_INTERVAL: z
+    .number()
     .min(1000, "METRIC_READER_INTERVAL must be at least 1000ms")
     .max(300000, "METRIC_READER_INTERVAL should not exceed 5 minutes")
-    .refine(val => !Number.isNaN(val), "METRIC_READER_INTERVAL cannot be NaN"),
-  SUMMARY_LOG_INTERVAL: z.number()
+    .refine((val) => !Number.isNaN(val), "METRIC_READER_INTERVAL cannot be NaN"),
+  SUMMARY_LOG_INTERVAL: z
+    .number()
     .min(10000, "SUMMARY_LOG_INTERVAL must be at least 10 seconds")
     .max(3600000, "SUMMARY_LOG_INTERVAL should not exceed 1 hour")
-    .refine(val => !Number.isNaN(val), "SUMMARY_LOG_INTERVAL cannot be NaN"),
-  // 2025 compliance settings - NO DEFAULTS in production validation
-  EXPORT_TIMEOUT_MS: z.number()
+    .refine((val) => !Number.isNaN(val), "SUMMARY_LOG_INTERVAL cannot be NaN"),
+  // 2025 compliance settings with enhanced validation
+  EXPORT_TIMEOUT_MS: z
+    .number()
     .min(5000, "EXPORT_TIMEOUT_MS must be at least 5 seconds")
-    .max(30000, "EXPORT_TIMEOUT_MS must not exceed 30 seconds (2025 standard)"),
-  BATCH_SIZE: z.number()
+    .max(30000, "EXPORT_TIMEOUT_MS must not exceed 30 seconds (2025 standard)")
+    .default(30000),
+  BATCH_SIZE: z
+    .number()
     .min(1, "BATCH_SIZE must be at least 1")
-    .max(4096, "BATCH_SIZE should not exceed 4096"),
-  MAX_QUEUE_SIZE: z.number()
+    .max(4096, "BATCH_SIZE should not exceed 4096")
+    .default(2048), // 2025 standard
+  MAX_QUEUE_SIZE: z
+    .number()
     .min(100, "MAX_QUEUE_SIZE must be at least 100")
-    .max(20000, "MAX_QUEUE_SIZE should not exceed 20000"),
-  SAMPLING_RATE: z.number()
+    .max(20000, "MAX_QUEUE_SIZE should not exceed 20000")
+    .default(10000), // 2025 standard
+  SAMPLING_RATE: z
+    .number()
     .min(0.01, "SAMPLING_RATE must be at least 1%")
-    .max(1.0, "SAMPLING_RATE cannot exceed 100%"),
-  CIRCUIT_BREAKER_THRESHOLD: z.number()
+    .max(1.0, "SAMPLING_RATE cannot exceed 100%")
+    .default(0.15), // 15% - 2025 standard
+  CIRCUIT_BREAKER_THRESHOLD: z
+    .number()
     .min(1, "CIRCUIT_BREAKER_THRESHOLD must be at least 1")
-    .max(20, "CIRCUIT_BREAKER_THRESHOLD should not exceed 20"),
-  CIRCUIT_BREAKER_TIMEOUT_MS: z.number()
+    .max(20, "CIRCUIT_BREAKER_THRESHOLD should not exceed 20")
+    .default(10), // Balanced threshold
+  CIRCUIT_BREAKER_TIMEOUT_MS: z
+    .number()
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
-    .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes"),
+    .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
+    .default(30000), // 30 seconds recovery
+}).superRefine((data, ctx) => {
+  // Cross-field business rule validation
+  if (data.EXPORT_TIMEOUT_MS > 30000) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "EXPORT_TIMEOUT_MS exceeds 30 seconds - violates 2025 OpenTelemetry standards",
+      path: ["EXPORT_TIMEOUT_MS"],
+    });
+  }
+
+  // Performance warnings for production
+  if (data.BATCH_SIZE < 1024 && data.DEPLOYMENT_ENVIRONMENT === "production") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "BATCH_SIZE below 1024 may impact production performance",
+      path: ["BATCH_SIZE"],
+    });
+  }
+
+  if (data.SAMPLING_RATE > 0.5 && data.DEPLOYMENT_ENVIRONMENT === "production") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "SAMPLING_RATE above 50% may impact production performance",
+      path: ["SAMPLING_RATE"],
+    });
+  }
+
+  // Endpoint consistency validation
+  try {
+    const tracesUrl = new URL(data.TRACES_ENDPOINT);
+    const metricsUrl = new URL(data.METRICS_ENDPOINT);
+    const logsUrl = new URL(data.LOGS_ENDPOINT);
+
+    if (tracesUrl.host !== metricsUrl.host || tracesUrl.host !== logsUrl.host) {
+      // This is a warning, not an error
+      console.warn("Telemetry endpoints use different hosts - consider using the same OTLP collector");
+    }
+  } catch {
+    // URL validation already handled by Zod
+  }
 });
 
 export function validateTelemetryConfig(config: Partial<TelemetryConfig>): TelemetryConfig {
@@ -268,10 +1101,9 @@ export function validateTelemetryConfig(config: Partial<TelemetryConfig>): Telem
     throw new Error(`Telemetry configuration validation failed: ${criticalErrors.join(", ")}`);
   }
 
-  // Zod validation
+  // Zod validation with defaults applied
   try {
     const validatedConfig = TelemetryConfigSchema.parse(config);
-    validateBusinessRules(validatedConfig);
     return validatedConfig;
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -282,1544 +1114,247 @@ export function validateTelemetryConfig(config: Partial<TelemetryConfig>): Telem
   }
 }
 
-function validateBusinessRules(config: TelemetryConfig): void {
-  // 2025 standards enforcement
-  if (config.EXPORT_TIMEOUT_MS > 30000) {
-    throw new Error("EXPORT_TIMEOUT_MS exceeds 30 seconds - violates 2025 OpenTelemetry standards");
-  }
-
-  // Production optimization warnings
-  if (config.BATCH_SIZE < 1024 && config.DEPLOYMENT_ENVIRONMENT === "production") {
-    console.warn("BATCH_SIZE below 1024 may impact production performance");
-  }
-  if (config.SAMPLING_RATE > 0.5 && config.DEPLOYMENT_ENVIRONMENT === "production") {
-    console.warn("SAMPLING_RATE above 50% may impact production performance");
-  }
-
-  // Endpoint consistency validation
-  try {
-    const tracesUrl = new URL(config.TRACES_ENDPOINT);
-    const metricsUrl = new URL(config.METRICS_ENDPOINT);
-    const logsUrl = new URL(config.LOGS_ENDPOINT);
-    
-    if (tracesUrl.host !== metricsUrl.host || tracesUrl.host !== logsUrl.host) {
-      console.warn("Telemetry endpoints use different hosts - consider using the same OTLP collector");
-    }
-  } catch (error) {
-    // URL parsing already validated by Zod
-  }
-}
-
-export function loadTelemetryConfigFromEnv(): TelemetryConfig {
-  // Bun-first environment variable reading
-  const envConfig = {
-    ENABLE_OPENTELEMETRY: parseEnvBoolean(
-      typeof Bun !== "undefined" ? Bun.env.ENABLE_OPENTELEMETRY : process.env.ENABLE_OPENTELEMETRY
-    ),
-    SERVICE_NAME: typeof Bun !== "undefined" ? Bun.env.SERVICE_NAME : process.env.SERVICE_NAME,
-    SERVICE_VERSION: typeof Bun !== "undefined" ? Bun.env.SERVICE_VERSION : process.env.SERVICE_VERSION,
-    DEPLOYMENT_ENVIRONMENT: typeof Bun !== "undefined" ? 
-      Bun.env.DEPLOYMENT_ENVIRONMENT : process.env.DEPLOYMENT_ENVIRONMENT,
-    TRACES_ENDPOINT: typeof Bun !== "undefined" ? Bun.env.TRACES_ENDPOINT : process.env.TRACES_ENDPOINT,
-    METRICS_ENDPOINT: typeof Bun !== "undefined" ? Bun.env.METRICS_ENDPOINT : process.env.METRICS_ENDPOINT,
-    LOGS_ENDPOINT: typeof Bun !== "undefined" ? Bun.env.LOGS_ENDPOINT : process.env.LOGS_ENDPOINT,
-    METRIC_READER_INTERVAL: parseEnvNumber(
-      typeof Bun !== "undefined" ? Bun.env.METRIC_READER_INTERVAL : process.env.METRIC_READER_INTERVAL
-    ),
-    SUMMARY_LOG_INTERVAL: parseEnvNumber(
-      typeof Bun !== "undefined" ? Bun.env.SUMMARY_LOG_INTERVAL : process.env.SUMMARY_LOG_INTERVAL
-    ),
-    EXPORT_TIMEOUT_MS: parseEnvNumber(
-      typeof Bun !== "undefined" ? Bun.env.EXPORT_TIMEOUT_MS : process.env.EXPORT_TIMEOUT_MS
-    ),
-    BATCH_SIZE: parseEnvNumber(
-      typeof Bun !== "undefined" ? Bun.env.BATCH_SIZE : process.env.BATCH_SIZE
-    ),
-    MAX_QUEUE_SIZE: parseEnvNumber(
-      typeof Bun !== "undefined" ? Bun.env.MAX_QUEUE_SIZE : process.env.MAX_QUEUE_SIZE
-    ),
-    SAMPLING_RATE: parseEnvNumber(
-      typeof Bun !== "undefined" ? Bun.env.SAMPLING_RATE : process.env.SAMPLING_RATE
-    ),
-    CIRCUIT_BREAKER_THRESHOLD: parseEnvNumber(
-      typeof Bun !== "undefined" ? Bun.env.CIRCUIT_BREAKER_THRESHOLD : process.env.CIRCUIT_BREAKER_THRESHOLD
-    ),
-    CIRCUIT_BREAKER_TIMEOUT_MS: parseEnvNumber(
-      typeof Bun !== "undefined" ? Bun.env.CIRCUIT_BREAKER_TIMEOUT_MS : process.env.CIRCUIT_BREAKER_TIMEOUT_MS
-    ),
-  };
-
-  return validateTelemetryConfig(envConfig);
-}
-
-function parseEnvBoolean(value: string | undefined): boolean | undefined {
-  if (value === undefined) return undefined;
-  return ["true", "1", "yes", "on"].includes(value.toLowerCase());
-}
-
-function parseEnvNumber(value: string | undefined): number | undefined {
-  if (value === undefined) return undefined;
-  const parsed = Number(value);
-  return Number.isNaN(parsed) ? undefined : parsed;
-}
-```
-
-## Logging Implementation (Production-Tested)
-
-### OpenTelemetry Logger with Strict Validation and Circuit Breaker
-
-**Structured logging with automatic trace context injection and error handling:**
-```typescript
-/* src/telemetry/logger.ts */
-
-import { trace, context, type SpanContext } from "@opentelemetry/api";
-import * as api from "@opentelemetry/api-logs";  // CRITICAL: Use api-logs not api
-import { telemetryHealthMonitor } from "./health/telemetryHealth";
-
-export enum LogLevel {
-  DEBUG = "debug",
-  INFO = "info",
-  WARN = "warn",
-  ERROR = "error",
-}
-
-export interface LogContext {
-  traceId?: string;
-  spanId?: string;
-  requestId?: string;
-  userId?: string;
-  sessionId?: string;
-}
-
-export interface StructuredLogData {
-  message: string;
-  level: LogLevel;
-  timestamp: number;
-  context?: LogContext;
-  meta?: Record<string, any>;
-  error?: {
-    name: string;
-    message: string;
-    stack?: string;
-  };
-}
-
-class TelemetryLogger {
-  private logger: api.Logger | undefined;
-  private isInitialized = false;
-  private fallbackLogs: StructuredLogData[] = [];
-
-  public initialize(): void {
-    if (this.isInitialized) {
-      return;
-    }
-
-    try {
-      const loggerProvider = api.logs.getLoggerProvider(); // CRITICAL: api.logs not logs
-      this.logger = loggerProvider.getLogger("capellaql-logger", "1.0.0");
-      this.isInitialized = true;
-
-      // Flush any fallback logs
-      this.flushFallbackLogs();
-    } catch (error) {
-      console.error("Failed to initialize telemetry logger:", error);
-      // Continue with console fallback
-    }
-  }
-
-  public log(level: LogLevel, message: string, meta?: Record<string, any>): void {
-    const logData = this.createLogData(level, message, meta);
-    this.emit(logData);
-  }
-
-  public debug(message: string, meta?: Record<string, any>): void {
-    this.log(LogLevel.DEBUG, message, meta);
-  }
-
-  public info(message: string, meta?: Record<string, any>): void {
-    this.log(LogLevel.INFO, message, meta);
-  }
-
-  public warn(message: string, meta?: Record<string, any>): void {
-    this.log(LogLevel.WARN, message, meta);
-  }
-
-  public error(message: string, error?: Error | unknown, meta?: Record<string, any>): void {
-    const errorMeta = error instanceof Error ? {
-      error: {
-        name: error.name,
-        message: error.message,
-        stack: error.stack,
-      },
-      ...meta
-    } : { error: String(error), ...meta };
-
-    this.log(LogLevel.ERROR, message, errorMeta);
-  }
-
-  private createLogData(level: LogLevel, message: string, meta?: Record<string, any>): StructuredLogData {
-    return {
-      message,
-      level,
-      timestamp: Date.now(),
-      context: this.getCurrentTraceContext(),
-      meta,
-    };
-  }
-
-  private getCurrentTraceContext(): LogContext {
-    try {
-      const ctx = context.active();
-      const span = trace.getSpan(ctx);
-      const spanContext: SpanContext | undefined = span?.spanContext();
-
-      return spanContext ? {
-        traceId: spanContext.traceId,
-        spanId: spanContext.spanId,
-      } : {};
-    } catch {
-      return {};
-    }
-  }
-
-  private emit(logData: StructuredLogData): void {
-    // Check circuit breaker
-    const circuitBreaker = telemetryHealthMonitor.getCircuitBreaker();
-    
-    if (!circuitBreaker.canExecute()) {
-      // Circuit breaker is open, fall back to console
-      this.fallbackToConsole(logData);
-      return;
-    }
-
-    if (this.isInitialized && this.logger) {
-      try {
-        this.logger.emit({
-          timestamp: logData.timestamp,
-          severityText: logData.level.toUpperCase(),
-          severityNumber: this.getSeverityNumber(logData.level),
-          body: logData.message,
-          attributes: {
-            ...logData.context,
-            ...logData.meta,
-          },
-        });
-
-        // Record successful log emission
-        telemetryHealthMonitor.recordExporterSuccess("logs");
-        circuitBreaker.recordSuccess();
-
-      } catch (error) {
-        // Record failure and fall back to console
-        telemetryHealthMonitor.recordExporterFailure("logs", error as Error);
-        circuitBreaker.recordFailure();
-        this.fallbackToConsole(logData, error);
-      }
-    } else {
-      // Store for later if not initialized
-      this.fallbackLogs.push(logData);
-      if (this.fallbackLogs.length > 100) {
-        // Prevent memory buildup
-        this.fallbackLogs.shift();
-      }
-      this.fallbackToConsole(logData);
-    }
-  }
-
-  private fallbackToConsole(logData: StructuredLogData, error?: unknown): void {
-    const timestamp = new Date(logData.timestamp).toISOString();
-    const contextStr = logData.context ? 
-      `[${logData.context.traceId?.slice(0, 8)}:${logData.context.spanId?.slice(0, 8)}]` : 
-      "";
-    
-    const logMessage = `${timestamp} ${logData.level.toUpperCase()} ${contextStr} ${logData.message}`;
-    
-    switch (logData.level) {
-      case LogLevel.DEBUG:
-        console.debug(logMessage, logData.meta || "");
-        break;
-      case LogLevel.INFO:
-        console.info(logMessage, logData.meta || "");
-        break;
-      case LogLevel.WARN:
-        console.warn(logMessage, logData.meta || "");
-        break;
-      case LogLevel.ERROR:
-        console.error(logMessage, logData.meta || "");
-        if (error) {
-          console.error("Logging error:", error);
-        }
-        break;
-    }
-  }
-
-  private flushFallbackLogs(): void {
-    if (this.fallbackLogs.length > 0 && this.isInitialized && this.logger) {
-      console.info(`Flushing ${this.fallbackLogs.length} fallback logs to OpenTelemetry`);
-      
-      for (const logData of this.fallbackLogs) {
-        this.emit(logData);
-      }
-      
-      this.fallbackLogs = [];
-    }
-  }
-
-  private getSeverityNumber(level: LogLevel): number {
-    switch (level) {
-      case LogLevel.DEBUG:
-        return 5; // DEBUG
-      case LogLevel.INFO:
-        return 9; // INFO
-      case LogLevel.WARN:
-        return 13; // WARN
-      case LogLevel.ERROR:
-        return 17; // ERROR
-      default:
-        return 9; // INFO
-    }
-  }
-}
-
-// Singleton logger instance
-export const telemetryLogger = new TelemetryLogger();
-
-// Convenience functions matching existing logger interface
-export function log(message: string, meta?: Record<string, any>): void {
-  telemetryLogger.info(message, meta);
-}
-
-export function debug(message: string, meta?: Record<string, any>): void {
-  telemetryLogger.debug(message, meta);
-}
-
-export function warn(message: string, meta?: Record<string, any>): void {
-  telemetryLogger.warn(message, meta);
-}
-
-export function err(message: string, error?: Error | unknown, meta?: Record<string, any>): void {
-  telemetryLogger.error(message, error, meta);
-}
-
-export function error(message: string, error?: Error | unknown, meta?: Record<string, any>): void {
-  telemetryLogger.error(message, error, meta);
-}
-```
-
-## Circuit Breaker Implementation (Three-State Pattern)
-
-### Production-Ready Circuit Breaker with Health Integration
-
-**Complete three-state circuit breaker with statistics:**
-```typescript
-/* src/telemetry/health/CircuitBreaker.ts */
-
-export enum CircuitBreakerState {
-  CLOSED = "CLOSED",       // Normal operation
-  OPEN = "OPEN",           // Failing, blocking requests
-  HALF_OPEN = "HALF_OPEN"  // Testing if service recovered
-}
-
-export interface CircuitBreakerConfig {
-  failureThreshold: number;    // Number of failures before opening (default: 5)
-  recoveryTimeoutMs: number;   // Time to wait before trying HALF_OPEN (default: 60000)
-  successThreshold: number;    // Successes needed in HALF_OPEN to close (default: 3)
-  timeWindowMs: number;        // Time window for failure counting (default: 60000)
-}
-
-export interface CircuitBreakerStats {
-  state: CircuitBreakerState;
-  failures: number;
-  successes: number;
-  lastFailureTime: number | null;
-  lastSuccessTime: number | null;
-  totalAttempts: number;
-  totalFailures: number;
-  totalSuccesses: number;
-}
-
-export class TelemetryCircuitBreaker {
-  private state: CircuitBreakerState = CircuitBreakerState.CLOSED;
-  private failures: number = 0;
-  private successes: number = 0;
-  private lastFailureTime: number | null = null;
-  private lastSuccessTime: number | null = null;
-  private totalAttempts: number = 0;
-  private totalFailures: number = 0;
-  private totalSuccesses: number = 0;
-  private readonly config: CircuitBreakerConfig;
-
-  constructor(config: Partial<CircuitBreakerConfig> = {}) {
-    this.config = {
-      failureThreshold: config.failureThreshold ?? 5,
-      recoveryTimeoutMs: config.recoveryTimeoutMs ?? 60000, // 1 minute
-      successThreshold: config.successThreshold ?? 3,
-      timeWindowMs: config.timeWindowMs ?? 60000, // 1 minute
-    };
-  }
-
-  public canExecute(): boolean {
-    this.totalAttempts++;
-    
-    switch (this.state) {
-      case CircuitBreakerState.CLOSED:
-        return true;
-        
-      case CircuitBreakerState.OPEN:
-        if (this.shouldAttemptReset()) {
-          this.state = CircuitBreakerState.HALF_OPEN;
-          this.successes = 0;
-          return true;
-        }
-        return false;
-        
-      case CircuitBreakerState.HALF_OPEN:
-        return true;
-        
-      default:
-        return false;
-    }
-  }
-
-  public recordSuccess(): void {
-    this.lastSuccessTime = Date.now();
-    this.totalSuccesses++;
-    
-    switch (this.state) {
-      case CircuitBreakerState.CLOSED:
-        this.resetFailures();
-        break;
-        
-      case CircuitBreakerState.HALF_OPEN:
-        this.successes++;
-        if (this.successes >= this.config.successThreshold) {
-          this.state = CircuitBreakerState.CLOSED;
-          this.resetFailures();
-        }
-        break;
-    }
-  }
-
-  public recordFailure(): void {
-    this.lastFailureTime = Date.now();
-    this.failures++;
-    this.totalFailures++;
-    
-    switch (this.state) {
-      case CircuitBreakerState.CLOSED:
-        if (this.failures >= this.config.failureThreshold) {
-          this.state = CircuitBreakerState.OPEN;
-        }
-        break;
-        
-      case CircuitBreakerState.HALF_OPEN:
-        this.state = CircuitBreakerState.OPEN;
-        break;
-    }
-  }
-
-  public getStats(): CircuitBreakerStats {
-    return {
-      state: this.state,
-      failures: this.failures,
-      successes: this.successes,
-      lastFailureTime: this.lastFailureTime,
-      lastSuccessTime: this.lastSuccessTime,
-      totalAttempts: this.totalAttempts,
-      totalFailures: this.totalFailures,
-      totalSuccesses: this.totalSuccesses,
-    };
-  }
-
-  public getHealthStatus(): {
-    isHealthy: boolean;
-    successRate: number;
-    state: CircuitBreakerState;
-    canExecute: boolean;
-  } {
-    const successRate = this.totalAttempts > 0 ? 
-      (this.totalSuccesses / this.totalAttempts) * 100 : 0;
-    
-    return {
-      isHealthy: this.state === CircuitBreakerState.CLOSED,
-      successRate: Math.round(successRate * 100) / 100, // Round to 2 decimals
-      state: this.state,
-      canExecute: this.canExecute(),
-    };
-  }
-
-  public reset(): void {
-    this.state = CircuitBreakerState.CLOSED;
-    this.resetFailures();
-    this.successes = 0;
-  }
-
-  private shouldAttemptReset(): boolean {
-    if (!this.lastFailureTime) return false;
-    return (Date.now() - this.lastFailureTime) >= this.config.recoveryTimeoutMs;
-  }
-
-  private resetFailures(): void {
-    this.failures = 0;
-  }
-}
-```
-
-## SDK Initialization (Complete with Compatibility Fixes)
-
-### Full SDK Setup with Real-World Compatibility
-
-**Complete initialization with Bun runtime optimizations:**
-```typescript
-/* src/telemetry/instrumentation.ts */
-
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
-import { resourceFromAttributes } from "@opentelemetry/resources";
-import { 
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-  ATTR_TELEMETRY_SDK_NAME,
-  ATTR_TELEMETRY_SDK_LANGUAGE,
-  ATTR_TELEMETRY_SDK_VERSION,
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
-  SEMRESATTRS_SERVICE_NAMESPACE,
-  SEMRESATTRS_SERVICE_INSTANCE_ID
-} from "@opentelemetry/semantic-conventions";
-import { 
-  CompositePropagator, 
-  W3CTraceContextPropagator, 
-  W3CBaggagePropagator 
-} from "@opentelemetry/core";
-import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
-
-import { SmartSampler } from "./sampling/SmartSampler";
-import { telemetryHealthMonitor } from "./health/telemetryHealth";
-import { telemetryLogger, log, warn, error } from "./logger";
-import { type TelemetryConfig, loadTelemetryConfigFromEnv } from "./config";
-
-let sdk: NodeSDK | undefined;
-let isInitialized = false;
-let config: TelemetryConfig;
-
-export async function initializeTelemetry(): Promise<void> {
-  if (isInitialized) {
-    warn("OpenTelemetry already initialized, skipping");
-    return;
-  }
-
-  try {
-    // Load and validate configuration (fail fast if invalid)
-    config = loadTelemetryConfigFromEnv();
-    
-    if (!config.ENABLE_OPENTELEMETRY) {
-      log("OpenTelemetry instrumentation is disabled");
-      return;
-    }
-
-    log("Initializing 2025-compliant OpenTelemetry SDK...", {
-      serviceName: config.SERVICE_NAME,
-      serviceVersion: config.SERVICE_VERSION,
-      environment: config.DEPLOYMENT_ENVIRONMENT,
-      samplingRate: config.SAMPLING_RATE,
-      exportTimeout: config.EXPORT_TIMEOUT_MS,
-    });
-
-    // Set up diagnostic logging
-    diag.setLogger(
-      new DiagConsoleLogger(), 
-      config.DEPLOYMENT_ENVIRONMENT === "development" ? DiagLogLevel.INFO : DiagLogLevel.WARN
-    );
-
-    // Initialize health monitor with config
-    telemetryHealthMonitor.setConfig(config);
-
-    // Create resource with all 2025-compliant semantic conventions
-    const resource = createResource(config);
-
-    // Create 2025-compliant exporters
-    const traceExporter = createTraceExporter(config);
-    const metricExporter = createMetricExporter(config);
-    const logExporter = createLogExporter(config);
-
-    // Create span processor with 2025 batch settings
-    const spanProcessor = new BatchSpanProcessor(traceExporter, {
-      maxExportBatchSize: config.BATCH_SIZE, // 2048 (2025 standard)
-      maxQueueSize: config.MAX_QUEUE_SIZE,   // 10,000 (2025 standard)
-      scheduledDelayMillis: 5000,            // 5 seconds
-      exportTimeoutMillis: config.EXPORT_TIMEOUT_MS, // 30 seconds (2025 standard)
-    });
-
-    // Create log processor with 2025 batch settings
-    const logProcessor = new BatchLogRecordProcessor(logExporter, {
-      maxExportBatchSize: Math.min(config.BATCH_SIZE, 512), // Logs can be smaller batches
-      maxQueueSize: config.MAX_QUEUE_SIZE,
-      scheduledDelayMillis: 5000,
-      exportTimeoutMillis: config.EXPORT_TIMEOUT_MS,
-    });
-
-    // Create metric reader with proper intervals
-    const metricReader = new PeriodicExportingMetricReader({
-      exporter: metricExporter,
-      exportIntervalMillis: config.METRIC_READER_INTERVAL,
-      exportTimeoutMillis: config.EXPORT_TIMEOUT_MS,
-    });
-
-    // Create smart sampler with 2025 standards
-    const sampler = new SmartSampler({
-      defaultSamplingRate: config.SAMPLING_RATE, // 15% (2025 standard)
-      errorSamplingRate: 1.0, // 100% error retention (2025 standard)
-      enabledEndpoints: ["/graphql", "/health"], // Always sample these
-    });
-
-    // Create propagator with W3C standards
-    const propagator = new CompositePropagator({
-      propagators: [
-        new W3CTraceContextPropagator(),
-        new W3CBaggagePropagator(),
-      ],
-    });
-
-    // Initialize NodeSDK with 2025-compliant configuration
-    sdk = new NodeSDK({
-      resource,
-      sampler,
-      textMapPropagator: propagator,
-      spanProcessors: [spanProcessor],
-      logRecordProcessors: [logProcessor],
-      metricReader,
-      instrumentations: [
-        // Auto-instrumentations with Bun-compatible settings
-        getNodeAutoInstrumentations({
-          "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
-          "@opentelemetry/instrumentation-aws-sdk": { enabled: false },
-          "@opentelemetry/instrumentation-fs": { enabled: false },
-          "@opentelemetry/instrumentation-winston": { enabled: false }, // We use our own
-          "@opentelemetry/instrumentation-runtime-node": { enabled: false }, // Not compatible with Bun
-          "@opentelemetry/instrumentation-http": { 
-            enabled: true,
-            ignoreIncomingRequestHook: (req) => {
-              // Reduce noise from health checks
-              return req.url?.includes("/health") || false;
-            }
-          },
-        }),
-        // GraphQL instrumentation with proper settings
-        new GraphQLInstrumentation({
-          allowValues: true,
-          depth: -1, // Capture full query depth
-          mergeItems: true, // Merge similar operations
-        }),
-      ],
-    });
-
-    // Start the SDK
-    await sdk.start();
-
-    // Initialize logger after SDK is started
-    telemetryLogger.initialize();
-
-    isInitialized = true;
-
-    log("OpenTelemetry SDK initialized successfully", {
-      tracesEndpoint: config.TRACES_ENDPOINT,
-      metricsEndpoint: config.METRICS_ENDPOINT,
-      logsEndpoint: config.LOGS_ENDPOINT,
-      samplingRate: `${config.SAMPLING_RATE * 100}%`,
-      batchSize: config.BATCH_SIZE,
-      exportTimeoutMs: config.EXPORT_TIMEOUT_MS,
-    });
-
-    // Set up graceful shutdown
-    setupGracefulShutdown();
-
-  } catch (err) {
-    error("Failed to initialize OpenTelemetry SDK", err);
-    throw err; // Re-throw to fail fast
-  }
-}
-
-function createResource(config: TelemetryConfig) {
-  const attributes = {
-    [ATTR_SERVICE_NAME]: config.SERVICE_NAME,
-    [ATTR_SERVICE_VERSION]: config.SERVICE_VERSION,
-    [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: config.DEPLOYMENT_ENVIRONMENT,
-    [SEMRESATTRS_SERVICE_NAMESPACE]: "capella-graphql-api", // 2025 standard
-    [SEMRESATTRS_SERVICE_INSTANCE_ID]: process.env.HOSTNAME || process.env.INSTANCE_ID || "unknown",
-    [ATTR_TELEMETRY_SDK_NAME]: "opentelemetry", // 2025 standard
-    [ATTR_TELEMETRY_SDK_LANGUAGE]: "nodejs", // 2025 standard
-    [ATTR_TELEMETRY_SDK_VERSION]: "2.0.1", // 2025 standard
-    // Runtime information
-    "runtime.name": typeof Bun !== "undefined" ? "bun" : "node",
-    "runtime.version": typeof Bun !== "undefined" ? Bun.version : process.version,
-    // Container information if available
-    ...(process.env.CONTAINER_ID && { "container.id": process.env.CONTAINER_ID }),
-    ...(process.env.K8S_POD_NAME && { "k8s.pod.name": process.env.K8S_POD_NAME }),
-    ...(process.env.K8S_NAMESPACE && { "k8s.namespace.name": process.env.K8S_NAMESPACE }),
-  };
-
-  return resourceFromAttributes(attributes);
-}
-
-function createTraceExporter(config: TelemetryConfig): OTLPTraceExporter {
-  // Special handling for collectors that expect data at root path
-  let url = config.TRACES_ENDPOINT;
-  
-  if (config.TRACES_ENDPOINT.includes('siobytes.com') && !config.TRACES_ENDPOINT.endsWith('/v1/traces')) {
-    url = config.TRACES_ENDPOINT + '/v1/traces';
-  }
-    
-  return new OTLPTraceExporter({
-    url: url,
-    headers: {
-      "Content-Type": "application/json",     // JSON over HTTP for collector on port 4318
-      // Gzip compression removed - causes timeout with some collectors
-    },
-    timeoutMillis: config.EXPORT_TIMEOUT_MS,    // 30 seconds (2025 standard)
-    concurrencyLimit: 10,                       // Reasonable concurrency
-    keepAlive: true,
-  });
-}
-
-function createMetricExporter(config: TelemetryConfig): OTLPMetricExporter {
-  // Special handling for collectors that expect data at root path
-  let url = config.METRICS_ENDPOINT;
-  
-  if (config.METRICS_ENDPOINT.includes('siobytes.com')) {
-    // For siobytes collectors, we need to construct a URL that results in root path
-    // The SDK will append /v1/metrics, so we use a trick to cancel it out
-    url = config.METRICS_ENDPOINT + '/..';
-  }
-    
-  return new OTLPMetricExporter({
-    url: url,
-    headers: {
-      "Content-Type": "application/json",     // JSON over HTTP for collector on port 4318
-      // Gzip compression removed - causes timeout with some collectors
-    },
-    timeoutMillis: config.EXPORT_TIMEOUT_MS,    // 30 seconds (2025 standard)
-    concurrencyLimit: 10,
-    keepAlive: true,
-  });
-}
-
-function createLogExporter(config: TelemetryConfig): OTLPLogExporter {
-  // Special handling for collectors that expect data at root path
-  let url = config.LOGS_ENDPOINT;
-  
-  if (config.LOGS_ENDPOINT.includes('siobytes.com')) {
-    // For siobytes collectors, we need to construct a URL that results in root path
-    // The SDK will append /v1/logs, so we use a trick to cancel it out
-    url = config.LOGS_ENDPOINT + '/..';
-  }
-    
-  return new OTLPLogExporter({
-    url: url,
-    headers: {
-      "Content-Type": "application/json",     // JSON over HTTP for collector on port 4318
-      // Gzip compression removed - causes timeout with some collectors
-    },
-    timeoutMillis: config.EXPORT_TIMEOUT_MS,    // 30 seconds (2025 standard)
-    concurrencyLimit: 10,
-    keepAlive: true,
-  });
-}
-
-function setupGracefulShutdown(): void {
-  const gracefulShutdown = async (signal: string) => {
-    log(`Received ${signal}, shutting down OpenTelemetry SDK gracefully...`);
-    
-    try {
-      await shutdownTelemetry();
-      log("OpenTelemetry SDK shut down successfully");
-    } catch (err) {
-      error("Error during OpenTelemetry SDK shutdown", err);
-    }
-  };
-
-  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-  process.on("SIGQUIT", () => gracefulShutdown("SIGQUIT"));
-}
-
-export async function shutdownTelemetry(): Promise<void> {
-  if (!sdk || !isInitialized) {
-    return;
-  }
-
-  try {
-    await sdk.shutdown();
-    sdk = undefined;
-    isInitialized = false;
-    log("OpenTelemetry SDK shutdown completed");
-  } catch (err) {
-    error("Error shutting down OpenTelemetry SDK", err);
-    throw err;
-  }
-}
-
-export function getTelemetrySDK(): NodeSDK | undefined {
-  return sdk;
-}
-
-export function isTelemetryInitialized(): boolean {
-  return isInitialized;
-}
-
-// Initialize telemetry on module load
-if (typeof Bun !== "undefined" || process.env.NODE_ENV !== "test") {
-  initializeTelemetry().catch((err) => {
-    console.error("Critical: Failed to initialize OpenTelemetry:", err);
-    // In production, we might want to exit here
-    if (process.env.DEPLOYMENT_ENVIRONMENT === "production") {
-      process.exit(1);
-    }
+// Integration helper for unified config system
+export function extractTelemetryFromUnified(unifiedConfig: Config): TelemetryConfig {
+  return validateTelemetryConfig({
+    ENABLE_OPENTELEMETRY: unifiedConfig.telemetry.ENABLE_OPENTELEMETRY,
+    SERVICE_NAME: unifiedConfig.telemetry.SERVICE_NAME,
+    SERVICE_VERSION: unifiedConfig.telemetry.SERVICE_VERSION,
+    DEPLOYMENT_ENVIRONMENT: unifiedConfig.telemetry.DEPLOYMENT_ENVIRONMENT,
+    TRACES_ENDPOINT: unifiedConfig.telemetry.TRACES_ENDPOINT,
+    METRICS_ENDPOINT: unifiedConfig.telemetry.METRICS_ENDPOINT,
+    LOGS_ENDPOINT: unifiedConfig.telemetry.LOGS_ENDPOINT,
+    METRIC_READER_INTERVAL: unifiedConfig.telemetry.METRIC_READER_INTERVAL,
+    SUMMARY_LOG_INTERVAL: unifiedConfig.telemetry.SUMMARY_LOG_INTERVAL,
+    EXPORT_TIMEOUT_MS: unifiedConfig.telemetry.EXPORT_TIMEOUT_MS,
+    BATCH_SIZE: unifiedConfig.telemetry.BATCH_SIZE,
+    MAX_QUEUE_SIZE: unifiedConfig.telemetry.MAX_QUEUE_SIZE,
+    SAMPLING_RATE: unifiedConfig.telemetry.SAMPLING_RATE,
+    CIRCUIT_BREAKER_THRESHOLD: unifiedConfig.telemetry.CIRCUIT_BREAKER_THRESHOLD,
+    CIRCUIT_BREAKER_TIMEOUT_MS: unifiedConfig.telemetry.CIRCUIT_BREAKER_TIMEOUT_MS,
   });
 }
 ```
 
-## Smart Sampling Strategy (15% + 100% Error Retention)
+## Advanced Memory Management for Telemetry Systems
 
-### Production-Ready Sampling with Error Priority
-
-**Exact 2025 sampling standards implementation:**
+### Memory Pressure Detection and Data Dropping Patterns
 ```typescript
-/* src/telemetry/sampling/SmartSampler.ts */
-
-import {
-  Sampler,
-  SamplingResult,
-  SamplingDecision,
-  type Context,
-  type Link,
-  type Attributes,
-  SpanKind,
-} from "@opentelemetry/api";
-
-export interface SmartSamplingConfig {
-  defaultSamplingRate: number; // 0.15 for 15% (2025 standard)
-  errorSamplingRate: number;   // 1.0 for 100% (2025 standard)
-  enabledEndpoints?: string[]; // Optional specific endpoint sampling
+// Production-ready telemetry memory management
+interface MemoryPressureInfo {
+  isUnderPressure: boolean;
+  heapUsageRatio: number;
+  bufferMemoryUsageMB: number;
+  totalMemoryUsageMB: number;
+  pressureLevel: 'low' | 'medium' | 'high' | 'critical';
 }
 
-export class SmartSampler implements Sampler {
-  private readonly config: SmartSamplingConfig;
+interface TelemetryMemoryConfig {
+  maxMemoryMB: number;
+  memoryPressureThreshold: number; // Percentage (0-1) of heap usage
+  emergencyFlushThreshold: number; // Percentage (0-1) of max memory
+}
 
-  constructor(config: SmartSamplingConfig = {
-    defaultSamplingRate: 0.15, // 15% default sampling (2025 standard)
-    errorSamplingRate: 1.0,    // 100% error retention (2025 standard)
-  }) {
-    this.config = config;
+export class TelemetryBatchCoordinator {
+  private currentMemoryUsage = 0;
+  private lastMemoryCheck = 0;
+  private statistics = {
+    emergencyFlushCount: 0,
+    dataDropCount: 0,
+    currentMemoryUsageMB: 0,
+  };
+
+  /**
+   * Add telemetry data with memory pressure checking
+   */
+  addSpans(spans: SpanData[]): void {
+    const spanSize = this.estimateSpanArraySize(spans);
     
-    // Validate configuration
-    if (config.defaultSamplingRate < 0 || config.defaultSamplingRate > 1) {
-      throw new Error("Default sampling rate must be between 0 and 1");
-    }
-    if (config.errorSamplingRate < 0 || config.errorSamplingRate > 1) {
-      throw new Error("Error sampling rate must be between 0 and 1");
-    }
-  }
-
-  shouldSample(
-    context: Context,
-    traceId: string,
-    spanName: string,
-    spanKind: SpanKind,
-    attributes: Attributes,
-    links: Link[]
-  ): SamplingResult {
-    // Always sample errors (100% error retention - 2025 standard)
-    const httpStatusCode = attributes["http.status_code"];
-    const hasError = attributes["error"] === true;
-    
-    if (hasError || (httpStatusCode && Number(httpStatusCode) >= 400)) {
-      return {
-        decision: SamplingDecision.RECORD_AND_SAMPLED,
-        attributes: {
-          "sampling.reason": "error_retention",
-          "sampling.rate": this.config.errorSamplingRate,
-        },
-      };
-    }
-
-    // Check for specific endpoint sampling rules
-    if (this.config.enabledEndpoints) {
-      const httpRoute = attributes["http.route"] || attributes["http.target"];
-      if (httpRoute && this.config.enabledEndpoints.some(endpoint => 
-        String(httpRoute).includes(endpoint))) {
-        return {
-          decision: SamplingDecision.RECORD_AND_SAMPLED,
-          attributes: {
-            "sampling.reason": "endpoint_enabled",
-            "sampling.rate": 1.0,
-          },
-        };
+    // Check memory pressure BEFORE adding data
+    if (this.shouldPerformMemoryCheck()) {
+      const memoryPressure = this.checkMemoryPressure();
+      if (memoryPressure.pressureLevel === 'critical') {
+        this.handleCriticalMemoryPressure();
+        return; // Drop the spans to prevent OOM
+      } else if (memoryPressure.pressureLevel === 'high') {
+        this.emergencyFlush();
       }
     }
 
-    // Health checks - lower sampling rate
-    if (spanName.includes("/health") || spanName.includes("health")) {
-      const healthSamplingRate = this.config.defaultSamplingRate * 0.1; // 1.5% for health checks
-      const shouldSample = Math.random() < healthSamplingRate;
-      return {
-        decision: shouldSample ? 
-          SamplingDecision.RECORD_AND_SAMPLED : 
-          SamplingDecision.NOT_RECORD,
-        attributes: shouldSample ? {
-          "sampling.reason": "health_check",
-          "sampling.rate": healthSamplingRate,
-        } : undefined,
-      };
-    }
-
-    // Default sampling (15% - 2025 standard)
-    const shouldSample = Math.random() < this.config.defaultSamplingRate;
-    
-    return {
-      decision: shouldSample ? 
-        SamplingDecision.RECORD_AND_SAMPLED : 
-        SamplingDecision.NOT_RECORD,
-      attributes: shouldSample ? {
-        "sampling.reason": "default_sampling",
-        "sampling.rate": this.config.defaultSamplingRate,
-      } : undefined,
-    };
+    this.traceBuffer.push(...spans);
+    this.currentMemoryUsage += spanSize;
+    this.updateMemoryStats();
   }
 
-  toString(): string {
-    return `SmartSampler{defaultRate=${this.config.defaultSamplingRate}, errorRate=${this.config.errorSamplingRate}}`;
-  }
-}
-```
-
-## Health Monitoring (Complete Implementation)
-
-### Comprehensive Health Tracking with Circuit Breaker Integration
-
-**Full health monitoring with real-time status:**
-```typescript
-/* src/telemetry/health/telemetryHealth.ts */
-
-import { TelemetryCircuitBreaker } from "./CircuitBreaker";
-
-export interface TelemetryHealthData {
-  timestamp: number;
-  status: "healthy" | "degraded" | "unhealthy";
-  exporters: {
-    traces: ExporterHealth;
-    metrics: ExporterHealth;
-    logs: ExporterHealth;
-  };
-  circuitBreaker: {
-    state: string;
-    isHealthy: boolean;
-    successRate: number;
-    canExecute: boolean;
-    totalAttempts: number;
-    totalFailures: number;
-  };
-  configuration: {
-    samplingRate: number;
-    exportTimeoutMs: number;
-    batchSize: number;
-    maxQueueSize: number;
-  };
-  runtime: {
-    memoryUsageMB: number;
-    uptimeMs: number;
-    environment: string;
-    version: string;
-  };
-}
-
-export interface ExporterHealth {
-  name: string;
-  status: "healthy" | "degraded" | "unhealthy";
-  lastExportTime: number | null;
-  exportCount: number;
-  failureCount: number;
-  successRate: number;
-}
-
-class TelemetryHealthMonitor {
-  private circuitBreaker: TelemetryCircuitBreaker;
-  private exporters: Map<string, ExporterHealth>;
-  private config: any;
-
-  constructor() {
-    this.circuitBreaker = new TelemetryCircuitBreaker({
-      failureThreshold: 5,
-      recoveryTimeoutMs: 60000,
-      successThreshold: 3,
-    });
-    
-    this.exporters = new Map([
-      ["traces", this.createInitialExporterHealth("traces")],
-      ["metrics", this.createInitialExporterHealth("metrics")],
-      ["logs", this.createInitialExporterHealth("logs")]
-    ]);
-  }
-
-  public setConfig(config: any): void {
-    this.config = config;
-  }
-
-  public getCircuitBreaker(): TelemetryCircuitBreaker {
-    return this.circuitBreaker;
-  }
-
-  public recordExporterSuccess(exporterName: string): void {
-    const exporter = this.exporters.get(exporterName);
-    if (exporter) {
-      exporter.lastExportTime = Date.now();
-      exporter.exportCount++;
-      exporter.successRate = ((exporter.exportCount - exporter.failureCount) / exporter.exportCount) * 100;
-      
-      // Update exporter status
-      if (exporter.successRate >= 95) {
-        exporter.status = "healthy";
-      } else if (exporter.successRate >= 80) {
-        exporter.status = "degraded";
-      } else {
-        exporter.status = "unhealthy";
-      }
-    }
-    
-    this.circuitBreaker.recordSuccess();
-  }
-
-  public recordExporterFailure(exporterName: string, error?: Error): void {
-    const exporter = this.exporters.get(exporterName);
-    if (exporter) {
-      exporter.failureCount++;
-      exporter.exportCount++;
-      exporter.successRate = ((exporter.exportCount - exporter.failureCount) / exporter.exportCount) * 100;
-      
-      // Update exporter status
-      if (exporter.successRate >= 95) {
-        exporter.status = "healthy";
-      } else if (exporter.successRate >= 80) {
-        exporter.status = "degraded";
-      } else {
-        exporter.status = "unhealthy";
-      }
-    }
-    
-    this.circuitBreaker.recordFailure();
-  }
-
-  public getHealthData(): TelemetryHealthData {
-    const circuitBreakerStats = this.circuitBreaker.getHealthStatus();
+  /**
+   * Check current memory pressure
+   */
+  private checkMemoryPressure(): MemoryPressureInfo {
     const memoryUsage = process.memoryUsage();
+    const heapUsageRatio = memoryUsage.heapUsed / memoryUsage.heapTotal;
+    const bufferMemoryMB = this.currentMemoryUsage / (1024 * 1024);
+
+    let pressureLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
     
-    // Determine overall status
-    const exporterStatuses = Array.from(this.exporters.values()).map(e => e.status);
-    let overallStatus: "healthy" | "degraded" | "unhealthy";
-    
-    if (exporterStatuses.every(s => s === "healthy") && circuitBreakerStats.isHealthy) {
-      overallStatus = "healthy";
-    } else if (exporterStatuses.some(s => s === "unhealthy") || !circuitBreakerStats.isHealthy) {
-      overallStatus = "unhealthy";
-    } else {
-      overallStatus = "degraded";
+    if (heapUsageRatio > 0.95 || bufferMemoryMB > this.config.maxMemoryMB) {
+      pressureLevel = 'critical';
+    } else if (heapUsageRatio > this.config.memoryPressureThreshold || 
+               bufferMemoryMB > this.config.maxMemoryMB * this.config.emergencyFlushThreshold) {
+      pressureLevel = 'high';
+    } else if (heapUsageRatio > 0.7) {
+      pressureLevel = 'medium';
     }
 
     return {
-      timestamp: Date.now(),
-      status: overallStatus,
-      exporters: {
-        traces: this.exporters.get("traces")!,
-        metrics: this.exporters.get("metrics")!,
-        logs: this.exporters.get("logs")!,
-      },
-      circuitBreaker: {
-        state: circuitBreakerStats.state,
-        isHealthy: circuitBreakerStats.isHealthy,
-        successRate: circuitBreakerStats.successRate,
-        canExecute: circuitBreakerStats.canExecute,
-        totalAttempts: this.circuitBreaker.getStats().totalAttempts,
-        totalFailures: this.circuitBreaker.getStats().totalFailures,
-      },
-      configuration: {
-        samplingRate: this.config?.SAMPLING_RATE || 0.15,
-        exportTimeoutMs: this.config?.EXPORT_TIMEOUT_MS || 30000,
-        batchSize: this.config?.BATCH_SIZE || 2048,
-        maxQueueSize: this.config?.MAX_QUEUE_SIZE || 10000,
-      },
-      runtime: {
-        memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
-        uptimeMs: process.uptime() * 1000,
-        environment: this.config?.DEPLOYMENT_ENVIRONMENT || "unknown",
-        version: this.config?.SERVICE_VERSION || "unknown",
-      },
+      isUnderPressure: pressureLevel !== 'low',
+      heapUsageRatio,
+      bufferMemoryUsageMB: bufferMemoryMB,
+      totalMemoryUsageMB: memoryUsage.heapUsed / (1024 * 1024),
+      pressureLevel,
     };
   }
 
-  private createInitialExporterHealth(name: string): ExporterHealth {
-    return {
-      name,
-      status: "healthy",
-      lastExportTime: null,
-      exportCount: 0,
-      failureCount: 0,
-      successRate: 100,
-    };
-  }
-}
+  /**
+   * Handle critical memory pressure by dropping oldest data
+   */
+  private handleCriticalMemoryPressure(): void {
+    console.error('CRITICAL: Telemetry memory pressure - dropping oldest data to prevent OOM');
+    
+    // Drop 50% of oldest data from each buffer
+    const tracesToDrop = Math.floor(this.traceBuffer.length * 0.5);
+    const droppedTraces = this.traceBuffer.splice(0, tracesToDrop);
 
-// Singleton instance
-export const telemetryHealthMonitor = new TelemetryHealthMonitor();
+    // Update memory usage and statistics
+    const droppedSize = this.estimateSpanArraySize(droppedTraces);
+    this.currentMemoryUsage -= droppedSize;
+    this.statistics.dataDropCount += tracesToDrop;
 
-// Convenience function for health endpoint
-export function getTelemetryHealth(): TelemetryHealthData {
-  return telemetryHealthMonitor.getHealthData();
-}
-```
+    console.error('Telemetry data dropped due to memory pressure', {
+      dropped: { traces: tracesToDrop, memoryFreedMB: droppedSize / (1024 * 1024) },
+      remaining: { traces: this.traceBuffer.length, memoryUsageMB: this.currentMemoryUsage / (1024 * 1024) }
+    });
 
-## Integration Patterns (Real-World Tested)
-
-### Bun Runtime Configuration
-
-**bunfig.toml setup for preload initialization:**
-```toml
-# Bun configuration with telemetry preload
-preload = ['src/telemetry/instrumentation.ts']
-logLevel = "debug"
-
-[run]
-bun = true
-
-[install.lockfile]
-path = "bun.lockb"
-
-[build]
-target = "bun"
-```
-
-### Environment Variable Configuration
-
-**.env.example with 2025 standards:**
-```bash
-# OpenTelemetry Configuration (2025 Standards)
-ENABLE_OPENTELEMETRY=true
-
-# Service identification (REQUIRED - no fallbacks)
-SERVICE_NAME="CapellaQL Service"
-SERVICE_VERSION="2.0"
-DEPLOYMENT_ENVIRONMENT="development"
-
-# OTLP Collector Endpoints - JSON over HTTP (Standard for port 4318)
-# Development (localhost collector)
-TRACES_ENDPOINT="http://localhost:4318/v1/traces"
-METRICS_ENDPOINT="http://localhost:4318/v1/metrics"
-LOGS_ENDPOINT="http://localhost:4318/v1/logs"
-
-# Production (remote collector - uncomment for production)
-# TRACES_ENDPOINT="https://your-collector.example.com/v1/traces"
-# METRICS_ENDPOINT="https://your-collector.example.com/v1/metrics"
-# LOGS_ENDPOINT="https://your-collector.example.com/v1/logs"
-
-# Monitoring intervals
-METRIC_READER_INTERVAL=60000
-SUMMARY_LOG_INTERVAL=300000
-
-# 2025 OpenTelemetry Compliance Settings (STRICT)
-EXPORT_TIMEOUT_MS=30000            # 30 seconds max (2025 standard)
-BATCH_SIZE=2048                    # Batch size (2025 standard)
-MAX_QUEUE_SIZE=10000              # Max queue size (2025 standard)
-SAMPLING_RATE=0.15                # 15% sampling rate (2025 standard)
-CIRCUIT_BREAKER_THRESHOLD=10      # Circuit breaker failure threshold (lenient for development)
-CIRCUIT_BREAKER_TIMEOUT_MS=30000  # Circuit breaker recovery timeout (30 seconds)
-```
-
-### Collector Configuration Notes
-
-**For JSON over HTTP (port 4318 - Standard):**
-- Content-Type: `application/json`
-- Endpoints: `/v1/traces`, `/v1/metrics`, `/v1/logs`
-- Fast connection failures for development
-- Standard for most OTLP HTTP collectors
-
-**For Protobuf over HTTP (port 4318 - Alternative):**
-- Content-Type: `application/x-protobuf`
-- More efficient binary format
-- Better for high-throughput production environments
-
-**Development vs Production:**
-- **Development**: Use localhost endpoints for fast failures and easier debugging
-- **Production**: Use remote collector endpoints with proper authentication headers
-
-### Application Integration
-
-**Main application integration pattern:**
-```typescript
-// src/index.ts
-import { initializeTelemetry, shutdownTelemetry } from "./telemetry/instrumentation";
-import { getTelemetryHealth } from "./telemetry/health/telemetryHealth";
-import { log, error } from "./telemetry/logger";
-
-// Telemetry initializes automatically via bunfig.toml preload
-// But you can also initialize manually if needed:
-// await initializeTelemetry();
-
-// Add health endpoint to your server
-app.get("/health/telemetry", (req, res) => {
-  const health = getTelemetryHealth();
-  res.status(health.status === "healthy" ? 200 : 503).json(health);
-});
-
-// Graceful shutdown handling
-process.on('SIGTERM', async () => {
-  log('Received SIGTERM, shutting down gracefully');
-  await shutdownTelemetry();
-  process.exit(0);
-});
-```
-
-## Bun-Specific Optimizations
-
-### Performance Enhancements with Bun Runtime
-
-**Leverage Bun.sleep() and Bun.nanoseconds() for better performance:**
-```typescript
-/**
- * Bun-optimized retry with backoff for telemetry operations
- */
-export async function retryWithBackoff<T>(
-  operation: () => Promise<T>,
-  maxRetries = 3,
-  baseDelay = 1000
-): Promise<T> {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      if (attempt === maxRetries) throw error;
-
-      // Use Bun.sleep() if available for better performance
-      const delay = baseDelay * (2 ** (attempt - 1));
-      if (typeof Bun !== "undefined") {
-        await Bun.sleep(delay);
-      } else {
-        await new Promise(resolve => setTimeout(resolve, delay));
+    // Force garbage collection if available
+    if (global.gc) {
+      try {
+        global.gc();
+      } catch (error) {
+        console.debug('Manual garbage collection failed:', error);
       }
     }
   }
-  throw new Error("Should never reach here");
-}
 
-/**
- * Performance timing with Bun.nanoseconds() precision
- */
-export function measureOperation<T>(
-  name: string,
-  operation: () => T,
-  histogram?: any
-): T {
-  const start = typeof Bun !== "undefined" ? Bun.nanoseconds() : Date.now() * 1_000_000;
-  try {
-    const result = operation();
-    const duration = typeof Bun !== "undefined" ?
-      (Bun.nanoseconds() - start) / 1_000_000 : // Convert to ms
-      Date.now() * 1_000_000 - start;
-
-    // Record metric if histogram provided (convert ms to seconds for UCUM)
-    if (histogram) {
-      histogram.record(duration / 1000, { operation: name });
-    }
-
-    return result;
-  } catch (error) {
-    throw error;
-  }
-}
-
-/**
- * Multi-source environment variable resolution (Bun-aware)
- */
-function getEnvVar(key: string): string | undefined {
-  // Priority order for Bun environments
-  return (typeof Bun !== "undefined" ? Bun.env[key] : undefined) ||
-         process.env[key] ||
-         import.meta?.env?.[key];
-}
-```
-
-### Bun Runtime Compatibility Fixes
-
-**Essential compatibility fixes for production deployment:**
-```typescript
-// Disable incompatible instrumentations for Bun
-const bunCompatibleInstrumentations = getNodeAutoInstrumentations({
-  "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
-  "@opentelemetry/instrumentation-aws-sdk": { enabled: false },
-  "@opentelemetry/instrumentation-fs": { enabled: false },
-  "@opentelemetry/instrumentation-winston": { enabled: false },
-  "@opentelemetry/instrumentation-runtime-node": { enabled: false }, // CRITICAL: Not compatible with Bun
-  "@opentelemetry/instrumentation-http": { 
-    enabled: true,
-    ignoreIncomingRequestHook: (req) => {
-      // Reduce noise from health checks
-      return req.url?.includes("/health") || false;
-    }
-  },
-});
-
-// Environment variable reading (Bun-first approach)
-const getConfig = () => ({
-  serviceName: typeof Bun !== "undefined" ? Bun.env.SERVICE_NAME : process.env.SERVICE_NAME,
-  serviceVersion: typeof Bun !== "undefined" ? Bun.env.SERVICE_VERSION : process.env.SERVICE_VERSION,
-  // ... other config
-});
-```
-
-## Troubleshooting Guide (Production-Tested)
-
-### Common Issues and Solutions
-
-**1. Import Compatibility Issues:**
-```typescript
-// ❌ OLD (will cause errors)
-import { Resource } from "@opentelemetry/resources";
-import { 
-  ATTR_DEPLOYMENT_ENVIRONMENT,
-  ATTR_SERVICE_INSTANCE_ID 
-} from "@opentelemetry/semantic-conventions";
-
-// ✅ NEW (2025 compatible)
-import { resourceFromAttributes } from "@opentelemetry/resources";
-import { 
-  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
-  SEMRESATTRS_SERVICE_INSTANCE_ID 
-} from "@opentelemetry/semantic-conventions";
-```
-
-**2. Bun Runtime Compatibility:**
-```typescript
-// ❌ Will cause "Not implemented" errors in Bun
-"@opentelemetry/instrumentation-runtime-node": { enabled: true }
-
-// ✅ Disable for Bun compatibility
-"@opentelemetry/instrumentation-runtime-node": { enabled: false }
-```
-
-**3. Logger API Issues:**
-```typescript
-// ❌ OLD (will cause export errors)
-import { logs } from "@opentelemetry/api";
-
-// ✅ NEW (correct import)
-import * as api from "@opentelemetry/api-logs";
-const logger = api.logs.getLoggerProvider().getLogger("name", "version");
-```
-
-**4. Configuration Validation Failures:**
-```bash
-# Common validation error messages and solutions:
-
-# Error: "SERVICE_NAME is required but missing"
-# Solution: Ensure SERVICE_NAME is set in environment
-export SERVICE_NAME="your-service-name"
-
-# Error: "EXPORT_TIMEOUT_MS exceeds 30 seconds"
-# Solution: Use 2025 standard timeout
-export EXPORT_TIMEOUT_MS=30000
-
-# Error: "METRIC_READER_INTERVAL is NaN"
-# Solution: Ensure numeric values are valid
-export METRIC_READER_INTERVAL=60000
-```
-
-**5. Collector Compatibility Issues (Real-World):**
-```typescript
-// Issue: Collector expects data at root path, SDK appends /v1/traces
-// Solution: Custom URL handling for specific collectors
-
-function createTraceExporter(config: TelemetryConfig): OTLPTraceExporter {
-  let url = config.TRACES_ENDPOINT;
-  
-  // Handle collectors that expect root path delivery
-  if (config.TRACES_ENDPOINT.includes('your-collector.com')) {
-    url = config.TRACES_ENDPOINT + '/..';  // Cancel out SDK path append
-  }
+  /**
+   * Emergency flush when memory pressure is high
+   */
+  private emergencyFlush(): void {
+    const now = Date.now();
+    if (now - this.lastEmergencyFlush < 2000) return; // Prevent too frequent flushes
     
-  return new OTLPTraceExporter({
-    url: url,
-    headers: {
-      "Content-Type": "application/json",
-      // Skip gzip if collector has timeout issues
-    },
-    // ... rest of config
-  });
-}
-```
+    this.lastEmergencyFlush = now;
+    this.statistics.emergencyFlushCount++;
 
-**6. Gzip Compression Issues:**
-```bash
-# Issue: Collector times out with gzip compressed payloads
-# Symptoms: 200 OK responses but SDK shows timeout errors
-# Solution: Remove Content-Encoding header
+    console.warn('Emergency telemetry flush due to memory pressure', {
+      bufferSizes: { traces: this.traceBuffer.length, metrics: this.metricBuffer.length },
+      memoryUsageMB: this.currentMemoryUsage / (1024 * 1024),
+    });
 
-# Before (causes timeouts):
-headers: {
-  "Content-Type": "application/json",
-  "Content-Encoding": "gzip"
-}
-
-# After (works with timeout-sensitive collectors):
-headers: {
-  "Content-Type": "application/json"
-  // No gzip compression
-}
-```
-
-### Diagnostic Tools
-
-**Enable debug logging for troubleshooting:**
-```typescript
-import { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
-
-// Enable detailed diagnostic logging
-diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.DEBUG);
-
-// Health check endpoint for monitoring
-app.get("/health/telemetry", (req, res) => {
-  const health = getTelemetryHealth();
-  console.log("Telemetry Health:", JSON.stringify(health, null, 2));
-  res.status(health.status === "healthy" ? 200 : 503).json(health);
-});
-
-// Circuit breaker status logging
-const circuitBreaker = telemetryHealthMonitor.getCircuitBreaker();
-console.log("Circuit Breaker Stats:", circuitBreaker.getStats());
-```
-
-## Integration with Other Agents
-
-### Collaborative Workflow Patterns
-
-**Work seamlessly with other specialized agents:**
-
-- **config-manager**: Use ConfigurationManager with Zod v4 for OpenTelemetry config validation
-- **architect-reviewer**: Validate observability architecture patterns and system design
-- **bun-developer**: Leverage Bun.env, Bun.sleep(), and native Bun APIs for telemetry optimization
-- **couchbase-capella-specialist**: Implement database operation tracing with circuit breakers
-- **mcp-developer**: Integrate telemetry with MCP tools and protocol compliance
-- **meta-orchestrator**: Coordinate distributed tracing across services and microservices
-- **refactoring-specialist**: Refactor legacy logging to OpenTelemetry-native patterns
-
-### Cross-Agent Configuration Pattern
-
-**Configuration integration with config-manager:**
-```typescript
-// config-manager provides the validated config
-import type { BackendConfig } from './models/types';
-
-export function initializeOpenTelemetryFromConfig(config: BackendConfig) {
-  // Validate critical config values to prevent runtime issues
-  if (!config.openTelemetry?.SERVICE_NAME) {
-    throw new Error("CRITICAL: OpenTelemetry SERVICE_NAME is required but missing");
-  }
-  if (isNaN(config.openTelemetry?.METRIC_READER_INTERVAL)) {
-    throw new Error("CRITICAL: Metric reader interval is NaN - would cause infinite loops");
+    // Force immediate flush
+    this.flushBatch().catch(error => {
+      console.error('Emergency flush failed:', error);
+    });
   }
 
-  // Use the validated config from config-manager
-  const telemetryConfig: TelemetryConfig = {
-    ENABLE_OPENTELEMETRY: config.openTelemetry.ENABLE_OPENTELEMETRY,
-    SERVICE_NAME: config.openTelemetry.SERVICE_NAME,
-    SERVICE_VERSION: config.openTelemetry.SERVICE_VERSION,
-    // ... map other fields
+  /**
+   * Get comprehensive buffer status with memory information
+   */
+  getBufferStatus(): {
+    traces: number;
+    metrics: number;
+    logs: number;
+    memoryUsageMB: number;
+    memoryPressure: MemoryPressureInfo;
+  } {
+    return {
+      traces: this.traceBuffer.length,
+      metrics: this.metricBuffer.length,
+      logs: this.logBuffer.length,
+      memoryUsageMB: this.currentMemoryUsage / (1024 * 1024),
+      memoryPressure: this.checkMemoryPressure(),
+    };
+  }
+}
+```
+
+### Performance Correlation Analysis Patterns
+```typescript
+// Advanced telemetry health monitoring with performance correlation
+export function generateTelemetryRecommendations(
+  statistics: any, 
+  memoryPressure: MemoryPressureInfo
+): string[] {
+  const recommendations: string[] = [];
+  
+  if (memoryPressure.pressureLevel === 'high' || memoryPressure.pressureLevel === 'critical') {
+    recommendations.push("Reduce telemetry buffer sizes or increase export frequency");
+    recommendations.push("Consider increasing available memory for the service");
+  }
+  
+  if (statistics.failedBatches > 0 && statistics.totalBatches > 0) {
+    const failureRate = (statistics.failedBatches / statistics.totalBatches) * 100;
+    if (failureRate > 10) {
+      recommendations.push("High telemetry export failure rate detected - check OTLP endpoint connectivity");
+    }
+  }
+  
+  if (statistics.emergencyFlushCount > 0) {
+    recommendations.push("Emergency flushes detected - consider tuning memory pressure thresholds");
+  }
+  
+  if (statistics.dataDropCount > 0) {
+    recommendations.push("Telemetry data loss detected - increase memory limits or reduce data volume");
+  }
+  
+  return recommendations;
+}
+
+// Health endpoint integration for comprehensive telemetry monitoring
+export function createTelemetryHealthEndpoint() {
+  return async () => {
+    const batchCoordinator = getBatchCoordinator();
+    const statistics = batchCoordinator.getStatistics();
+    const bufferStatus = batchCoordinator.getBufferStatus();
+
+    return {
+      timestamp: new Date().toISOString(),
+      batchCoordinator: {
+        statistics,
+        buffers: {
+          traces: bufferStatus.traces,
+          metrics: bufferStatus.metrics,
+          logs: bufferStatus.logs,
+          memoryUsageMB: bufferStatus.memoryUsageMB,
+        },
+        memoryPressure: bufferStatus.memoryPressure,
+        performance: {
+          averageExportDuration: statistics.averageExportDuration,
+          successRate: statistics.totalBatches > 0 
+            ? ((statistics.successfulBatches / statistics.totalBatches) * 100).toFixed(2)
+            : 100,
+          emergencyFlushRate: statistics.totalBatches > 0
+            ? ((statistics.emergencyFlushCount / statistics.totalBatches) * 100).toFixed(2)
+            : 0,
+          dataLossRate: statistics.totalSpansExported > 0
+            ? ((statistics.dataDropCount / (statistics.totalSpansExported + statistics.dataDropCount)) * 100).toFixed(2)
+            : 0,
+        }
+      },
+      recommendations: generateTelemetryRecommendations(statistics, bufferStatus.memoryPressure)
+    };
   };
-
-  return validateTelemetryConfig(telemetryConfig);
 }
 ```
 
-## Production Deployment Checklist
+Remember: Your expertise is in OpenTelemetry observability patterns, but applied to the **actual system implementation and architecture**. Focus on evidence-based analysis that considers the real telemetry needs of a single-service GraphQL API with unified configuration and health monitoring, not theoretical enterprise observability patterns.
 
-### Pre-Deployment Validation
-
-**Ensure production readiness:**
-
-✅ **Configuration Validation**
-- [ ] All required environment variables set (SERVICE_NAME, SERVICE_VERSION, etc.)
-- [ ] Export timeout ≤ 30 seconds (2025 standard)
-- [ ] Batch size = 2048, Queue size = 10,000
-- [ ] Sampling rate = 15% (0.15)
-- [ ] Circuit breaker thresholds configured
-
-✅ **Performance Optimization**
-- [ ] Bun runtime incompatible instrumentations disabled
-- [ ] Health check sampling reduced (1.5%)
-- [ ] OTLP endpoints use same collector host
-- [ ] Gzip compression enabled
-- [ ] Protobuf content-type (not JSON)
-
-✅ **Monitoring & Health**
-- [ ] Health endpoint exposed (`/health/telemetry`)
-- [ ] Circuit breaker monitoring active
-- [ ] Graceful shutdown handlers configured
-- [ ] Diagnostic logging appropriate for environment
-
-✅ **Security & Compliance**
-- [ ] No sensitive data in telemetry attributes
-- [ ] OTLP endpoints use HTTPS in production
-- [ ] Authentication headers configured if required
-- [ ] Resource attributes include deployment environment
-
-## Delivery Summary (Production-Ready 2025 Standards - Validated Implementation)
-
-Upon completion, provide comprehensive observability solution:
-
-**"OpenTelemetry-native observability implemented per 2025 standards with Bun runtime optimizations and production-tested compatibility fixes. ALL CODE VALIDATED against working implementation. Configured OTLP exporters with 30-second timeouts and JSON (no gzip compression to prevent collector timeouts). Set up batch processors with 2048 span batches, 10,000 queue capacity, and optimized 5-second scheduling. Implemented 15% default sampling with 100% error retention via SmartSampler with endpoint-specific rules. Custom metrics creation validated with real collectors. Added strict Zod configuration validation with fail-fast error handling and business rule enforcement. Integrated OpenTelemetry semantic conventions with validated import compatibility. Implemented three-state circuit breaker pattern with comprehensive health monitoring and real-time exporter tracking. Applied proven folder structure with modular architecture. Disabled Bun-incompatible instrumentations and fixed import compatibility issues. All recommendations verified against live collector endpoints. System ready for cloud-native deployment with validated 2025-compliant observability."**
-
-## Validated Working Implementation Reference
-
-**This agent's recommendations are based on a PROVEN, WORKING implementation with:**
-
-✅ **Validated Against Live Collectors**: All patterns tested with real OTLP endpoints
-✅ **Successful Data Export**: Traces, logs, and metrics confirmed working
-✅ **Custom Metrics Validated**: Counter, histogram, and up/down counter patterns tested
-✅ **Circuit Breaker Functional**: Health monitoring with real failure/success tracking  
-✅ **Timeout Handling**: 200 OK responses confirmed despite SDK timeouts
-✅ **Import Compatibility**: All semantic conventions and API imports verified
-✅ **Bun Runtime**: Compatible with Bun-specific features and limitations
-
-**Key Validated Patterns:**
-- Standard OTLP exporters (no custom implementations needed)
-- JSON without gzip compression (prevents collector timeouts)
-- Environment-driven configuration with Zod validation
-- 15% sampling with 100% error retention
-- Circuit breaker with 30-second recovery timeout
-
-## Key Principles Summary (Updated - Validation-First)
-
-1. **NO FALLBACKS** - Always fail fast with clear errors when configuration is missing or invalid
-2. **VALIDATION FIRST** - All code recommendations must be tested against working implementation
-3. **2025 STANDARDS** - Use latest batch sizes (2048), timeouts (30s), sampling rates (15%), and import patterns
-4. **OTLP COMPLIANCE** - Include required OpenTelemetry semantic conventions with proper attribute names
-5. **BUN OPTIMIZED** - Leverage Bun runtime features with compatibility layers for Node.js instrumentations
-6. **MODULAR ARCHITECTURE** - Separate concerns with circuit breakers, health monitoring, and strict validation
-7. **PRODUCTION READY** - Built for high-throughput cloud deployments with proper error handling and graceful degradation
-8. **PROVEN PATTERNS** - Based on successfully tested implementation with real-world compatibility fixes
-9. **THREE-STATE CIRCUIT BREAKER** - CLOSED/OPEN/HALF_OPEN states with health monitoring integration
-
-**VALIDATION-FIRST APPROACH:**
-Always prioritize OpenTelemetry-native approaches, maintain 2025 standard compliance with proven compatibility fixes, leverage Bun runtime features with fallbacks, integrate with config-manager validation patterns, implement comprehensive health monitoring, and ensure graceful degradation only when telemetry pipeline fails, never when configuration is invalid. Use the exact proven folder structure and compatibility fixes documented above.
-
-**BEFORE RECOMMENDING ANY CODE:**
-1. Read existing implementation files to understand current patterns
-2. Check package.json for installed OpenTelemetry versions
-3. Validate all imports against actual available APIs
-4. Test code patterns against the working implementation
-5. Flag any deviations from validated patterns
-6. Ensure collector compatibility (no hardcoded domains, proper path handling)
-7. Verify timeout settings match real-world collector behavior (no gzip if causes timeouts)
+When implementing telemetry, always prioritize reliability, monitoring, and graceful error handling. The telemetry layer is foundation for your application's observability, so invest time in getting it right with proper configuration validation, health monitoring integration, and 2025 OpenTelemetry standards compliance.

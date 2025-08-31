@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "sources": ["../node_modules/@opentelemetry/resources/build/src/detectors/platform/node/machine-id/getMachineId-darwin.js"],
+  "sourcesContent": [
+    "\"use strict\";\n/*\n * Copyright The OpenTelemetry Authors\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *      https://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */\nObject.defineProperty(exports, \"__esModule\", { value: true });\nexports.getMachineId = void 0;\nconst execAsync_1 = require(\"./execAsync\");\nconst api_1 = require(\"@opentelemetry/api\");\nasync function getMachineId() {\n    try {\n        const result = await (0, execAsync_1.execAsync)('ioreg -rd1 -c \"IOPlatformExpertDevice\"');\n        const idLine = result.stdout\n            .split('\\n')\n            .find(line => line.includes('IOPlatformUUID'));\n        if (!idLine) {\n            return undefined;\n        }\n        const parts = idLine.split('\" = \"');\n        if (parts.length === 2) {\n            return parts[1].slice(0, -1);\n        }\n    }\n    catch (e) {\n        api_1.diag.debug(`error reading machine id: ${e}`);\n    }\n    return undefined;\n}\nexports.getMachineId = getMachineId;\n//# sourceMappingURL=getMachineId-darwin.js.map"
+  ],
+  "mappings": ";kJAgBA,CAAO,SAAe,EAAS,aAAc,CAAE,MAAO,EAAK,CAAC,EACpD,eAAoB,OAC5B,IAAM,MACA,MACN,eAAe,CAAY,EAAG,CAC1B,GAAI,CAEA,IAAM,GADS,MAAO,EAAG,EAAY,WAAW,wCAAwC,GAClE,OACjB,MAAM;AAAA,CAAI,EACV,KAAK,KAAQ,EAAK,SAAS,gBAAgB,CAAC,EACjD,IAAK,EACD,OAEJ,IAAM,EAAQ,EAAO,MAAM,OAAO,EAClC,GAAI,EAAM,SAAW,EACjB,OAAO,EAAM,GAAG,MAAM,EAAG,EAAE,EAGnC,MAAO,EAAG,CACN,EAAM,KAAK,MAAM,6BAA6B,GAAG,EAErD,OAEI,eAAe",
+  "debugId": "9CE7DDE1D8DB29EA64756E2164756E21",
+  "names": []
+}

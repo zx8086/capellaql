@@ -104,12 +104,25 @@ class TelemetryLogger {
       const span = trace.getSpan(ctx);
       const spanContext: SpanContext | undefined = span?.spanContext();
 
-      return spanContext
+      const baseContext = spanContext
         ? {
             traceId: spanContext.traceId,
             spanId: spanContext.spanId,
           }
         : {};
+
+      // Add correlation ID from span attributes if available
+      if (span) {
+        const attributes = span.attributes;
+        if (attributes && attributes["correlation.id"]) {
+          baseContext.requestId = String(attributes["correlation.id"]);
+        }
+        if (attributes && attributes["user.id"]) {
+          baseContext.userId = String(attributes["user.id"]);
+        }
+      }
+
+      return baseContext;
     } catch {
       return {};
     }
@@ -127,14 +140,22 @@ class TelemetryLogger {
 
     if (this.isInitialized && this.logger) {
       try {
+        // Enhanced log record with 2025 compliance
         this.logger.emit({
           timestamp: logData.timestamp,
           severityText: logData.level.toUpperCase(),
           severityNumber: this.getSeverityNumber(logData.level),
           body: logData.message,
           attributes: {
+            // Core telemetry context
             ...logData.context,
+            // User metadata
             ...logData.meta,
+            // Service identification (2025 standard)
+            "service.name": "capellaql",
+            "service.version": "2.0.0",
+            // Runtime information
+            "runtime.name": typeof Bun !== "undefined" ? "bun" : "node",
           },
         });
 

@@ -1,6 +1,8 @@
 /* src/telemetry/tracing/dbSpans.ts */
 
 import { type Attributes, type Span, SpanStatusCode, trace } from "@opentelemetry/api";
+import { recordDatabaseOperation } from "../metrics/databaseMetrics";
+import { telemetryLogger } from "../logger";
 
 export interface CouchbaseSpanOptions {
   bucket: string;
@@ -47,10 +49,32 @@ export async function createDatabaseSpan<T>(options: CouchbaseSpanOptions, opera
         "db.operation.success": true,
       });
 
+      // Record database metrics with trace correlation
+      recordDatabaseOperation(
+        options.operation,
+        options.bucket,
+        duration,
+        true,
+        options.scope,
+        options.collection
+      );
+
+      // Log successful operation with trace context
+      telemetryLogger.debug(`Database operation completed successfully`, {
+        operation: options.operation,
+        bucket: options.bucket,
+        scope: options.scope,
+        collection: options.collection,
+        key: options.key,
+        duration_ms: duration,
+      });
+
       span.setStatus({ code: SpanStatusCode.OK });
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
+      const errorType = error instanceof Error ? error.name : 'UnknownError';
+      
       span.setAttributes({
         "db.operation.duration_ms": duration,
         "db.operation.success": false,
@@ -63,6 +87,28 @@ export async function createDatabaseSpan<T>(options: CouchbaseSpanOptions, opera
         });
         span.recordException(error);
       }
+
+      // Record failed operation metrics with trace correlation
+      recordDatabaseOperation(
+        options.operation,
+        options.bucket,
+        duration,
+        false,
+        options.scope,
+        options.collection,
+        errorType
+      );
+
+      // Log error with trace context and structured metadata
+      telemetryLogger.error(`Database operation failed`, error, {
+        operation: options.operation,
+        bucket: options.bucket,
+        scope: options.scope,
+        collection: options.collection,
+        key: options.key,
+        duration_ms: duration,
+        error_type: errorType,
+      });
 
       span.setStatus({
         code: SpanStatusCode.ERROR,

@@ -17,3 +17,17 @@ export const getCluster = async (): Promise<capellaConn> => {
     throw error;
   }
 };
+
+export const closeConnection = async (): Promise<void> => {
+  if (connection) {
+    try {
+      // Use proper SDK v4 method to close the cluster connection
+      await connection.cluster.close();
+      connection = null;
+      log("Couchbase cluster connection closed gracefully");
+    } catch (error: any) {
+      err("Error closing Couchbase connection", error);
+      // Don't throw - let shutdown continue even if close fails
+    }
+  }
+};

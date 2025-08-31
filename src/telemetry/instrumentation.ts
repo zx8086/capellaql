@@ -6,6 +6,12 @@ import { CompositePropagator, W3CBaggagePropagator, W3CTraceContextPropagator } 
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+// Bun-optimized exporters for better timeout handling
+import { BunTraceExporter } from "./exporters/BunTraceExporter";
+import { BunMetricExporter } from "./exporters/BunMetricExporter";
+import { BunLogExporter } from "./exporters/BunLogExporter";
+import { BunMetricReader } from "./exporters/BunMetricReader";
+import { BunSpanProcessor } from "./exporters/BunSpanProcessor";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
@@ -27,6 +33,7 @@ import { BunPerf } from "$utils/bunUtils";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 import { log, telemetryLogger, warn } from "./logger";
 import { SmartSampler } from "./sampling/SmartSampler";
+import os from "node:os";
 
 let sdk: NodeSDK | undefined;
 let isInitialized = false;
@@ -64,21 +71,41 @@ export async function initializeTelemetry(): Promise<void> {
     // Initialize health monitor with config
     telemetryHealthMonitor.setConfig(config);
 
-    // Create resource with all 2025-compliant semantic conventions
-    const resource = await createResource(config);
+    // Create resource with all 2025-compliant semantic conventions (synchronous)
+    const resource = createResource(config);
 
-    // Create 2025-compliant exporters
+    // Create 2025-compliant exporters - use Bun-optimized exporters when running under Bun
     const traceExporter = createTraceExporter(config);
     const metricExporter = createMetricExporter(config);
     const logExporter = createLogExporter(config);
 
-    // Create span processor with 2025 batch settings
-    const spanProcessor = new BatchSpanProcessor(traceExporter, {
-      maxExportBatchSize: config.BATCH_SIZE, // 2048 (2025 standard)
-      maxQueueSize: config.MAX_QUEUE_SIZE, // 10,000 (2025 standard)
-      scheduledDelayMillis: 5000, // 5 seconds
-      exportTimeoutMillis: config.EXPORT_TIMEOUT_MS, // 30 seconds (2025 standard)
-    });
+    // Create span processor - use custom Bun processor when running under Bun
+    let spanProcessor;
+    if (typeof Bun !== "undefined") {
+      if (config.DEPLOYMENT_ENVIRONMENT === 'development') {
+        console.log('Using Bun-optimized span processor (bypasses BatchSpanProcessor)');
+      }
+      spanProcessor = new BunSpanProcessor({
+        url: config.TRACES_ENDPOINT,
+        maxBatchSize: config.BATCH_SIZE,
+        scheduledDelayMillis: 5000,
+        maxQueueSize: config.MAX_QUEUE_SIZE,
+        timeoutMillis: 10000,
+        retryConfig: {
+          maxRetries: 3,
+          initialDelayMs: 1000,
+          maxDelayMs: 10000,
+          backoffMultiplier: 2,
+        },
+      });
+    } else {
+      spanProcessor = new BatchSpanProcessor(traceExporter, {
+        maxExportBatchSize: config.BATCH_SIZE, // 2048 (2025 standard)
+        maxQueueSize: config.MAX_QUEUE_SIZE, // 10,000 (2025 standard)
+        scheduledDelayMillis: 5000, // 5 seconds
+        exportTimeoutMillis: config.EXPORT_TIMEOUT_MS, // 30 seconds (2025 standard)
+      });
+    }
 
     // Create log processor with 2025 batch settings
     const logProcessor = new BatchLogRecordProcessor(logExporter, {
@@ -88,12 +115,30 @@ export async function initializeTelemetry(): Promise<void> {
       exportTimeoutMillis: config.EXPORT_TIMEOUT_MS,
     });
 
-    // Create metric reader with proper intervals
-    const metricReader = new PeriodicExportingMetricReader({
-      exporter: metricExporter,
-      exportIntervalMillis: config.METRIC_READER_INTERVAL,
-      exportTimeoutMillis: config.EXPORT_TIMEOUT_MS,
-    });
+    // Create metric reader - use custom Bun reader when running under Bun
+    let metricReader;
+    if (typeof Bun !== "undefined") {
+      if (config.DEPLOYMENT_ENVIRONMENT === 'development') {
+        console.log('Using Bun-optimized metric reader (bypasses PeriodicExportingMetricReader)');
+      }
+      metricReader = new BunMetricReader({
+        url: config.METRICS_ENDPOINT,
+        exportIntervalMillis: config.METRIC_READER_INTERVAL,
+        timeoutMillis: 10000,
+        retryConfig: {
+          maxRetries: 3,
+          initialDelayMs: 1000,
+          maxDelayMs: 10000,
+          backoffMultiplier: 2,
+        },
+      });
+    } else {
+      metricReader = new PeriodicExportingMetricReader({
+        exporter: metricExporter,
+        exportIntervalMillis: config.METRIC_READER_INTERVAL,
+        exportTimeoutMillis: config.EXPORT_TIMEOUT_MS,
+      });
+    }
 
     // Create smart sampler with 2025 standards
     const sampler = new SmartSampler({
@@ -110,6 +155,7 @@ export async function initializeTelemetry(): Promise<void> {
     // Initialize NodeSDK with 2025-compliant configuration
     sdk = new NodeSDK({
       resource,
+      autoDetectResources: false, // Disable async resource detection to eliminate warnings
       sampler,
       textMapPropagator: propagator,
       spanProcessors: [spanProcessor],
@@ -166,28 +212,68 @@ export async function initializeTelemetry(): Promise<void> {
 }
 
 function createResource(config: TelemetryConfig) {
+  // Create fully synchronous resource to avoid "async attributes settled" warnings
   const attributes = {
+    // Service identification (2025 standards)
     [ATTR_SERVICE_NAME]: config.SERVICE_NAME,
     [ATTR_SERVICE_VERSION]: config.SERVICE_VERSION,
     [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: config.DEPLOYMENT_ENVIRONMENT,
     [SEMRESATTRS_SERVICE_NAMESPACE]: "capella-graphql-api", // 2025 standard
-    [SEMRESATTRS_SERVICE_INSTANCE_ID]: config.runtime?.HOSTNAME || config.runtime?.INSTANCE_ID || "unknown",
-    [ATTR_TELEMETRY_SDK_NAME]: "opentelemetry", // 2025 standard
-    [ATTR_TELEMETRY_SDK_LANGUAGE]: "nodejs", // 2025 standard
-    [ATTR_TELEMETRY_SDK_VERSION]: "2.0.1", // 2025 standard
-    // Runtime information
+    [SEMRESATTRS_SERVICE_INSTANCE_ID]: config.runtime?.HOSTNAME || config.runtime?.INSTANCE_ID || os.hostname(),
+    
+    // OpenTelemetry SDK identification (2025 standards)
+    [ATTR_TELEMETRY_SDK_NAME]: "opentelemetry",
+    [ATTR_TELEMETRY_SDK_LANGUAGE]: "nodejs",
+    [ATTR_TELEMETRY_SDK_VERSION]: "2.0.1",
+    
+    // Runtime information (manual, synchronous)
     "runtime.name": "bun",
     "runtime.version": typeof Bun !== "undefined" ? Bun.version : process.version,
-    // Container information if available through unified config
+    
+    // Process information (replaces processDetector)
+    "process.pid": process.pid,
+    "process.executable.name": typeof Bun !== "undefined" ? "bun" : "node",
+    "process.executable.path": process.execPath,
+    "process.command": process.argv[1] || "unknown",
+    "process.runtime.name": typeof Bun !== "undefined" ? "bun" : "nodejs",
+    "process.runtime.version": typeof Bun !== "undefined" ? Bun.version : process.version,
+    
+    // Host information (replaces hostDetector)
+    "host.name": os.hostname(),
+    "host.arch": os.arch(),
+    "host.type": os.type(),
+    "host.cpu.family": os.cpus()[0]?.model || "unknown",
+    
+    // Container information if available through unified config (synchronous)
     ...(config.runtime?.CONTAINER_ID && { "container.id": config.runtime.CONTAINER_ID }),
     ...(config.runtime?.K8S_POD_NAME && { "k8s.pod.name": config.runtime.K8S_POD_NAME }),
     ...(config.runtime?.K8S_NAMESPACE && { "k8s.namespace.name": config.runtime.K8S_NAMESPACE }),
   };
 
+  // Use direct resource creation to ensure all attributes are immediately available
   return resourceFromAttributes(attributes);
 }
 
-function createTraceExporter(config: TelemetryConfig): OTLPTraceExporter {
+function createTraceExporter(config: TelemetryConfig): OTLPTraceExporter | BunTraceExporter {
+  // Use Bun-optimized exporter when running under Bun to eliminate timeout issues
+  if (typeof Bun !== "undefined") {
+    if (config.DEPLOYMENT_ENVIRONMENT === 'development') {
+      console.log('Using Bun-optimized trace exporter');
+    }
+    return new BunTraceExporter({
+      url: config.TRACES_ENDPOINT,
+      timeoutMillis: 10000, // Reduced timeout for faster failure detection
+      concurrencyLimit: 10,
+      retryConfig: {
+        maxRetries: 3,
+        initialDelayMs: 1000,
+        maxDelayMs: 10000,
+        backoffMultiplier: 2,
+      },
+    });
+  }
+  
+  // Fallback to standard exporter for Node.js compatibility
   return new OTLPTraceExporter({
     url: config.TRACES_ENDPOINT,
     headers: {
@@ -200,7 +286,26 @@ function createTraceExporter(config: TelemetryConfig): OTLPTraceExporter {
   });
 }
 
-function createMetricExporter(config: TelemetryConfig): OTLPMetricExporter {
+function createMetricExporter(config: TelemetryConfig): OTLPMetricExporter | BunMetricExporter {
+  // Use Bun-optimized exporter when running under Bun to eliminate timeout issues
+  if (typeof Bun !== "undefined") {
+    if (config.DEPLOYMENT_ENVIRONMENT === 'development') {
+      console.log('Using Bun-optimized metric exporter');
+    }
+    return new BunMetricExporter({
+      url: config.METRICS_ENDPOINT,
+      timeoutMillis: 10000, // Reduced timeout for faster failure detection
+      concurrencyLimit: 10,
+      retryConfig: {
+        maxRetries: 3,
+        initialDelayMs: 1000,
+        maxDelayMs: 10000,
+        backoffMultiplier: 2,
+      },
+    });
+  }
+  
+  // Fallback to standard exporter for Node.js compatibility
   return new OTLPMetricExporter({
     url: config.METRICS_ENDPOINT,
     headers: {
@@ -213,7 +318,26 @@ function createMetricExporter(config: TelemetryConfig): OTLPMetricExporter {
   });
 }
 
-function createLogExporter(config: TelemetryConfig): OTLPLogExporter {
+function createLogExporter(config: TelemetryConfig): OTLPLogExporter | BunLogExporter {
+  // Use Bun-optimized exporter when running under Bun to eliminate timeout issues
+  if (typeof Bun !== "undefined") {
+    if (config.DEPLOYMENT_ENVIRONMENT === 'development') {
+      console.log('Using Bun-optimized log exporter with circuit breaker');
+    }
+    return new BunLogExporter({
+      url: config.LOGS_ENDPOINT,
+      timeoutMillis: 10000, // Reduced timeout for faster failure detection
+      concurrencyLimit: 10,
+      retryConfig: {
+        maxRetries: 3,
+        initialDelayMs: 1000,
+        maxDelayMs: 10000,
+        backoffMultiplier: 2,
+      },
+    });
+  }
+  
+  // Fallback to standard exporter for Node.js compatibility
   return new OTLPLogExporter({
     url: config.LOGS_ENDPOINT,
     headers: {

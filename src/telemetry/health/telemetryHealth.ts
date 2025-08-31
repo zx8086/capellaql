@@ -80,9 +80,11 @@ class TelemetryHealthMonitor {
       exporter.exportCount++;
       exporter.successRate = ((exporter.exportCount - exporter.failureCount) / exporter.exportCount) * 100;
 
-      // Update exporter status
+      // Update exporter status with hysteresis to prevent flapping
       if (exporter.successRate >= 95) {
         exporter.status = "healthy";
+      } else if (exporter.successRate >= 85 && exporter.status === "healthy") {
+        exporter.status = "healthy"; // Keep healthy until drops below 85%
       } else if (exporter.successRate >= 80) {
         exporter.status = "degraded";
       } else {
@@ -146,10 +148,10 @@ class TelemetryHealthMonitor {
         totalFailures: this.circuitBreaker.getStats().totalFailures,
       },
       configuration: {
-        samplingRate: this.config?.samplingRate || 0.15,
-        exportTimeoutMs: this.config?.exportTimeoutMs || 30000,
-        batchSize: this.config?.batchSize || 2048,
-        maxQueueSize: this.config?.maxQueueSize || 10000,
+        samplingRate: this.config?.SAMPLING_RATE || 0.15,
+        exportTimeoutMs: this.config?.EXPORT_TIMEOUT_MS || 30000,
+        batchSize: this.config?.BATCH_SIZE || 2048,
+        maxQueueSize: this.config?.MAX_QUEUE_SIZE || 10000,
       },
       runtime: {
         memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),

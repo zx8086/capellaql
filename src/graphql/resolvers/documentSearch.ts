@@ -2,6 +2,7 @@
 
 import { getCluster } from "$lib/clusterProvider";
 import { createCouchbaseSearchSpan, err, log } from "../../telemetry";
+import { withSQLiteCache, SQLiteCacheKeys } from "$lib/bunSQLiteCache";
 
 interface SearchResult {
   bucket: string;
@@ -23,7 +24,17 @@ const documentSearch = {
     ): Promise<SearchResult[]> => {
       const { collections, keys } = args;
 
-      return await createCouchbaseSearchSpan(collections, keys, async () => {
+      // Create cache key based on collections and keys
+      const cacheKey = SQLiteCacheKeys.documentSearch(
+        collections.map(c => `${c.bucket}.${c.scope}.${c.collection}`).join(','),
+        keys.join(','),
+        keys.length
+      );
+
+      return await withSQLiteCache(
+        cacheKey,
+        async () => {
+          return await createCouchbaseSearchSpan(collections, keys, async () => {
         try {
           const connection = await getCluster();
           const results: SearchResult[] = [];
@@ -111,7 +122,10 @@ const documentSearch = {
           err("Error in document search:", error);
           throw error;
         }
-      });
+          });
+        },
+        2 * 60 * 1000 // 2-minute TTL for search results
+      );
     },
   },
 };

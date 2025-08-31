@@ -69,6 +69,15 @@ export async function clusterConn(): Promise<capellaConn> {
         const cluster: QueryableCluster = await connect(clusterConnStr, {
           username: username,
           password: password,
+          timeouts: {
+            kvTimeout: config.capella.COUCHBASE_KV_TIMEOUT,
+            kvDurableTimeout: config.capella.COUCHBASE_KV_DURABLE_TIMEOUT,
+            queryTimeout: config.capella.COUCHBASE_QUERY_TIMEOUT,
+            analyticsTimeout: config.capella.COUCHBASE_ANALYTICS_TIMEOUT,
+            searchTimeout: config.capella.COUCHBASE_SEARCH_TIMEOUT,
+            connectTimeout: config.capella.COUCHBASE_CONNECT_TIMEOUT,
+            bootstrapTimeout: config.capella.COUCHBASE_BOOTSTRAP_TIMEOUT,
+          },
         });
         log("Cluster connection established.");
 
@@ -99,4 +108,81 @@ export async function clusterConn(): Promise<capellaConn> {
       30000
     ); // 3 retries, starting at 2s, max 30s delay
   });
+}
+
+export async function getCouchbaseHealth(): Promise<{
+  status: 'healthy' | 'degraded' | 'unhealthy';
+  details: {
+    connection: 'connected' | 'disconnected' | 'connecting';
+    ping?: any;
+    diagnostics?: any;
+    circuitBreaker: {
+      state: string;
+      failures: number;
+      successes: number;
+    };
+    error?: string;
+  };
+}> {
+  try {
+    const connection = await clusterConn();
+    const circuitBreakerStats = dbCircuitBreaker.getStats();
+    
+    // Test basic connectivity
+    const ping = await connection.cluster.ping();
+    const diagnostics = await connection.cluster.diagnostics();
+    
+    // Determine health status based on ping results
+    let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
+    
+    if (circuitBreakerStats.state === 'open') {
+      status = 'unhealthy';
+    } else if (circuitBreakerStats.failures > 0 || ping.services.length === 0) {
+      status = 'degraded';
+    }
+    
+    return {
+      status,
+      details: {
+        connection: 'connected',
+        ping,
+        diagnostics,
+        circuitBreaker: circuitBreakerStats,
+      }
+    };
+  } catch (error) {
+    return {
+      status: 'unhealthy',
+      details: {
+        connection: 'disconnected',
+        circuitBreaker: dbCircuitBreaker.getStats(),
+        error: error instanceof Error ? error.message : String(error),
+      }
+    };
+  }
+}
+
+export async function pingCouchbase(): Promise<{
+  success: boolean;
+  latency?: number;
+  services?: any[];
+  error?: string;
+}> {
+  try {
+    const connection = await clusterConn();
+    const startTime = Date.now();
+    const pingResult = await connection.cluster.ping();
+    const latency = Date.now() - startTime;
+    
+    return {
+      success: true,
+      latency,
+      services: pingResult.services || [],
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }

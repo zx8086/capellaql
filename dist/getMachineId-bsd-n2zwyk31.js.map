@@ -1,0 +1,10 @@
+{
+  "version": 3,
+  "sources": ["../node_modules/@opentelemetry/resources/build/esm/detectors/platform/node/machine-id/getMachineId-bsd.js"],
+  "sourcesContent": [
+    "/*\n * Copyright The OpenTelemetry Authors\n *\n * Licensed under the Apache License, Version 2.0 (the \"License\");\n * you may not use this file except in compliance with the License.\n * You may obtain a copy of the License at\n *\n *      https://www.apache.org/licenses/LICENSE-2.0\n *\n * Unless required by applicable law or agreed to in writing, software\n * distributed under the License is distributed on an \"AS IS\" BASIS,\n * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.\n * See the License for the specific language governing permissions and\n * limitations under the License.\n */\nimport { promises as fs } from 'fs';\nimport { execAsync } from './execAsync';\nimport { diag } from '@opentelemetry/api';\nexport async function getMachineId() {\n    try {\n        const result = await fs.readFile('/etc/hostid', { encoding: 'utf8' });\n        return result.trim();\n    }\n    catch (e) {\n        diag.debug(`error reading machine id: ${e}`);\n    }\n    try {\n        const result = await execAsync('kenv -q smbios.system.uuid');\n        return result.stdout.trim();\n    }\n    catch (e) {\n        diag.debug(`error reading machine id: ${e}`);\n    }\n    return undefined;\n}\n//# sourceMappingURL=getMachineId-bsd.js.map"
+  ],
+  "mappings": ";oIAeA,aAAS,KAET,eACA,eAAsB,CAAY,EAAG,CACjC,GAAI,CAEA,OADe,MAAM,EAAG,SAAS,cAAe,CAAE,SAAU,MAAO,CAAC,GACtD,KAAK,EAEvB,MAAO,EAAG,CACN,OAAK,MAAM,6BAA6B,GAAG,EAE/C,GAAI,CAEA,OADe,MAAM,EAAU,4BAA4B,GAC7C,OAAO,KAAK,EAE9B,MAAO,EAAG,CACN,OAAK,MAAM,6BAA6B,GAAG,EAE/C",
+  "debugId": "13A2A2D8FB8C975264756E2164756E21",
+  "names": []
+}

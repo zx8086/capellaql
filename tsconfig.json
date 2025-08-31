@@ -1,49 +1,52 @@
 {
   "compilerOptions": {
-    // Latest TypeScript features
-    "lib": ["ES2023", "DOM"],
-    "target": "ES2023",
+    // Latest TypeScript features optimized for Bun
+    "lib": ["ES2024", "DOM", "WebWorker"],
+    "target": "ES2024",
     "module": "ESNext",
     "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
-    "typeRoots": ["./node_modules/@types", "./src/types"],
+    "typeRoots": ["./node_modules/@types", "./src/types", "./node_modules/bun-types"],
 
-    // Bun-optimized bundler mode
+    // Bun-optimized bundler mode with enhanced performance
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": false,
     "verbatimModuleSyntax": false,
     "noEmit": false,
-    "noImplicitAny": false,
+    "noImplicitAny": true,
+    "skipLibCheck": true,
 
-    // Enhanced source map configuration for Bun
+    // Enhanced source map configuration for Bun debugging
     "sourceMap": true,
     "inlineSources": true,
     "sourceRoot": "/",
     "declaration": true,
     "declarationMap": true,
 
-    // Strict type checking (Bun recommended)
+    // Strict type checking (production-ready)
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
 
-    // Module system optimizations
+    // Module system optimizations for Bun
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-    "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
 
-    // Output configuration
+    // Output configuration optimized for Bun builds
     "outDir": "./dist",
-    "rootDir": "./src",
     "baseUrl": ".",
+    "incremental": true,
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo",
 
-    // Enhanced path aliases for Bun
+    // Enhanced path aliases for comprehensive module resolution
     "paths": {
       "$lib": ["src/lib/index"],
       "$lib/*": ["src/lib/*"],
@@ -55,23 +58,56 @@
       "$telemetry": ["src/telemetry/index"],
       "$telemetry/*": ["src/telemetry/*"],
       "$graphql": ["src/graphql/index"],
-      "$graphql/*": ["src/graphql/*"]
+      "$graphql/*": ["src/graphql/*"],
+      "$types": ["src/types/index"],
+      "$types/*": ["src/types/*"],
+      "$constants": ["src/constants/index"],
+      "$constants/*": ["src/constants/*"]
     },
 
-    // Production-ready settings
+    // Production-ready strict settings
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noPropertyAccessFromIndexSignature": true,
 
     // Bun-specific optimizations
     "useDefineForClassFields": true,
     "experimentalDecorators": false,
-    "emitDecoratorMetadata": false
+    "emitDecoratorMetadata": false,
+
+    // Enhanced error reporting
+    "pretty": true,
+    "preserveWatchOutput": true,
+
+    // Import/Export optimizations
+    "importsNotUsedAsValues": "error",
+    "preserveValueImports": false
   },
-  "include": ["src/**/*", "src/global.d.ts", "**/*.test.ts"],
-  "exclude": ["node_modules", "dist", ".bun-cache", "coverage", "test/k6/**/*.js", "tools/**/*"],
+  "include": [
+    "src/**/*",
+    "src/global.d.ts",
+    "tests/**/*.test.ts",
+    "tools/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".bun-cache",
+    "coverage",
+    "test/k6/**/*.js",
+    "**/*.min.js",
+    "**/*.d.ts"
+  ],
   "ts-node": {
-    "esm": true
+    "esm": true,
+    "experimentalSpecifierResolution": "node"
+  },
+  "compileOnSave": false,
+  "watchOptions": {
+    "watchFile": "useFsEvents",
+    "watchDirectory": "useFsEvents",
+    "fallbackPolling": "dynamicPriority",
+    "synchronousWatchDirectory": true,
+    "excludeDirectories": ["**/node_modules", "**/.git", "**/dist", "**/.bun-cache"]
   },
   "bun-types": "latest"
 }

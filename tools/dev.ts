@@ -30,7 +30,9 @@ if (missingVars.length > 0) {
 console.log("✅ Environment variables validated");
 console.log(`🌍 Environment: ${Bun.env.NODE_ENV || "development"}`);
 console.log(`🔗 Couchbase: ${Bun.env.COUCHBASE_URL}`);
-console.log(`📊 Telemetry: ${Bun.env.ENABLE_OPENTELEMETRY === "true" ? "Enabled" : "Disabled"}\n`);
+console.log(`📊 Telemetry: ${Bun.env.ENABLE_OPENTELEMETRY === "true" ? "Enabled" : "Disabled"}`);
+console.log(`🔍 Health Monitoring: System, Performance & Correlation Analysis`);
+console.log(`⏱️  Timeout Configuration: Production-ready SDK timeouts active\n`);
 
 // Start main server with hot reload
 console.log("🔄 Starting server with hot reload...");
@@ -44,12 +46,9 @@ const server = spawn(["bun", "run", "--hot", "--watch", "src/index.ts"], {
   },
 });
 
-// Start test watcher
-console.log("🧪 Starting test watcher...");
-const testWatcher = spawn(["bun", "test", "--watch"], {
-  stdio: ["inherit", "inherit", "inherit"],
-  env: { ...Bun.env, FORCE_COLOR: "1" },
-});
+// Tests run on demand only - not automatically in dev mode
+// Use: bun run test:watch for test watching
+console.log("🧪 Tests available on demand:");
 
 // Health check monitoring
 let healthCheckInterval: Timer;
@@ -61,6 +60,22 @@ async function checkHealth() {
     if (response.ok) {
       if (!serverReady) {
         console.log("\n✅ Server is ready and healthy!");
+        console.log("🎯 All monitoring endpoints active: Health, Performance & Telemetry");
+        
+        // Quick verification that new endpoints are working
+        try {
+          const systemHealthResponse = await fetch("http://localhost:4000/health/system");
+          const performanceResponse = await fetch("http://localhost:4000/health/performance");
+          
+          if (systemHealthResponse.ok && performanceResponse.ok) {
+            console.log("🔍 Enhanced monitoring: System Health & Performance Analytics ready");
+          } else {
+            console.log("⚠️ Some enhanced monitoring endpoints may not be ready yet");
+          }
+        } catch (_monitoringError) {
+          console.log("ℹ️ Enhanced monitoring endpoints initializing...");
+        }
+        
         displayDashboard();
         serverReady = true;
       }
@@ -80,20 +95,38 @@ async function checkHealth() {
 
 function displayDashboard() {
   console.log(`
-┌─────────────────────────────────────────────────────────────┐
-│               📡 CapellaQL Development Dashboard             │
-├─────────────────────────────────────────────────────────────┤
-│ 🌐 GraphQL Playground:  http://localhost:4000/graphql      │
-│ 💚 Health Check:        http://localhost:4000/health       │
-│ 📊 Telemetry Health:    http://localhost:4000/health/tel.. │
-│ 🧪 Tests:              Running in watch mode               │
-│ 🔄 Hot Reload:         Enabled                             │
-├─────────────────────────────────────────────────────────────┤
-│ Commands:                                                   │
-│ • Ctrl+C           → Stop development environment          │
-│ • bun run quality  → Run typecheck + lint                  │
-│ • bun run format   → Format code with Biome                │
-└─────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                       📡 CapellaQL Development Dashboard                       │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ 🌐 GraphQL Playground:  http://localhost:4000/graphql                        │
+│ 🖥️  Development UI:     http://localhost:4000/dashboard                       │
+│ 💚 Health Check:        http://localhost:4000/health                         │
+│ 📊 Telemetry Health:    http://localhost:4000/health/telemetry               │
+│ 🔍 System Health:       http://localhost:4000/health/system                  │
+│ 📈 Health Summary:      http://localhost:4000/health/summary                 │
+│ ⚡ Performance:         http://localhost:4000/health/performance              │
+│ 📊 Perf History:        http://localhost:4000/health/performance/history     │
+│ 🧪 Tests:              bun run test (on demand)                             │
+│ 🔄 Hot Reload:         Enabled                                              │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Cache & Analytics:                                                           │
+│ • /health/cache               → SQLite vs Map cache performance comparison  │
+│ • /health/telemetry/detailed  → Memory pressure analysis & data tracking    │
+│ • /health/comprehensive       → All-in-one system health dashboard          │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Health & Performance Monitoring:                                             │
+│ • /health/system              → Unified health across all domains           │
+│ • /health/summary             → Critical issues & status overview           │
+│ • /health/performance         → Real-time metrics & correlations            │
+│ • /health/performance/history → Performance trends & historical data        │
+├───────────────────────────────────────────────────────────────────────────────┤
+│ Commands:                                                                    │
+│ • Ctrl+C              → Stop development environment                        │
+│ • bun run test        → Run tests on demand                                 │
+│ • bun run test:watch  → Run tests in watch mode                             │
+│ • bun run quality     → Run typecheck + lint                                │
+│ • bun run format      → Format code with Biome                              │
+└───────────────────────────────────────────────────────────────────────────────┘
 `);
 }
 
@@ -125,7 +158,7 @@ function cleanup() {
   }
 
   server.kill();
-  testWatcher.kill();
+  // No test watcher to kill
 
   console.log("✅ Development environment stopped cleanly");
   process.exit(0);
@@ -144,12 +177,7 @@ server.exited.then((code) => {
   cleanup();
 });
 
-testWatcher.exited.then((code) => {
-  console.log(`📝 Test watcher exited with code ${code}`);
-  if (code !== 0) {
-    console.warn("⚠️ Test watcher stopped unexpectedly");
-  }
-});
+// Test watcher removed - tests run on demand only
 
 // Keep process alive
 console.log("🎯 Development environment is starting...");

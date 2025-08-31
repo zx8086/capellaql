@@ -22,6 +22,15 @@ CapellaQL is a high-performance GraphQL service built with Bun that provides a m
 - `k6 run test/k6/spike-test-health.js` - Traffic spike simulation
 - `k6 run test/k6/graphql-endpoints.js` - GraphQL endpoint performance testing
 
+### Development Dashboard
+- `http://localhost:4000/dashboard` - **CapellaQL Development Dashboard**
+  - Real-time cache analytics with SQLite vs Map performance comparison
+  - Telemetry insights with memory pressure analysis and data loss tracking
+  - Comprehensive system health monitoring (database, memory, telemetry)
+  - Performance overview with key metrics and trends
+  - Auto-refresh capability (30-second intervals)
+  - Direct links to all health endpoints for detailed analysis
+
 ## Architecture Overview
 
 ### Technology Stack
@@ -61,20 +70,29 @@ src/
 ├── config.ts                    # Central configuration with Zod validation
 ├── index.ts                     # Main server entry point with Elysia
 ├── instrumentation.ts           # OpenTelemetry setup and metrics
+├── dashboard/
+│   └── index.html              # Development dashboard (served at /dashboard)
 ├── graphql/
 │   ├── schema.ts               # GraphQL schema assembly
 │   ├── typeDefs.ts             # GraphQL type definitions
+│   ├── types.ts                # TypeScript types for resolvers
 │   └── resolvers/              # Modular resolver files
 ├── lib/
 │   ├── couchbaseConnector.ts   # Database connection factory
-│   └── clusterProvider.ts      # Cluster management utilities
+│   ├── clusterProvider.ts      # Cluster management utilities
+│   └── queryCache.ts           # Query result caching layer
 ├── models/
 │   ├── index.ts                # Model exports
-│   └── types.ts                # TypeScript types and Zod schemas
+│   ├── types.ts                # TypeScript types and Zod schemas
+│   └── errors.ts               # Structured error hierarchy
 ├── otlp/                       # Custom OpenTelemetry exporters
 ├── utils/
 │   ├── logger.ts               # Winston-based structured logging
 │   └── simpleLogger.ts         # Fallback logging utilities
+tests/                          # Centralized test directory
+├── unit/                       # Unit tests
+├── integration/                # Integration tests  
+└── e2e/                       # End-to-end tests
 ```
 
 ### Path Aliases (tsconfig.json)
@@ -124,6 +142,53 @@ Copy `.env.example` to `.env` and configure:
 - Production images support multi-architecture deployment
 - Source maps preserved in production for debugging
 
+## Available Claude Code Agents
+
+When working with this project, you have access to specialized agents that can provide expert assistance:
+
+### Core Development Agents
+- **@agent-bun-developer** - Expert in Bun runtime, APIs, and performance optimization. Use for Bun-specific development, native SQL/Redis integration, workspaces, and ES2023+ features.
+- **@agent-couchbase-capella-specialist** - Expert in Couchbase Capella connections, SDK v4.4.6, pooling, retry logic, and optimization. Use for all database-related tasks and connection management.
+- **@agent-config-manager** - Environment variable and configuration expert. Use for .env files, configuration validation, Zod schemas, and environment management.
+- **@agent-otel-logger** - OpenTelemetry observability specialist. Use for telemetry configuration, logging implementation, metrics collection, and distributed tracing.
+
+### Architecture & Quality Agents
+- **@agent-architect-reviewer** - System design validation and technical decisions. Use for architecture reviews, design patterns, and scalability concerns.
+- **@agent-refactoring-specialist** - Code quality and refactoring expert. Use for improving code structure, reducing complexity, and safe code transformations.
+- **@agent-meta-orchestrator** - Complex multi-step task coordination. Use for breaking down complex problems and workflow planning.
+
+### When to Use Each Agent
+- **Database issues**: Use @agent-couchbase-capella-specialist
+- **Configuration problems**: Use @agent-config-manager  
+- **Performance optimization**: Use @agent-bun-developer
+- **Telemetry/logging**: Use @agent-otel-logger
+- **Architecture decisions**: Use @agent-architect-reviewer
+- **Code quality improvements**: Use @agent-refactoring-specialist
+
+## Testing Structure
+
+### Test Organization
+```
+tests/
+├── unit/                    # Unit tests for individual components
+│   ├── config.test.ts      # Configuration validation tests
+│   ├── utils/
+│   │   └── bunUtils.test.ts # Bun utility function tests
+│   └── lib/
+│       └── couchbaseConnector.test.ts # Database connection tests
+├── integration/            # Integration tests for component interactions
+│   └── graphql.test.ts    # GraphQL resolver integration tests
+└── e2e/                   # End-to-end tests for full system
+    └── server.test.ts     # Server startup, endpoints, performance tests
+```
+
+### Test Commands
+- `bun test` - Run all tests with watch mode
+- `bun test tests/unit` - Run only unit tests
+- `bun test tests/integration` - Run only integration tests  
+- `bun test tests/e2e` - Run only end-to-end tests
+- `bun test --coverage` - Run tests with coverage report
+
 ## Important Notes
 
 - This codebase extensively uses Bun-specific features and APIs
@@ -132,3 +197,32 @@ Copy `.env.example` to `.env` and configure:
 - Maintain the structured logging approach with correlation IDs
 - Test changes with the provided K6 performance test suite
 - All configuration should use the centralized config system with proper validation
+- Use the specialized agents for expert assistance in their respective domains
+
+## Development Process Management
+
+### Background Process Management
+**CRITICAL**: Always kill background processes after testing/development sessions to prevent resource leaks and port conflicts.
+
+#### Process Cleanup Commands
+```bash
+# Kill specific background process by ID
+# (Use KillBash tool with shell_id when using Claude Code)
+
+# Manual cleanup if needed
+pkill -f "bun run dev"
+pkill -f "bun run start" 
+lsof -ti:4000 | xargs kill -9  # Kill processes on port 4000
+```
+
+#### Best Practices
+- **Always terminate** background dev servers (`bun run dev`) after testing
+- **Check for running processes** before starting new sessions: `lsof -i :4000`
+- **Use process monitoring** to track active background tasks
+- **Document cleanup steps** for complex testing scenarios
+
+This prevents:
+- Port conflicts when restarting servers
+- Memory/CPU resource accumulation  
+- Interference between test sessions
+- System performance degradation

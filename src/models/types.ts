@@ -20,6 +20,14 @@ export interface CapellaConfig {
   COUCHBASE_BUCKET: string;
   COUCHBASE_SCOPE: string;
   COUCHBASE_COLLECTION: string;
+  // SDK timeout configurations (milliseconds)
+  COUCHBASE_KV_TIMEOUT: number;
+  COUCHBASE_KV_DURABLE_TIMEOUT: number;
+  COUCHBASE_QUERY_TIMEOUT: number;
+  COUCHBASE_ANALYTICS_TIMEOUT: number;
+  COUCHBASE_SEARCH_TIMEOUT: number;
+  COUCHBASE_CONNECT_TIMEOUT: number;
+  COUCHBASE_BOOTSTRAP_TIMEOUT: number;
 }
 
 export interface RuntimeConfig {
@@ -103,6 +111,42 @@ const CapellaConfigSchema = z.object({
   COUCHBASE_BUCKET: z.string().min(1, "Bucket name cannot be empty").default("default"),
   COUCHBASE_SCOPE: z.string().min(1, "Scope name cannot be empty").default("_default"),
   COUCHBASE_COLLECTION: z.string().min(1, "Collection name cannot be empty").default("_default"),
+  // SDK timeout configurations with production-ready defaults
+  COUCHBASE_KV_TIMEOUT: z.coerce
+    .number()
+    .min(1000, "KV timeout must be at least 1 second")
+    .max(30000, "KV timeout should not exceed 30 seconds")
+    .default(5000),
+  COUCHBASE_KV_DURABLE_TIMEOUT: z.coerce
+    .number()
+    .min(5000, "KV durable timeout must be at least 5 seconds")
+    .max(60000, "KV durable timeout should not exceed 60 seconds")
+    .default(10000),
+  COUCHBASE_QUERY_TIMEOUT: z.coerce
+    .number()
+    .min(5000, "Query timeout must be at least 5 seconds")
+    .max(120000, "Query timeout should not exceed 2 minutes")
+    .default(15000),
+  COUCHBASE_ANALYTICS_TIMEOUT: z.coerce
+    .number()
+    .min(10000, "Analytics timeout must be at least 10 seconds")
+    .max(300000, "Analytics timeout should not exceed 5 minutes")
+    .default(30000),
+  COUCHBASE_SEARCH_TIMEOUT: z.coerce
+    .number()
+    .min(5000, "Search timeout must be at least 5 seconds")
+    .max(120000, "Search timeout should not exceed 2 minutes")
+    .default(15000),
+  COUCHBASE_CONNECT_TIMEOUT: z.coerce
+    .number()
+    .min(5000, "Connect timeout must be at least 5 seconds")
+    .max(60000, "Connect timeout should not exceed 60 seconds")
+    .default(10000),
+  COUCHBASE_BOOTSTRAP_TIMEOUT: z.coerce
+    .number()
+    .min(10000, "Bootstrap timeout must be at least 10 seconds")
+    .max(120000, "Bootstrap timeout should not exceed 2 minutes")
+    .default(15000),
 });
 
 const RuntimeConfigSchema = z.object({

@@ -21,6 +21,13 @@ const envVarMapping = {
     COUCHBASE_BUCKET: "COUCHBASE_BUCKET",
     COUCHBASE_SCOPE: "COUCHBASE_SCOPE",
     COUCHBASE_COLLECTION: "COUCHBASE_COLLECTION",
+    COUCHBASE_KV_TIMEOUT: "COUCHBASE_KV_TIMEOUT",
+    COUCHBASE_KV_DURABLE_TIMEOUT: "COUCHBASE_KV_DURABLE_TIMEOUT",
+    COUCHBASE_QUERY_TIMEOUT: "COUCHBASE_QUERY_TIMEOUT",
+    COUCHBASE_ANALYTICS_TIMEOUT: "COUCHBASE_ANALYTICS_TIMEOUT",
+    COUCHBASE_SEARCH_TIMEOUT: "COUCHBASE_SEARCH_TIMEOUT",
+    COUCHBASE_CONNECT_TIMEOUT: "COUCHBASE_CONNECT_TIMEOUT",
+    COUCHBASE_BOOTSTRAP_TIMEOUT: "COUCHBASE_BOOTSTRAP_TIMEOUT",
   },
   runtime: {
     NODE_ENV: "NODE_ENV",
@@ -160,6 +167,14 @@ const defaultConfig: Config = {
     COUCHBASE_BUCKET: "default",
     COUCHBASE_SCOPE: "_default",
     COUCHBASE_COLLECTION: "_default",
+    // Production-ready timeout defaults (milliseconds)
+    COUCHBASE_KV_TIMEOUT: 5000,
+    COUCHBASE_KV_DURABLE_TIMEOUT: 10000,
+    COUCHBASE_QUERY_TIMEOUT: 15000,
+    COUCHBASE_ANALYTICS_TIMEOUT: 30000,
+    COUCHBASE_SEARCH_TIMEOUT: 15000,
+    COUCHBASE_CONNECT_TIMEOUT: 10000,
+    COUCHBASE_BOOTSTRAP_TIMEOUT: 15000,
   },
   runtime: {
     NODE_ENV: "development",
@@ -361,6 +376,35 @@ function loadConfigFromEnv(): Partial<Config> {
         "string",
         "COUCHBASE_COLLECTION"
       ) as string) || defaultConfig.capella.COUCHBASE_COLLECTION,
+
+    // SDK timeout configurations
+    COUCHBASE_KV_TIMEOUT:
+      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_KV_TIMEOUT), "number", "COUCHBASE_KV_TIMEOUT") as number) ||
+      defaultConfig.capella.COUCHBASE_KV_TIMEOUT,
+
+    COUCHBASE_KV_DURABLE_TIMEOUT:
+      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_KV_DURABLE_TIMEOUT), "number", "COUCHBASE_KV_DURABLE_TIMEOUT") as number) ||
+      defaultConfig.capella.COUCHBASE_KV_DURABLE_TIMEOUT,
+
+    COUCHBASE_QUERY_TIMEOUT:
+      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_QUERY_TIMEOUT), "number", "COUCHBASE_QUERY_TIMEOUT") as number) ||
+      defaultConfig.capella.COUCHBASE_QUERY_TIMEOUT,
+
+    COUCHBASE_ANALYTICS_TIMEOUT:
+      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_ANALYTICS_TIMEOUT), "number", "COUCHBASE_ANALYTICS_TIMEOUT") as number) ||
+      defaultConfig.capella.COUCHBASE_ANALYTICS_TIMEOUT,
+
+    COUCHBASE_SEARCH_TIMEOUT:
+      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_SEARCH_TIMEOUT), "number", "COUCHBASE_SEARCH_TIMEOUT") as number) ||
+      defaultConfig.capella.COUCHBASE_SEARCH_TIMEOUT,
+
+    COUCHBASE_CONNECT_TIMEOUT:
+      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_CONNECT_TIMEOUT), "number", "COUCHBASE_CONNECT_TIMEOUT") as number) ||
+      defaultConfig.capella.COUCHBASE_CONNECT_TIMEOUT,
+
+    COUCHBASE_BOOTSTRAP_TIMEOUT:
+      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_BOOTSTRAP_TIMEOUT), "number", "COUCHBASE_BOOTSTRAP_TIMEOUT") as number) ||
+      defaultConfig.capella.COUCHBASE_BOOTSTRAP_TIMEOUT,
   };
 
   // LOAD RUNTIME CONFIGURATION
