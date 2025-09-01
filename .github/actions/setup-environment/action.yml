@@ -1,60 +1,9 @@
-# .github/actions/setup-environment/action.yml
-
 name: "Setup Environment"
 description: "Sets up common actions and environment"
 
 runs:
   using: "composite"
   steps:
-    - name: Cache GitHub Actions
-      uses: actions/cache@v3
-      with:
-        path: |
-          ${{ env.ACTIONS_CACHE_DIR }}
-          ~/actions-runner/_work/_actions
-          ~/actions-runner/_work/_tool
-        key: ${{ runner.os }}-actions-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-actions-
-
-    - name: Cache Docker BuildKit
-      uses: actions/cache@v3
-      with:
-        path: ${{ env.DOCKER_BUILDX_CACHE_DIR }}
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
-        restore-keys: |
-          ${{ runner.os }}-buildx-
-
-    - name: Set Environment Variables
-      shell: bash
-      run: |
-        echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
-        echo "COMPOSE_DOCKER_CLI_BUILD=1" >> $GITHUB_ENV
-        echo "BUILDX_NO_DEFAULT_LOAD=true" >> $GITHUB_ENV
-        echo "BUILDKIT_INLINE_CACHE=1" >> $GITHUB_ENV
-        echo "BUILDX_CACHE_TTL=168h" >> $GITHUB_ENV
-        echo "BUILDKIT_PROGRESS=plain" >> $GITHUB_ENV
-        echo "BUILDKIT_STEP_LOG_MAX_SIZE=10000000" >> $GITHUB_ENV
-        echo "BUILDKIT_STEP_LOG_MAX_SPEED=10000000" >> $GITHUB_ENV
-        echo "BUILDKIT_CACHE_MOUNT_NS=buildkit-cache" >> $GITHUB_ENV
-        echo "BUILDX_CACHE_PATH=${ACTIONS_CACHE_DIR}/buildx" >> $GITHUB_ENV
-
-    - name: Install verification tools
-      shell: bash
-      run: |
-        mkdir -p ~/tmp
-        cd ~/tmp
-
-        # Install cosign
-        curl -Lo cosign https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-arm64
-        chmod +x cosign
-        sudo mv cosign /usr/local/bin/
-
-        # Install syft
-        curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sudo sh -s -- -b /usr/local/bin
-
-        cd - && rm -rf ~/tmp
-
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
       with:
@@ -68,29 +17,50 @@ runs:
           image=moby/buildkit:latest
           network=host
         buildkitd-flags: --debug
-        buildkitd-config-inline: |
-          [worker.oci]
-          max-parallelism = 1
-          gc = true
-
-          [worker.containerd]
-          gc = true
-          gc-keepstorage = 5368709120
-
-          [registry."docker.io"]
-          mirrors = ["mirror.gcr.io"]
-
-          [cache]
-            [cache.local]
-              type = "local"
-              path = "/tmp/buildx-cache"
-              max-size = 5368709120
-            [cache.registry]
-              type = "registry"
-              ref = "docker.io/zx8086/capellaql:buildcache"
-              max-size = 5368709120
 
     - name: Set up Bun
-      uses: oven-sh/setup-bun@v1
+      uses: oven-sh/setup-bun@v2
       with:
         bun-version: latest
+
+    - name: Set Environment Variables
+      shell: bash
+      run: |
+        echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
+        echo "COMPOSE_DOCKER_CLI_BUILD=1" >> $GITHUB_ENV
+        echo "BUILDX_NO_DEFAULT_LOAD=true" >> $GITHUB_ENV
+        echo "BUILDKIT_INLINE_CACHE=1" >> $GITHUB_ENV
+        echo "BUILDKIT_PROGRESS=plain" >> $GITHUB_ENV
+
+    - name: Install verification tools
+      shell: bash
+      run: |
+        # Create directories
+        mkdir -p "${GITHUB_WORKSPACE}/bin"
+        
+        # Detect architecture
+        ARCH=$(uname -m)
+        case $ARCH in
+          x86_64) ARCH_SUFFIX="amd64" ;;
+          aarch64|arm64) ARCH_SUFFIX="arm64" ;;
+          *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
+        esac
+
+        # Install cosign
+        curl -Lo "${GITHUB_WORKSPACE}/bin/cosign" "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-${ARCH_SUFFIX}"
+        chmod +x "${GITHUB_WORKSPACE}/bin/cosign"
+
+        # Install syft
+        SYFT_RELEASE=$(curl -s https://api.github.com/repos/anchore/syft/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
+        SYFT_VERSION_NO_V=$(echo "${SYFT_RELEASE}" | sed 's/^v//')
+        curl -Lo syft.tar.gz "https://github.com/anchore/syft/releases/download/${SYFT_RELEASE}/syft_${SYFT_VERSION_NO_V}_linux_${ARCH_SUFFIX}.tar.gz"
+        tar xzf syft.tar.gz syft
+        mv syft "${GITHUB_WORKSPACE}/bin/"
+        rm syft.tar.gz
+
+        # Add to PATH
+        echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
+
+        # Verify installations
+        "${GITHUB_WORKSPACE}/bin/cosign" version || true
+        "${GITHUB_WORKSPACE}/bin/syft" --version || true
