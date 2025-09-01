@@ -15,7 +15,7 @@ export class BunLogExporter extends BunOTLPExporter<ReadableLogRecord> implement
   private circuitBreakerLastFailureTime = 0;
   private readonly circuitBreakerThreshold = 5;
   private readonly circuitBreakerTimeoutMs = 30000; // 30 seconds
-  
+
   // Advanced filtering state
   private recentLogHashes = new Map<string, number>(); // hash -> timestamp
   private readonly deduplicationWindow = 60000; // 1 minute
@@ -96,34 +96,35 @@ export class BunLogExporter extends BunOTLPExporter<ReadableLogRecord> implement
   private applyAdvancedFiltering(logs: ReadableLogRecord[]): ReadableLogRecord[] {
     const now = Date.now();
     const filtered: ReadableLogRecord[] = [];
-    
+
     // Clean old hashes periodically
     this.cleanOldHashes(now);
-    
+
     for (const log of logs) {
       // Always keep error logs for 100% visibility
-      if (log.severityNumber && log.severityNumber >= 17) { // ERROR level and above
+      if (log.severityNumber && log.severityNumber >= 17) {
+        // ERROR level and above
         filtered.push(log);
         continue;
       }
-      
+
       // Create hash for deduplication (message + severity + key attributes)
       const logHash = this.createLogHash(log);
       const lastSeen = this.recentLogHashes.get(logHash);
-      
+
       if (!lastSeen || now - lastSeen > this.deduplicationWindow) {
         // First occurrence or outside deduplication window
         this.recentLogHashes.set(logHash, now);
         filtered.push(log);
       } else {
         // Skip duplicate within time window (intelligent aggregation)
-        console.debug(`Deduplicated log: ${log.body}`);
+        // Silently deduplicate to avoid console spam
       }
     }
-    
+
     return filtered;
   }
-  
+
   private cleanOldHashes(now: number): void {
     for (const [hash, timestamp] of this.recentLogHashes.entries()) {
       if (now - timestamp > this.deduplicationWindow * 2) {
@@ -131,22 +132,22 @@ export class BunLogExporter extends BunOTLPExporter<ReadableLogRecord> implement
       }
     }
   }
-  
+
   private createLogHash(log: ReadableLogRecord): string {
     // Create a hash based on message content and key attributes
-    const content = String(log.body || '');
+    const content = String(log.body || "");
     const severity = log.severityNumber || 0;
-    const traceId = log.spanContext?.traceId?.slice(0, 8) || '';
-    
+    const traceId = log.spanContext?.traceId?.slice(0, 8) || "";
+
     // Simple hash function
     let hash = 0;
     const str = `${content}:${severity}:${traceId}`;
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32bit integer
     }
-    
+
     return hash.toString();
   }
 

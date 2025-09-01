@@ -58,6 +58,14 @@ const envVarMapping = {
     SAMPLING_RATE: "SAMPLING_RATE",
     CIRCUIT_BREAKER_THRESHOLD: "CIRCUIT_BREAKER_THRESHOLD",
     CIRCUIT_BREAKER_TIMEOUT_MS: "CIRCUIT_BREAKER_TIMEOUT_MS",
+    LOG_SAMPLING_DEBUG: "LOG_SAMPLING_DEBUG",
+    LOG_SAMPLING_INFO: "LOG_SAMPLING_INFO",
+    LOG_SAMPLING_WARN: "LOG_SAMPLING_WARN",
+    LOG_SAMPLING_ERROR: "LOG_SAMPLING_ERROR",
+    LOG_RETENTION_DEBUG_DAYS: "LOG_RETENTION_DEBUG_DAYS",
+    LOG_RETENTION_INFO_DAYS: "LOG_RETENTION_INFO_DAYS",
+    LOG_RETENTION_WARN_DAYS: "LOG_RETENTION_WARN_DAYS",
+    LOG_RETENTION_ERROR_DAYS: "LOG_RETENTION_ERROR_DAYS",
   },
 } as const;
 
@@ -133,6 +141,14 @@ class ConfigurationError extends Error {
       "telemetry.SAMPLING_RATE": "SAMPLING_RATE",
       "telemetry.CIRCUIT_BREAKER_THRESHOLD": "CIRCUIT_BREAKER_THRESHOLD",
       "telemetry.CIRCUIT_BREAKER_TIMEOUT_MS": "CIRCUIT_BREAKER_TIMEOUT_MS",
+      "telemetry.LOG_SAMPLING_DEBUG": "LOG_SAMPLING_DEBUG",
+      "telemetry.LOG_SAMPLING_INFO": "LOG_SAMPLING_INFO",
+      "telemetry.LOG_SAMPLING_WARN": "LOG_SAMPLING_WARN",
+      "telemetry.LOG_SAMPLING_ERROR": "LOG_SAMPLING_ERROR",
+      "telemetry.LOG_RETENTION_DEBUG_DAYS": "LOG_RETENTION_DEBUG_DAYS",
+      "telemetry.LOG_RETENTION_INFO_DAYS": "LOG_RETENTION_INFO_DAYS",
+      "telemetry.LOG_RETENTION_WARN_DAYS": "LOG_RETENTION_WARN_DAYS",
+      "telemetry.LOG_RETENTION_ERROR_DAYS": "LOG_RETENTION_ERROR_DAYS",
     };
     return mapping[path];
   }
@@ -200,6 +216,16 @@ const defaultConfig: Config = {
     SAMPLING_RATE: 0.15,
     CIRCUIT_BREAKER_THRESHOLD: 5,
     CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
+    // Log sampling configuration - 100% sampling to ensure important events are captured
+    LOG_SAMPLING_DEBUG: 1.0,
+    LOG_SAMPLING_INFO: 1.0,
+    LOG_SAMPLING_WARN: 1.0,
+    LOG_SAMPLING_ERROR: 1.0,
+    // Log retention configuration
+    LOG_RETENTION_DEBUG_DAYS: 7,   // 7 days for debug logs
+    LOG_RETENTION_INFO_DAYS: 30,   // 30 days for info logs  
+    LOG_RETENTION_WARN_DAYS: 90,   // 90 days for warning logs
+    LOG_RETENTION_ERROR_DAYS: 365, // 365 days (1 year) for error logs
   },
 };
 
@@ -544,6 +570,64 @@ function loadConfigFromEnv(): Partial<Config> {
         "number",
         "CIRCUIT_BREAKER_TIMEOUT_MS"
       ) as number) || defaultConfig.telemetry.CIRCUIT_BREAKER_TIMEOUT_MS,
+
+    // Log sampling configuration
+    LOG_SAMPLING_DEBUG:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.LOG_SAMPLING_DEBUG),
+        "number",
+        "LOG_SAMPLING_DEBUG"
+      ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_DEBUG,
+
+    LOG_SAMPLING_INFO:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.LOG_SAMPLING_INFO),
+        "number",
+        "LOG_SAMPLING_INFO"
+      ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_INFO,
+
+    LOG_SAMPLING_WARN:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.LOG_SAMPLING_WARN),
+        "number",
+        "LOG_SAMPLING_WARN"
+      ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_WARN,
+
+    LOG_SAMPLING_ERROR:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.LOG_SAMPLING_ERROR),
+        "number",
+        "LOG_SAMPLING_ERROR"
+      ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_ERROR,
+
+    // Log retention configuration
+    LOG_RETENTION_DEBUG_DAYS:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.LOG_RETENTION_DEBUG_DAYS),
+        "number",
+        "LOG_RETENTION_DEBUG_DAYS"
+      ) as number) || defaultConfig.telemetry.LOG_RETENTION_DEBUG_DAYS,
+
+    LOG_RETENTION_INFO_DAYS:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.LOG_RETENTION_INFO_DAYS),
+        "number",
+        "LOG_RETENTION_INFO_DAYS"
+      ) as number) || defaultConfig.telemetry.LOG_RETENTION_INFO_DAYS,
+
+    LOG_RETENTION_WARN_DAYS:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.LOG_RETENTION_WARN_DAYS),
+        "number",
+        "LOG_RETENTION_WARN_DAYS"
+      ) as number) || defaultConfig.telemetry.LOG_RETENTION_WARN_DAYS,
+
+    LOG_RETENTION_ERROR_DAYS:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.LOG_RETENTION_ERROR_DAYS),
+        "number",
+        "LOG_RETENTION_ERROR_DAYS"
+      ) as number) || defaultConfig.telemetry.LOG_RETENTION_ERROR_DAYS,
   };
 
   return config;

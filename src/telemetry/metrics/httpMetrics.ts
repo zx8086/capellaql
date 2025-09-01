@@ -28,7 +28,7 @@ export function initializeHttpMetrics(): void {
     });
 
     isInitialized = true;
-    console.log("HTTP metrics initialized successfully");
+    // HTTP metrics initialized successfully (silent init)
   } catch (error) {
     console.error("Error initializing HTTP metrics:", error);
   }

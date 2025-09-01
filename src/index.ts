@@ -29,12 +29,14 @@ import {
   err,
   getTelemetryHealth,
   initializeHttpMetrics,
+  initializeTelemetry,
   log,
   recordHttpRequest,
   recordHttpResponseTime,
+  telemetryLogger,
+  warn,
 } from "./telemetry";
 import { createHealthcheck } from "./utils/bunUtils";
-import "source-map-support/register";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,7 +67,6 @@ const ALLOWED_ORIGINS = Array.isArray(config.application.ALLOWED_ORIGINS)
   ? config.application.ALLOWED_ORIGINS
   : (config.application.ALLOWED_ORIGINS as string).split(",").map((origin) => origin.trim());
 
-console.log("Parsed ALLOWED_ORIGINS:", ALLOWED_ORIGINS);
 const IS_DEVELOPMENT =
   config.telemetry.DEPLOYMENT_ENVIRONMENT === "development" || config.runtime.NODE_ENV === "development";
 
@@ -134,7 +135,21 @@ function checkRateLimit(request: Request): boolean {
 
   rateLimitStore.set(rateLimitKey, clientData);
 
-  return clientData.count > RATE_LIMIT;
+  const isRateLimited = clientData.count > RATE_LIMIT;
+  
+  // Only log rate limiting events for security monitoring
+  if (isRateLimited) {
+    warn("Rate limit exceeded - request blocked", {
+      clientIp: request.headers.get("x-forwarded-for") || request.headers.get("cf-connecting-ip") || "unknown",
+      userAgent: userAgent?.substring(0, 100),
+      requestCount: clientData.count,
+      rateLimitKey,
+      url: new URL(request.url).pathname,
+      method: request.method,
+    });
+  }
+
+  return isRateLimited;
 }
 
 const createYogaOptions = () => ({
@@ -177,37 +192,8 @@ const createYogaOptions = () => ({
         }
       },
     },
-    // Enhanced request logging plugin
+    // Error logging plugin
     {
-      onRequest: ({ request, url, serverContext }) => {
-        if (VERBOSE_HTTP) {
-          const clientIp = getClientIp(request);
-          log("GraphQL Request", {
-            method: request.method,
-            url: url.pathname,
-            clientIp,
-            userAgent: request.headers.get("user-agent")?.substring(0, 100),
-            origin: request.headers.get("origin"),
-            timestamp: new Date().toISOString(),
-          });
-        }
-      },
-      onExecute: ({ args }) => {
-        if (VERBOSE_HTTP) {
-          log("GraphQL Execute", {
-            operation: args.operationName,
-            variables: args.variableValues,
-          });
-        }
-      },
-      onSubscribe: ({ args }) => {
-        if (VERBOSE_HTTP) {
-          log("GraphQL Subscribe", {
-            operation: args.operationName,
-            variables: args.variableValues,
-          });
-        }
-      },
       onError: ({ error }) => {
         err("GraphQL Error", {
           error: error.message,
@@ -240,18 +226,6 @@ const createYogaOptions = () => ({
 
 const healthCheck = new Elysia()
   .get("/health", async ({ request }) => {
-    // Log request details when verbose HTTP is enabled
-    if (VERBOSE_HTTP) {
-      const clientIp = getClientIp(request);
-      log("Health check request", {
-        method: request.method,
-        url: "/health",
-        clientIp,
-        userAgent: request.headers.get("user-agent")?.substring(0, 100),
-        timestamp: new Date().toISOString(),
-      });
-    }
-
     try {
       const healthStatus = await createHealthcheck();
       return healthStatus;
@@ -266,8 +240,6 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/telemetry", async () => {
-    debug("Telemetry health check called");
-
     try {
       const telemetryHealth = getTelemetryHealth();
       return telemetryHealth;
@@ -281,8 +253,6 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/system", async () => {
-    debug("System health check called");
-
     try {
       const systemHealth = await getSystemHealth();
       return systemHealth;
@@ -317,8 +287,6 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/summary", async () => {
-    debug("System health summary called");
-
     try {
       const healthSummary = await getSystemHealthSummary();
       return healthSummary;
@@ -332,8 +300,6 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/performance", async () => {
-    debug("Performance metrics called");
-
     try {
       const performanceMetrics = await getPerformanceMetrics();
       return performanceMetrics;
@@ -356,8 +322,6 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/performance/history", async ({ query }) => {
-    debug("Performance history called");
-
     try {
       const count = query?.count ? parseInt(query.count as string) : 10;
       const performanceHistory = getPerformanceHistory(Math.min(count, 50)); // Max 50 entries
@@ -377,8 +341,6 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/cache", async () => {
-    debug("Cache metrics called");
-
     try {
       const { bunSQLiteCache } = await import("./lib/bunSQLiteCache");
       const { defaultQueryCache } = await import("./lib/queryCache");
@@ -420,8 +382,6 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/telemetry/detailed", async () => {
-    debug("Detailed telemetry metrics called");
-
     try {
       const { getBatchCoordinator } = await import("./telemetry/coordinator/BatchCoordinator");
       const batchCoordinator = getBatchCoordinator();
@@ -475,8 +435,6 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/comprehensive", async () => {
-    debug("Comprehensive health metrics called");
-
     try {
       // Collect all health metrics in parallel for performance
       const [systemHealth, telemetryHealth, performanceMetrics, cacheResponse, detailedTelemetry] =
@@ -722,8 +680,17 @@ const getClientIp = (request: Request): string => {
 };
 
 const app = new Elysia()
-  .onStart(() => {
+  .onStart(async () => {
+    log("Server starting...");
+    
+    // Initialize telemetry first
+    await initializeTelemetry();
+    telemetryLogger.initialize();
+    
+    // Initialize HTTP metrics
     initializeHttpMetrics();
+    
+    log("Server initialization completed");
   })
   .use(
     cors({
@@ -739,20 +706,21 @@ const app = new Elysia()
     message(ws, message) {
       try {
         const data = JSON.parse(message.toString());
-        log("WebSocket GraphQL message received", {
-          type: data.type,
-          id: data.id,
-          operation: data.payload?.operationName || "unknown",
-        });
 
         // Handle GraphQL over WebSocket protocol
         if (data.type === "connection_init") {
           ws.send(JSON.stringify({ type: "connection_ack" }));
         } else if (data.type === "start") {
           // This would typically integrate with your GraphQL subscription system
-          log("GraphQL subscription started", { id: data.id });
+          debug("GraphQL subscription started", {
+            id: data.id,
+            operationType: "subscription",
+          });
         } else if (data.type === "stop") {
-          log("GraphQL subscription stopped", { id: data.id });
+          debug("GraphQL subscription stopped", {
+            id: data.id,
+            operationType: "subscription",
+          });
         }
       } catch (error) {
         err("WebSocket message handling error", error);
@@ -766,26 +734,29 @@ const app = new Elysia()
     },
 
     open(_ws) {
-      debug("WebSocket connection opened");
       activeConnections.add(1);
     },
 
     close(_ws, code, reason) {
-      debug("WebSocket connection closed", { code, reason });
       activeConnections.add(-1);
     },
 
     error(_ws, error) {
-      err("WebSocket error", error);
+      err("WebSocket connection error", {
+        error: error instanceof Error ? error.message : String(error),
+        errorType: error instanceof Error ? error.constructor.name : "unknown",
+        connectionType: "websocket",
+      });
     },
   })
   .options("*", ({ set, request }) => {
-    // Only log OPTIONS when HTTP verbosity is enabled
-    if (VERBOSE_HTTP) {
-      log("CORS preflight request", {
-        origin: request.headers.get("origin"),
-        method: request.headers.get("access-control-request-method"),
-        headers: request.headers.get("access-control-request-headers"),
+    // Log potential security concerns
+    const origin = request.headers.get("origin");
+    if (origin && !ALLOWED_ORIGINS.includes("*") && !ALLOWED_ORIGINS.includes(origin)) {
+      warn("CORS request from non-configured origin", {
+        origin,
+        requestedMethod: request.headers.get("access-control-request-method"),
+        allowedOrigins: ALLOWED_ORIGINS.length,
       });
     }
 
@@ -811,17 +782,16 @@ const app = new Elysia()
     });
     activeConnections.add(1);
 
-    // Only log detailed request info for non-health endpoints when verbose HTTP is enabled
-    const isHealthEndpoint = route.startsWith("/health");
-    if ((!isHealthEndpoint && VERBOSE_HTTP) || (isHealthEndpoint && IS_DEVELOPMENT)) {
-      log("Request", {
+    if (checkRateLimit(context.request)) {
+      // Enhanced rate limiting response with security logging
+      const clientIp = getClientIp(context.request);
+      err("Rate limit exceeded - blocking request", {
+        clientIp,
         method,
         route,
-        userAgent: context.request.headers.get("user-agent")?.substring(0, 50) + "...",
-        clientIp,
+        userAgent: context.request.headers.get("user-agent")?.substring(0, 100),
+        rateLimitKey: getRateLimitKey(context.request),
       });
-    }
-    if (checkRateLimit(context.request)) {
       context.set.status = 429;
       return { error: "Too Many Requests" };
     }
@@ -848,13 +818,19 @@ const app = new Elysia()
           cspDirectives[1] += " 'unsafe-eval'";
         }
 
-        // Set CSP header
-        context.set.headers["Content-Security-Policy"] = cspDirectives.join("; ");
-
-        context.set.headers["X-XSS-Protection"] = "1; mode=block";
-        context.set.headers["X-Frame-Options"] = "SAMEORIGIN";
-        context.set.headers["X-Content-Type-Options"] = "nosniff";
-        context.set.headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+        // Enhanced security headers application
+        const securityHeaders = {
+          "Content-Security-Policy": cspDirectives.join("; "),
+          "X-XSS-Protection": "1; mode=block",
+          "X-Frame-Options": "SAMEORIGIN", 
+          "X-Content-Type-Options": "nosniff",
+          "Referrer-Policy": "strict-origin-when-cross-origin"
+        };
+        
+        // Apply security headers
+        Object.entries(securityHeaders).forEach(([header, value]) => {
+          context.set.headers[header] = value;
+        });
 
         const startTime = Date.now();
         context.store = { startTime };
@@ -870,18 +846,6 @@ const app = new Elysia()
           });
         }
 
-        // Only log detailed request info when verbose HTTP is enabled
-        const isHealthCheck = route.startsWith("/health");
-        if (VERBOSE_HTTP && (!isHealthCheck || IS_DEVELOPMENT)) {
-          log("Request details", {
-            requestId,
-            method,
-            route,
-            userAgent: context.request.headers.get("user-agent")?.substring(0, 100),
-            clientIp,
-          });
-        }
-
         if (context.request.url.includes("/graphql")) {
           const clonedRequest = context.request.clone();
           const text = await clonedRequest.text();
@@ -894,13 +858,25 @@ const app = new Elysia()
                 }
               | undefined;
             if (body && typeof body === "object") {
+              
               if (body.operationName) {
                 span?.updateName(`GraphQL: ${body.operationName}`);
                 span?.setAttribute("graphql.operation_name", body.operationName);
               }
+              
               if (body.query) {
                 span?.setAttribute("graphql.query", body.query);
+                
+                // Log large queries for performance monitoring
+                if (body.query.length > 1000) {
+                  warn("Large GraphQL query detected", {
+                    operationName: body.operationName,
+                    queryLength: body.query.length,
+                    requestId
+                  });
+                }
               }
+              
               if (body.variables) {
                 span?.setAttribute("graphql.variables", JSON.stringify(body.variables));
               }
@@ -930,19 +906,37 @@ const app = new Elysia()
     });
     activeConnections.add(-1); // Decrement active connections
 
-    // Only log response details for non-health endpoints when verbose HTTP is enabled, or slow requests
+    // Enhanced response logging - only log errors and slow requests
     const route = new URL(context.request.url).pathname;
-    const isHealthEndpoint = route.startsWith("/health");
-    const isSlowRequest = duration > 1000; // Log slow requests regardless
-
-    if (isSlowRequest || (VERBOSE_HTTP && !isHealthEndpoint) || (isHealthEndpoint && IS_DEVELOPMENT)) {
-      log("Response", {
+    const isSlowRequest = duration > 1000;
+    const isVerySlowRequest = duration > 5000;
+    const status = context.set.status || 200;
+    const isError = status >= 400;
+    
+    // Always log errors and very slow requests
+    if (isError) {
+      err("Request failed", {
         requestId: context.set.headers["X-Request-ID"],
         method: context.request.method,
         route,
-        status: context.set.status,
+        status,
         duration: `${duration}ms`,
-        ...(isSlowRequest && { slow: true }),
+      });
+    } else if (isVerySlowRequest) {
+      warn("Very slow request detected", {
+        requestId: context.set.headers["X-Request-ID"],
+        method: context.request.method,
+        route,
+        status,
+        duration: `${duration}ms`,
+      });
+    } else if (isSlowRequest) {
+      warn("Slow request", {
+        requestId: context.set.headers["X-Request-ID"],
+        method: context.request.method,
+        route,
+        status,
+        duration: `${duration}ms`,
       });
     }
   });
@@ -960,6 +954,29 @@ const tracesEndpoint = config.telemetry.TRACES_ENDPOINT;
 const metricsEndpoint = config.telemetry.METRICS_ENDPOINT;
 const logsEndpoint = config.telemetry.LOGS_ENDPOINT;
 const otelEnabled = config.telemetry.ENABLE_OPENTELEMETRY;
+
+// Simple server startup logging
+log("CapellaQL Server started", {
+  serverPort: SERVER_PORT,
+  environment: config.telemetry.DEPLOYMENT_ENVIRONMENT,
+  endpoints: {
+    graphql: graphqlUrl,
+    health: healthUrl,
+    telemetryHealth: telemetryHealthUrl,
+    dashboard: `${baseUrl}:${SERVER_PORT}/dashboard`
+  },
+  telemetry: {
+    enabled: otelEnabled,
+    tracesEndpoint,
+    metricsEndpoint, 
+    logsEndpoint,
+    samplingRate: config.telemetry.SAMPLING_RATE,
+  },
+  runtime: {
+    name: typeof Bun !== "undefined" ? "bun" : "node",
+    version: typeof Bun !== "undefined" ? Bun.version : process.version
+  }
+});
 
 console.log(`
 🚀 CapellaQL Server started successfully!
@@ -985,37 +1002,53 @@ let isShuttingDown = false;
 
 const gracefulShutdown = async (signal: string) => {
   if (isShuttingDown) {
-    log(`Shutdown already in progress, ignoring ${signal}`);
+    warn(`Shutdown already in progress, ignoring ${signal}`, {
+      signal,
+      shutdownInProgress: true,
+    });
     return;
   }
   
   isShuttingDown = true;
-  log(`Received ${signal}. Starting graceful shutdown...`);
+  log(`Graceful shutdown initiated`, {
+    signal,
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+  });
   try {
     // Import shutdown functions dynamically to avoid circular dependencies
     const { shutdownPerformanceMonitor } = await import("$lib/performanceMonitor");
     const { shutdownBatchCoordinator } = await import("$telemetry/coordinator/BatchCoordinator");
     const { closeConnection } = await import("$lib/clusterProvider");
 
+    const shutdownStartTime = Date.now();
+    
     // Shutdown telemetry batch coordinator first (ensure all data is exported)
     await shutdownBatchCoordinator();
-    log("Telemetry batch coordinator shutdown completed");
 
     // Close database connection to prevent resource leaks
     await closeConnection();
-    log("Database connection shutdown completed");
 
     // Shutdown performance monitor
     shutdownPerformanceMonitor();
-    log("Performance monitor shutdown completed");
 
     // Finally shutdown server
     await server.stop();
-    log("Server closed successfully");
-    log("Graceful shutdown completed");
+    
+    const shutdownDuration = Date.now() - shutdownStartTime;
+    log("Graceful shutdown completed", {
+      signal,
+      shutdownDurationMs: shutdownDuration,
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    });
     process.exit(0);
   } catch (error) {
-    err("Error during graceful shutdown", error);
+    err("Error during graceful shutdown - forcing exit", {
+      error: error instanceof Error ? error.message : String(error),
+      signal,
+      uptime: process.uptime(),
+    });
     process.exit(1);
   }
 };

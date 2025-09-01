@@ -62,6 +62,16 @@ export interface TelemetryConfig {
   SAMPLING_RATE: number;
   CIRCUIT_BREAKER_THRESHOLD: number;
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
+  // Log sampling configuration
+  LOG_SAMPLING_DEBUG: number;
+  LOG_SAMPLING_INFO: number;
+  LOG_SAMPLING_WARN: number;
+  LOG_SAMPLING_ERROR: number;
+  // Log retention configuration (days)
+  LOG_RETENTION_DEBUG_DAYS: number;
+  LOG_RETENTION_INFO_DAYS: number;
+  LOG_RETENTION_WARN_DAYS: number;
+  LOG_RETENTION_ERROR_DAYS: number;
 }
 
 export interface Config {
@@ -218,6 +228,48 @@ const TelemetryConfigSchema = z.object({
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
     .default(60000), // 1 minute
+  // Log sampling rates (0.0 to 1.0)
+  LOG_SAMPLING_DEBUG: z.coerce
+    .number()
+    .min(0.0, "LOG_SAMPLING_DEBUG must be at least 0%")
+    .max(1.0, "LOG_SAMPLING_DEBUG cannot exceed 100%")
+    .default(1.0), // 100% sampling for all levels to ensure important events are captured
+  LOG_SAMPLING_INFO: z.coerce
+    .number()
+    .min(0.0, "LOG_SAMPLING_INFO must be at least 0%")
+    .max(1.0, "LOG_SAMPLING_INFO cannot exceed 100%")
+    .default(1.0), // 100% sampling
+  LOG_SAMPLING_WARN: z.coerce
+    .number()
+    .min(0.0, "LOG_SAMPLING_WARN must be at least 0%")
+    .max(1.0, "LOG_SAMPLING_WARN cannot exceed 100%")
+    .default(1.0), // 100% sampling
+  LOG_SAMPLING_ERROR: z.coerce
+    .number()
+    .min(0.0, "LOG_SAMPLING_ERROR must be at least 0%")
+    .max(1.0, "LOG_SAMPLING_ERROR cannot exceed 100%")
+    .default(1.0), // 100% sampling - errors should always be captured
+  // Log retention periods in days
+  LOG_RETENTION_DEBUG_DAYS: z.coerce
+    .number()
+    .min(1, "LOG_RETENTION_DEBUG_DAYS must be at least 1 day")
+    .max(365, "LOG_RETENTION_DEBUG_DAYS should not exceed 365 days")
+    .default(7), // 7 days for debug logs
+  LOG_RETENTION_INFO_DAYS: z.coerce
+    .number()
+    .min(1, "LOG_RETENTION_INFO_DAYS must be at least 1 day")
+    .max(365, "LOG_RETENTION_INFO_DAYS should not exceed 365 days")
+    .default(30), // 30 days for info logs
+  LOG_RETENTION_WARN_DAYS: z.coerce
+    .number()
+    .min(1, "LOG_RETENTION_WARN_DAYS must be at least 1 day")
+    .max(365, "LOG_RETENTION_WARN_DAYS should not exceed 365 days")
+    .default(90), // 90 days for warning logs
+  LOG_RETENTION_ERROR_DAYS: z.coerce
+    .number()
+    .min(1, "LOG_RETENTION_ERROR_DAYS must be at least 1 day")
+    .max(3650, "LOG_RETENTION_ERROR_DAYS should not exceed 10 years")
+    .default(365), // 365 days (1 year) for error logs
 });
 
 // Configuration schema with production security checks

@@ -45,7 +45,7 @@ export function initializeDatabaseMetrics(): void {
     });
 
     isInitialized = true;
-    console.log("✅ Database metrics initialized successfully");
+    // Database metrics initialized successfully (silent init)
   } catch (error) {
     console.error("❌ Error initializing database metrics:", error);
     telemetryHealthMonitor.recordExporterFailure("metrics", error as Error);
