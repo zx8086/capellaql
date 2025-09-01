@@ -1,7 +1,7 @@
 /* src/lib/bunSQLiteCache.ts - Bun-native SQLite Query Cache */
 
 import { Database } from "bun:sqlite";
-import { log, err } from "../telemetry/logger";
+import { err, log } from "../telemetry/logger";
 import type { CacheStats } from "./queryCache";
 
 /**
@@ -49,13 +49,15 @@ export class BunSQLiteCache {
   private countStmt?: any;
   private sizeStmt?: any;
 
-  constructor(private config: BunSQLiteCacheConfig = {
-    maxMemoryMB: 50,
-    defaultTtlMs: 5 * 60 * 1000, // 5 minutes
-    cleanupIntervalMs: 60 * 1000, // 1 minute
-    maxEntries: 10000,
-    compressionThreshold: 1024, // 1KB
-  }) {
+  constructor(
+    private config: BunSQLiteCacheConfig = {
+      maxMemoryMB: 50,
+      defaultTtlMs: 5 * 60 * 1000, // 5 minutes
+      cleanupIntervalMs: 60 * 1000, // 1 minute
+      maxEntries: 10000,
+      compressionThreshold: 1024, // 1KB
+    }
+  ) {
     this.initialize();
   }
 
@@ -67,7 +69,7 @@ export class BunSQLiteCache {
       if (typeof Bun !== "undefined") {
         // Use in-memory SQLite database for maximum performance
         this.db = new Database(":memory:");
-        
+
         // Create optimized table with proper indexing
         this.db.exec(`
           CREATE TABLE cache (
@@ -110,7 +112,7 @@ export class BunSQLiteCache {
         this.sizeStmt = this.db.prepare("SELECT COALESCE(SUM(size), 0) as total_size FROM cache");
 
         this.startCleanupTimer();
-        
+
         log("BunSQLiteCache initialized with native SQLite", {
           maxMemoryMB: this.config.maxMemoryMB,
           maxEntries: this.config.maxEntries,
@@ -148,11 +150,11 @@ export class BunSQLiteCache {
       this.stats.hits++;
 
       const data = this.deserializeValue(result.value);
-      
-      log("SQLite cache hit", { 
+
+      log("SQLite cache hit", {
         key: key.substring(0, 50) + (key.length > 50 ? "..." : ""),
         hitCount: result.hit_count + 1,
-        age: now - (result.created_at || now)
+        age: now - (result.created_at || now),
       });
 
       return data;
@@ -184,11 +186,11 @@ export class BunSQLiteCache {
       // Update stats
       this.updateStats();
 
-      log("SQLite cache set", { 
+      log("SQLite cache set", {
         key: key.substring(0, 50) + (key.length > 50 ? "..." : ""),
         size,
         ttl: ttlMs || this.config.defaultTtlMs,
-        expiresIn: expiresAt - now
+        expiresIn: expiresAt - now,
       });
     } catch (error) {
       err("SQLite cache set error:", error);
@@ -198,11 +200,7 @@ export class BunSQLiteCache {
   /**
    * Get value or execute fetcher function with caching
    */
-  async getOrSet<T>(
-    key: string, 
-    fetcher: () => Promise<T>, 
-    ttlMs?: number
-  ): Promise<T> {
+  async getOrSet<T>(key: string, fetcher: () => Promise<T>, ttlMs?: number): Promise<T> {
     const cached = await this.get<T>(key);
     if (cached !== null) {
       return cached;
@@ -244,12 +242,12 @@ export class BunSQLiteCache {
     try {
       const result = this.deleteStmt?.run(key);
       const deleted = result?.changes > 0;
-      
+
       if (deleted) {
         this.updateStats();
         log("SQLite cache delete", { key });
       }
-      
+
       return deleted;
     } catch (error) {
       err("SQLite cache delete error:", error);
@@ -272,7 +270,7 @@ export class BunSQLiteCache {
         evictions: this.stats.evictions,
         memoryUsage: 0,
       };
-      
+
       log("SQLite cache cleared");
     } catch (error) {
       err("SQLite cache clear error:", error);
@@ -286,7 +284,7 @@ export class BunSQLiteCache {
     if (!this.db) return 0;
 
     try {
-      const allKeys = this.db.prepare("SELECT key FROM cache").all() as {key: string}[];
+      const allKeys = this.db.prepare("SELECT key FROM cache").all() as { key: string }[];
       let deletedCount = 0;
 
       for (const row of allKeys) {
@@ -300,9 +298,9 @@ export class BunSQLiteCache {
 
       if (deletedCount > 0) {
         this.updateStats();
-        log("SQLite cache pattern invalidation", { 
-          pattern: pattern.toString(), 
-          deleted: deletedCount 
+        log("SQLite cache pattern invalidation", {
+          pattern: pattern.toString(),
+          deleted: deletedCount,
         });
       }
 
@@ -321,9 +319,8 @@ export class BunSQLiteCache {
     avgHitsPerEntry: number;
     compressionRatio: number;
   } {
-    const hitRate = this.stats.hits + this.stats.misses > 0 
-      ? (this.stats.hits / (this.stats.hits + this.stats.misses)) * 100 
-      : 0;
+    const hitRate =
+      this.stats.hits + this.stats.misses > 0 ? (this.stats.hits / (this.stats.hits + this.stats.misses)) * 100 : 0;
 
     return {
       ...this.stats,
@@ -337,7 +334,7 @@ export class BunSQLiteCache {
    * Get detailed cache analytics
    */
   getAnalytics(): {
-    topKeys: Array<{key: string; hits: number; lastAccessed: number}>;
+    topKeys: Array<{ key: string; hits: number; lastAccessed: number }>;
     expirationDistribution: {
       expiredCount: number;
       expiringIn1Min: number;
@@ -354,7 +351,7 @@ export class BunSQLiteCache {
       return {
         topKeys: [],
         expirationDistribution: { expiredCount: 0, expiringIn1Min: 0, expiringIn5Min: 0, expiringIn1Hour: 0 },
-        memoryDistribution: { smallEntries: 0, mediumEntries: 0, largeEntries: 0 }
+        memoryDistribution: { smallEntries: 0, mediumEntries: 0, largeEntries: 0 },
       };
     }
 
@@ -362,37 +359,46 @@ export class BunSQLiteCache {
       const now = Date.now();
 
       // Top keys by hit count
-      const topKeys = this.db.prepare(`
+      const topKeys = this.db
+        .prepare(`
         SELECT key, hit_count as hits, last_accessed as lastAccessed 
         FROM cache 
         WHERE expires_at > ? 
         ORDER BY hit_count DESC 
         LIMIT 10
-      `).all(now) as Array<{key: string; hits: number; lastAccessed: number}>;
+      `)
+        .all(now) as Array<{ key: string; hits: number; lastAccessed: number }>;
 
       // Expiration distribution
-      const expStats = this.db.prepare(`
+      const expStats = this.db
+        .prepare(`
         SELECT 
           COUNT(CASE WHEN expires_at <= ? THEN 1 END) as expired,
           COUNT(CASE WHEN expires_at > ? AND expires_at <= ? THEN 1 END) as expiring_1min,
           COUNT(CASE WHEN expires_at > ? AND expires_at <= ? THEN 1 END) as expiring_5min,
           COUNT(CASE WHEN expires_at > ? AND expires_at <= ? THEN 1 END) as expiring_1hour
         FROM cache
-      `).get(
-        now, // expired
-        now, now + 60000, // expiring in 1 min
-        now + 60000, now + 300000, // expiring in 5 min
-        now + 300000, now + 3600000 // expiring in 1 hour
-      ) as any;
+      `)
+        .get(
+          now, // expired
+          now,
+          now + 60000, // expiring in 1 min
+          now + 60000,
+          now + 300000, // expiring in 5 min
+          now + 300000,
+          now + 3600000 // expiring in 1 hour
+        ) as any;
 
       // Memory distribution
-      const memStats = this.db.prepare(`
+      const memStats = this.db
+        .prepare(`
         SELECT 
           COUNT(CASE WHEN size < 1024 THEN 1 END) as small,
           COUNT(CASE WHEN size >= 1024 AND size < 10240 THEN 1 END) as medium,
           COUNT(CASE WHEN size >= 10240 THEN 1 END) as large
         FROM cache
-      `).get() as any;
+      `)
+        .get() as any;
 
       return {
         topKeys,
@@ -406,14 +412,14 @@ export class BunSQLiteCache {
           smallEntries: memStats.small || 0,
           mediumEntries: memStats.medium || 0,
           largeEntries: memStats.large || 0,
-        }
+        },
       };
     } catch (error) {
       err("SQLite cache analytics error:", error);
       return {
         topKeys: [],
         expirationDistribution: { expiredCount: 0, expiringIn1Min: 0, expiringIn5Min: 0, expiringIn1Hour: 0 },
-        memoryDistribution: { smallEntries: 0, mediumEntries: 0, largeEntries: 0 }
+        memoryDistribution: { smallEntries: 0, mediumEntries: 0, largeEntries: 0 },
       };
     }
   }
@@ -423,13 +429,13 @@ export class BunSQLiteCache {
    */
   private serializeValue<T>(value: T): string {
     const jsonString = JSON.stringify(value);
-    
+
     // TODO: Implement compression for large values
     if (jsonString.length > this.config.compressionThreshold) {
       // Future: Add compression here
       // return compress(jsonString);
     }
-    
+
     return jsonString;
   }
 
@@ -441,7 +447,7 @@ export class BunSQLiteCache {
     // if (isCompressed(value)) {
     //   value = decompress(value);
     // }
-    
+
     return JSON.parse(value);
   }
 
@@ -482,7 +488,7 @@ export class BunSQLiteCache {
     try {
       // Remove expired entries first
       const expiredCount = this.db.prepare("DELETE FROM cache WHERE expires_at <= ?").run(Date.now()).changes;
-      
+
       if (expiredCount > 0) {
         this.stats.evictions += expiredCount;
         log("SQLite cache expired eviction", { expired: expiredCount });
@@ -491,7 +497,7 @@ export class BunSQLiteCache {
       // Check if we still need space
       const currentStats = this.getCurrentDBStats();
       const maxMemoryBytes = this.config.maxMemoryMB * 1024 * 1024;
-      
+
       if (currentStats.totalSize + requiredSpace <= maxMemoryBytes) {
         return;
       }
@@ -499,17 +505,19 @@ export class BunSQLiteCache {
       // Evict LRU entries until we have enough space
       let freedSpace = 0;
       let evicted = 0;
-      const targetSpace = requiredSpace + (maxMemoryBytes * 0.1); // 10% buffer
+      const targetSpace = requiredSpace + maxMemoryBytes * 0.1; // 10% buffer
 
-      const lruEntries = this.db.prepare(`
+      const lruEntries = this.db
+        .prepare(`
         SELECT key, size FROM cache 
         ORDER BY last_accessed ASC, hit_count ASC
         LIMIT 100
-      `).all() as Array<{key: string; size: number}>;
+      `)
+        .all() as Array<{ key: string; size: number }>;
 
       for (const entry of lruEntries) {
         if (freedSpace >= targetSpace) break;
-        
+
         const result = this.deleteStmt?.run(entry.key);
         if (result?.changes > 0) {
           freedSpace += entry.size;
@@ -531,11 +539,13 @@ export class BunSQLiteCache {
     if (!this.db) return;
 
     try {
-      const lruKeys = this.db.prepare(`
+      const lruKeys = this.db
+        .prepare(`
         SELECT key FROM cache 
         ORDER BY last_accessed ASC, hit_count ASC 
         LIMIT ?
-      `).all(count) as Array<{key: string}>;
+      `)
+        .all(count) as Array<{ key: string }>;
 
       let evicted = 0;
       for (const row of lruKeys) {
@@ -643,11 +653,7 @@ export const bunSQLiteCache = new BunSQLiteCache();
 /**
  * Helper function to cache database operations with SQLite
  */
-export async function withSQLiteCache<T>(
-  key: string,
-  fetcher: () => Promise<T>,
-  ttlMs?: number
-): Promise<T> {
+export async function withSQLiteCache<T>(key: string, fetcher: () => Promise<T>, ttlMs?: number): Promise<T> {
   return bunSQLiteCache.getOrSet(key, fetcher, ttlMs);
 }
 
@@ -655,26 +661,20 @@ export async function withSQLiteCache<T>(
  * Enhanced cache keys for SQLite cache
  */
 export const SQLiteCacheKeys = {
-  looks: (brand: string, season: string, division: string) =>
-    `looks:${brand}:${season}:${division}`,
-  
-  lookDetails: (lookId: string) =>
-    `lookDetails:${lookId}`,
-  
+  looks: (brand: string, season: string, division: string) => `looks:${brand}:${season}:${division}`,
+
+  lookDetails: (lookId: string) => `lookDetails:${lookId}`,
+
   options: (lookId: string, filters?: Record<string, any>) => {
-    const filterStr = filters ? `:${JSON.stringify(filters, Object.keys(filters).sort())}` : '';
+    const filterStr = filters ? `:${JSON.stringify(filters, Object.keys(filters).sort())}` : "";
     return `options:${lookId}${filterStr}`;
   },
-  
-  optionsSummary: (brand: string, season: string, division: string) =>
-    `optionsSummary:${brand}:${season}:${division}`,
-    
-  assignments: (userId: string, status?: string) =>
-    `assignments:${userId}${status ? `:${status}` : ''}`,
 
-  documentSearch: (collection: string, term: string, limit: number) =>
-    `documentSearch:${collection}:${term}:${limit}`,
+  optionsSummary: (brand: string, season: string, division: string) => `optionsSummary:${brand}:${season}:${division}`,
 
-  healthCheck: (component: string) =>
-    `health:${component}`,
+  assignments: (userId: string, status?: string) => `assignments:${userId}${status ? `:${status}` : ""}`,
+
+  documentSearch: (collection: string, term: string, limit: number) => `documentSearch:${collection}:${term}:${limit}`,
+
+  healthCheck: (component: string) => `health:${component}`,
 };

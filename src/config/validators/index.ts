@@ -5,9 +5,8 @@ import type { Config } from "../base";
 // Cross-domain validation rules
 export function validateCrossConfiguration(config: Config): string[] {
   const warnings: string[] = [];
-  const isProduction = 
-    config.runtime.NODE_ENV === "production" || 
-    config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+  const isProduction =
+    config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   // RUNTIME SAFETY VALIDATIONS (All Environments)
 
@@ -159,7 +158,7 @@ export function generateConfigHealthReport(config: Config): string {
     config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   let report = "\n=== CONFIGURATION HEALTH REPORT ===\n";
-  
+
   // Overall status
   if (health.healthy) {
     report += "✅ Overall Status: HEALTHY\n";

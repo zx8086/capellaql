@@ -1,6 +1,6 @@
 /* src/lib/metricsCardinalityManager.ts */
 
-import { log, error as err } from '../telemetry/logger';
+import { error as err, log } from "../telemetry/logger";
 
 export interface CardinalityLimit {
   metricName: string;
@@ -35,56 +35,56 @@ class MetricsCardinalityManager {
   private setDefaultLimits(): void {
     const defaultLimits: CardinalityLimit[] = [
       {
-        metricName: 'graphql_resolver_duration_ms',
+        metricName: "graphql_resolver_duration_ms",
         maxCardinality: 500,
         enabled: true,
-        labelKeys: ['operation', 'field', 'status']
+        labelKeys: ["operation", "field", "status"],
       },
       {
-        metricName: 'graphql_resolver_calls_total',
+        metricName: "graphql_resolver_calls_total",
         maxCardinality: 500,
         enabled: true,
-        labelKeys: ['operation', 'field']
+        labelKeys: ["operation", "field"],
       },
       {
-        metricName: 'graphql_resolver_errors_total',
+        metricName: "graphql_resolver_errors_total",
         maxCardinality: 300,
         enabled: true,
-        labelKeys: ['operation', 'field', 'error']
+        labelKeys: ["operation", "field", "error"],
       },
       {
-        metricName: 'database_operation_duration_ms',
+        metricName: "database_operation_duration_ms",
         maxCardinality: 200,
         enabled: true,
-        labelKeys: ['operation', 'status']
+        labelKeys: ["operation", "status"],
       },
       {
-        metricName: 'http_requests_total',
+        metricName: "http_requests_total",
         maxCardinality: 1000,
         enabled: true,
-        labelKeys: ['method', 'route', 'status_code']
+        labelKeys: ["method", "route", "status_code"],
       },
       {
-        metricName: 'capellaql_performance_metrics',
+        metricName: "capellaql_performance_metrics",
         maxCardinality: 100,
         enabled: true,
-        labelKeys: ['component', 'status']
-      }
+        labelKeys: ["component", "status"],
+      },
     ];
 
-    defaultLimits.forEach(limit => {
+    defaultLimits.forEach((limit) => {
       this.limits.set(limit.metricName, limit);
       this.stats.set(limit.metricName, {
         metricName: limit.metricName,
         currentCardinality: 0,
         maxCardinality: limit.maxCardinality,
         droppedLabels: 0,
-        violationsCount: 0
+        violationsCount: 0,
       });
     });
 
-    log('Metrics cardinality manager initialized with default limits', {
-      metricsCount: defaultLimits.length
+    log("Metrics cardinality manager initialized with default limits", {
+      metricsCount: defaultLimits.length,
     });
   }
 
@@ -98,7 +98,7 @@ class MetricsCardinalityManager {
       maxCardinality: limit.maxCardinality ?? 1000,
       enabled: limit.enabled ?? true,
       labelKeys: limit.labelKeys ?? undefined,
-      ...existingLimit
+      ...existingLimit,
     };
 
     this.limits.set(metricName, newLimit);
@@ -109,7 +109,7 @@ class MetricsCardinalityManager {
         currentCardinality: 0,
         maxCardinality: newLimit.maxCardinality,
         droppedLabels: 0,
-        violationsCount: 0
+        violationsCount: 0,
       });
     }
 
@@ -119,7 +119,10 @@ class MetricsCardinalityManager {
   /**
    * Check if a metric with given labels should be allowed
    */
-  checkCardinality(metricName: string, labels: Record<string, string>): {
+  checkCardinality(
+    metricName: string,
+    labels: Record<string, string>
+  ): {
     allowed: boolean;
     reason?: string;
     sanitizedLabels?: Record<string, string>;
@@ -148,9 +151,9 @@ class MetricsCardinalityManager {
 
     // Check if this label combination already exists
     if (metricLabelSet.has(labelKey)) {
-      return { 
-        allowed: true, 
-        sanitizedLabels 
+      return {
+        allowed: true,
+        sanitizedLabels,
       };
     }
 
@@ -161,19 +164,20 @@ class MetricsCardinalityManager {
       stats.lastViolation = new Date();
 
       // Log cardinality violation
-      if (stats.violationsCount % 100 === 1) { // Log every 100th violation to avoid spam
+      if (stats.violationsCount % 100 === 1) {
+        // Log every 100th violation to avoid spam
         err(`Cardinality limit exceeded for metric: ${metricName}`, {
           currentCardinality: metricLabelSet.size,
           maxCardinality: limit.maxCardinality,
           droppedLabels: stats.droppedLabels,
-          attemptedLabels: sanitizedLabels
+          attemptedLabels: sanitizedLabels,
         });
       }
 
       return {
         allowed: false,
         reason: `Cardinality limit (${limit.maxCardinality}) exceeded for metric ${metricName}`,
-        sanitizedLabels: this.getFallbackLabels(metricName)
+        sanitizedLabels: this.getFallbackLabels(metricName),
       };
     }
 
@@ -181,25 +185,22 @@ class MetricsCardinalityManager {
     metricLabelSet.add(labelKey);
     stats.currentCardinality = metricLabelSet.size;
 
-    return { 
-      allowed: true, 
-      sanitizedLabels 
+    return {
+      allowed: true,
+      sanitizedLabels,
     };
   }
 
   /**
    * Get relevant labels based on configured label keys
    */
-  private getRelevantLabels(
-    labels: Record<string, string>, 
-    labelKeys?: string[]
-  ): Record<string, string> {
+  private getRelevantLabels(labels: Record<string, string>, labelKeys?: string[]): Record<string, string> {
     if (!labelKeys) {
       return labels;
     }
 
     const relevantLabels: Record<string, string> = {};
-    labelKeys.forEach(key => {
+    labelKeys.forEach((key) => {
       if (labels[key] !== undefined) {
         relevantLabels[key] = labels[key];
       }
@@ -213,31 +214,31 @@ class MetricsCardinalityManager {
    */
   private sanitizeLabels(labels: Record<string, string>): Record<string, string> {
     const sanitized: Record<string, string> = {};
-    
+
     for (const [key, value] of Object.entries(labels)) {
       let sanitizedValue = value;
 
       // Truncate very long values
       if (sanitizedValue.length > 100) {
-        sanitizedValue = sanitizedValue.substring(0, 100) + '...';
+        sanitizedValue = sanitizedValue.substring(0, 100) + "...";
       }
 
       // Replace problematic characters
-      sanitizedValue = sanitizedValue.replace(/[^\w\-_.:\/]/g, '_');
+      sanitizedValue = sanitizedValue.replace(/[^\w\-_.:/]/g, "_");
 
       // Handle common high-cardinality patterns
-      if (key === 'user_id' || key === 'request_id' || key === 'trace_id') {
+      if (key === "user_id" || key === "request_id" || key === "trace_id") {
         // For ID fields, keep only first few characters or hash
         sanitizedValue = this.hashHighCardinalityValue(sanitizedValue);
       }
 
       // Handle URLs
-      if (key === 'url' || key === 'path') {
+      if (key === "url" || key === "path") {
         sanitizedValue = this.sanitizeUrlPath(sanitizedValue);
       }
 
       // Handle IP addresses
-      if (key === 'client_ip' || key === 'remote_addr') {
+      if (key === "client_ip" || key === "remote_addr") {
         sanitizedValue = this.sanitizeIpAddress(sanitizedValue);
       }
 
@@ -255,7 +256,7 @@ class MetricsCardinalityManager {
     let hash = 0;
     for (let i = 0; i < value.length; i++) {
       const char = value.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
+      hash = (hash << 5) - hash + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
     return `hashed_${Math.abs(hash).toString(16).substring(0, 8)}`;
@@ -267,11 +268,11 @@ class MetricsCardinalityManager {
   private sanitizeUrlPath(path: string): string {
     // Replace dynamic segments with placeholders
     return path
-      .replace(/\/\d+/g, '/:id')                    // /123 -> /:id
-      .replace(/\/[a-f0-9-]{8,}/g, '/:uuid')        // UUIDs -> :uuid
-      .replace(/\/\w{20,}/g, '/:token')             // Long tokens -> :token
-      .replace(/\?.*$/, '')                         // Remove query params
-      .substring(0, 100);                           // Limit length
+      .replace(/\/\d+/g, "/:id") // /123 -> /:id
+      .replace(/\/[a-f0-9-]{8,}/g, "/:uuid") // UUIDs -> :uuid
+      .replace(/\/\w{20,}/g, "/:token") // Long tokens -> :token
+      .replace(/\?.*$/, "") // Remove query params
+      .substring(0, 100); // Limit length
   }
 
   /**
@@ -280,11 +281,11 @@ class MetricsCardinalityManager {
   private sanitizeIpAddress(ip: string): string {
     // Mask last octet of IPv4 addresses
     if (/^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
-      return ip.replace(/\.\d+$/, '.0');
+      return ip.replace(/\.\d+$/, ".0");
     }
-    
+
     // For IPv6 or other formats, return generic placeholder
-    return 'masked_ip';
+    return "masked_ip";
   }
 
   /**
@@ -292,7 +293,7 @@ class MetricsCardinalityManager {
    */
   private createLabelKey(labels: Record<string, string>): string {
     const sortedKeys = Object.keys(labels).sort();
-    return sortedKeys.map(key => `${key}=${labels[key]}`).join('|');
+    return sortedKeys.map((key) => `${key}=${labels[key]}`).join("|");
   }
 
   /**
@@ -301,9 +302,9 @@ class MetricsCardinalityManager {
   private getFallbackLabels(metricName: string): Record<string, string> {
     // Provide generic fallback labels to prevent data loss
     return {
-      status: 'cardinality_limited',
+      status: "cardinality_limited",
       metric: metricName,
-      reason: 'high_cardinality'
+      reason: "high_cardinality",
     };
   }
 
@@ -329,7 +330,7 @@ class MetricsCardinalityManager {
       }
     } else {
       this.metricLabels.clear();
-      this.stats.forEach(stats => {
+      this.stats.forEach((stats) => {
         stats.currentCardinality = 0;
         stats.droppedLabels = 0;
         stats.violationsCount = 0;
@@ -337,7 +338,7 @@ class MetricsCardinalityManager {
       });
     }
 
-    log(`Cardinality tracking reset${metricName ? ` for ${metricName}` : ' for all metrics'}`);
+    log(`Cardinality tracking reset${metricName ? ` for ${metricName}` : " for all metrics"}`);
   }
 
   /**
@@ -345,7 +346,7 @@ class MetricsCardinalityManager {
    */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
-    log(`Metrics cardinality management ${enabled ? 'enabled' : 'disabled'}`);
+    log(`Metrics cardinality management ${enabled ? "enabled" : "disabled"}`);
   }
 
   /**
@@ -361,7 +362,7 @@ class MetricsCardinalityManager {
       enabled: this.enabled,
       limitsCount: this.limits.size,
       totalMetrics: this.metricLabels.size,
-      limits: Array.from(this.limits.values())
+      limits: Array.from(this.limits.values()),
     };
   }
 
@@ -370,26 +371,26 @@ class MetricsCardinalityManager {
    */
   performMaintenance(): void {
     let totalCardinality = 0;
-    let cleanedMetrics = 0;
+    const cleanedMetrics = 0;
 
     this.metricLabels.forEach((labelSet, metricName) => {
       totalCardinality += labelSet.size;
-      
+
       // If a metric has grown very large, log a warning
       const limit = this.limits.get(metricName);
       if (limit && labelSet.size > limit.maxCardinality * 0.8) {
         log(`High cardinality warning for metric: ${metricName}`, {
           current: labelSet.size,
           limit: limit.maxCardinality,
-          usage: `${Math.round((labelSet.size / limit.maxCardinality) * 100)}%`
+          usage: `${Math.round((labelSet.size / limit.maxCardinality) * 100)}%`,
         });
       }
     });
 
-    log('Cardinality maintenance completed', {
+    log("Cardinality maintenance completed", {
       totalMetrics: this.metricLabels.size,
       totalCardinality,
-      cleanedMetrics
+      cleanedMetrics,
     });
   }
 }
@@ -405,6 +406,6 @@ export function withCardinalityCheck<T extends Record<string, string>>(
   const result = metricsCardinalityManager.checkCardinality(metricName, labels);
   return {
     allowed: result.allowed,
-    labels: (result.sanitizedLabels as T) || labels
+    labels: (result.sanitizedLabels as T) || labels,
   };
 }

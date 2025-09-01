@@ -1,6 +1,6 @@
 /* tests/e2e/server.test.ts - End-to-End Server Tests */
 
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
 describe("CapellaQL Server E2E Tests", () => {
   const TEST_PORT = 4001; // Use different port for testing
@@ -12,7 +12,7 @@ describe("CapellaQL Server E2E Tests", () => {
     process.env.NODE_ENV = "test";
     process.env.PORT = TEST_PORT.toString();
     process.env.ENABLE_OPENTELEMETRY = "false"; // Disable for tests
-    
+
     // Start server for testing
     const { default: app } = await import("../../src/index");
     // Note: In a real implementation, you'd need to modify index.ts to export the app
@@ -28,10 +28,10 @@ describe("CapellaQL Server E2E Tests", () => {
   describe("Health Endpoints", () => {
     test("GET /health should return healthy status", async () => {
       const response = await fetch(`${BASE_URL}/health`);
-      
+
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("application/json");
-      
+
       const data = await response.json();
       expect(data.status).toBe("healthy");
       expect(data.timestamp).toBeDefined();
@@ -40,9 +40,9 @@ describe("CapellaQL Server E2E Tests", () => {
 
     test("GET /health/telemetry should return telemetry status", async () => {
       const response = await fetch(`${BASE_URL}/health/telemetry`);
-      
+
       expect(response.status).toBe(200);
-      
+
       const data = await response.json();
       expect(data.status).toBeDefined();
       expect(data.timestamp).toBeDefined();
@@ -52,7 +52,7 @@ describe("CapellaQL Server E2E Tests", () => {
       const start = Date.now();
       const response = await fetch(`${BASE_URL}/health`);
       const duration = Date.now() - start;
-      
+
       expect(response.status).toBe(200);
       expect(duration).toBeLessThan(1000);
     });
@@ -80,7 +80,7 @@ describe("CapellaQL Server E2E Tests", () => {
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("application/json");
-      
+
       const data = await response.json();
       expect(data.data).toBeDefined();
       expect(data.data.health).toBeDefined();
@@ -107,7 +107,7 @@ describe("CapellaQL Server E2E Tests", () => {
       });
 
       expect(response.status).toBe(200);
-      
+
       const data = await response.json();
       expect(data.data).toBeDefined();
       expect(data.data.__schema).toBeDefined();
@@ -157,7 +157,7 @@ describe("CapellaQL Server E2E Tests", () => {
       });
 
       expect(response.status).toBe(400);
-      
+
       const data = await response.json();
       expect(data.errors).toBeDefined();
       expect(data.errors[0].message).toContain("exceeds maximum operation depth");
@@ -182,7 +182,7 @@ describe("CapellaQL Server E2E Tests", () => {
       });
 
       expect(response.status).toBe(400);
-      
+
       const data = await response.json();
       expect(data.errors).toBeDefined();
       expect(data.errors[0].message).toContain("Query too large");
@@ -192,13 +192,13 @@ describe("CapellaQL Server E2E Tests", () => {
       const response = await fetch(`${BASE_URL}/graphql`, {
         method: "GET",
         headers: {
-          "Accept": "text/html",
+          Accept: "text/html",
         },
       });
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-type")).toContain("text/html");
-      
+
       const html = await response.text();
       expect(html).toContain("GraphQL"); // Should contain GraphQL playground
     });
@@ -209,7 +209,7 @@ describe("CapellaQL Server E2E Tests", () => {
       const response = await fetch(`${BASE_URL}/graphql`, {
         method: "OPTIONS",
         headers: {
-          "Origin": "http://localhost:3000",
+          Origin: "http://localhost:3000",
           "Access-Control-Request-Method": "POST",
           "Access-Control-Request-Headers": "Content-Type",
         },
@@ -223,7 +223,7 @@ describe("CapellaQL Server E2E Tests", () => {
 
     test("All responses should include CORS headers", async () => {
       const response = await fetch(`${BASE_URL}/health`);
-      
+
       expect(response.status).toBe(200);
       expect(response.headers.get("Access-Control-Allow-Origin")).toBe("*");
     });
@@ -232,7 +232,7 @@ describe("CapellaQL Server E2E Tests", () => {
   describe("Security Headers", () => {
     test("All responses should include security headers", async () => {
       const response = await fetch(`${BASE_URL}/health`);
-      
+
       expect(response.status).toBe(200);
       expect(response.headers.get("X-XSS-Protection")).toBe("1; mode=block");
       expect(response.headers.get("X-Frame-Options")).toBe("SAMEORIGIN");
@@ -243,7 +243,7 @@ describe("CapellaQL Server E2E Tests", () => {
 
     test("All responses should include request ID header", async () => {
       const response = await fetch(`${BASE_URL}/health`);
-      
+
       expect(response.status).toBe(200);
       expect(response.headers.get("X-Request-ID")).toBeDefined();
       expect(response.headers.get("X-Request-ID")).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/); // ULID format
@@ -252,31 +252,35 @@ describe("CapellaQL Server E2E Tests", () => {
 
   describe("Rate Limiting", () => {
     test("Should allow normal request volume", async () => {
-      const requests = Array(10).fill(null).map(() => 
-        fetch(`${BASE_URL}/health`)
-      );
+      const requests = Array(10)
+        .fill(null)
+        .map(() => fetch(`${BASE_URL}/health`));
 
       const responses = await Promise.all(requests);
-      
-      responses.forEach(response => {
+
+      responses.forEach((response) => {
         expect(response.status).toBe(200);
       });
     });
 
-    test("Should rate limit excessive requests", async () => {
-      // This test would require sending 500+ requests rapidly
-      // Skipping actual implementation to avoid test suite slowdown
-      // In a real test, you'd send many requests and expect 429 status
-      
-      const response = await fetch(`${BASE_URL}/health`);
-      expect(response.status).toBe(200);
-    }, { timeout: 30000 });
+    test(
+      "Should rate limit excessive requests",
+      async () => {
+        // This test would require sending 500+ requests rapidly
+        // Skipping actual implementation to avoid test suite slowdown
+        // In a real test, you'd send many requests and expect 429 status
+
+        const response = await fetch(`${BASE_URL}/health`);
+        expect(response.status).toBe(200);
+      },
+      { timeout: 30000 }
+    );
   });
 
   describe("Error Handling", () => {
     test("Unknown endpoints should return 404", async () => {
       const response = await fetch(`${BASE_URL}/unknown-endpoint`);
-      
+
       expect(response.status).toBe(404);
     });
 
@@ -302,7 +306,7 @@ describe("CapellaQL Server E2E Tests", () => {
       });
 
       expect(response.status).toBe(400);
-      
+
       const data = await response.json();
       expect(data.errors).toBeDefined();
     });
@@ -311,17 +315,19 @@ describe("CapellaQL Server E2E Tests", () => {
   describe("Performance", () => {
     test("Health endpoint should respond quickly under load", async () => {
       const concurrentRequests = 20;
-      const requests = Array(concurrentRequests).fill(null).map(async () => {
-        const start = Date.now();
-        const response = await fetch(`${BASE_URL}/health`);
-        const duration = Date.now() - start;
-        
-        return { status: response.status, duration };
-      });
+      const requests = Array(concurrentRequests)
+        .fill(null)
+        .map(async () => {
+          const start = Date.now();
+          const response = await fetch(`${BASE_URL}/health`);
+          const duration = Date.now() - start;
+
+          return { status: response.status, duration };
+        });
 
       const results = await Promise.all(requests);
-      
-      results.forEach(result => {
+
+      results.forEach((result) => {
         expect(result.status).toBe(200);
         expect(result.duration).toBeLessThan(5000); // 5 seconds max under load
       });

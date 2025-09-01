@@ -4,45 +4,44 @@ import type { Config } from "./base";
 import { ConfigurationError } from "./base";
 
 // Import domain modules
-import { 
-  ApplicationConfigSchema, 
-  loadApplicationConfigFromEnv, 
+import {
+  ApplicationConfigSchema,
   applicationDefaults,
+  getApplicationEnvVarPath,
+  loadApplicationConfigFromEnv,
   validateApplicationConfig,
-  getApplicationEnvVarPath
 } from "./modules/application";
-import { 
-  CouchbaseConfigSchema, 
-  loadCouchbaseConfigFromEnv, 
+import {
+  CouchbaseConfigSchema,
   couchbaseDefaults,
+  getCouchbaseEnvVarPath,
+  loadCouchbaseConfigFromEnv,
   validateCouchbaseConfig,
-  getCouchbaseEnvVarPath
 } from "./modules/couchbase";
-import { 
-  TelemetryConfigSchema, 
-  loadTelemetryConfigFromEnv, 
-  telemetryDefaults,
-  validateTelemetryConfig,
-  getTelemetryEnvVarPath
-} from "./modules/telemetry";
-import { 
-  RuntimeConfigSchema, 
-  loadRuntimeConfigFromEnv, 
+import {
+  DeploymentConfigSchema,
+  deploymentDefaults,
+  getDeploymentEnvVarPath,
+  loadDeploymentConfigFromEnv,
+  validateDeploymentConfig,
+} from "./modules/deployment";
+import {
+  getRuntimeEnvVarPath,
+  loadRuntimeConfigFromEnv,
+  RuntimeConfigSchema,
   runtimeDefaults,
   validateRuntimeConfig,
-  getRuntimeEnvVarPath
 } from "./modules/runtime";
-import { 
-  DeploymentConfigSchema, 
-  loadDeploymentConfigFromEnv, 
-  deploymentDefaults,
-  validateDeploymentConfig,
-  getDeploymentEnvVarPath
-} from "./modules/deployment";
-
-// Import validators and utilities
-import { validateCrossConfiguration, validateConfigHealth, generateConfigHealthReport } from "./validators";
+import {
+  getTelemetryEnvVarPath,
+  loadTelemetryConfigFromEnv,
+  TelemetryConfigSchema,
+  telemetryDefaults,
+  validateTelemetryConfig,
+} from "./modules/telemetry";
 import { sanitizeConfigForLogging } from "./utils/sanitizer";
+// Import validators and utilities
+import { generateConfigHealthReport, validateConfigHealth, validateCrossConfiguration } from "./validators";
 
 // Unified configuration schema - composed from domain modules
 const ConfigSchema = z
@@ -158,8 +157,8 @@ try {
 
   if (!result.success) {
     const configError = new ModularConfigurationError(
-      "Modular configuration validation failed", 
-      result.error, 
+      "Modular configuration validation failed",
+      result.error,
       mergedConfig
     );
 
@@ -186,9 +185,8 @@ try {
   config = result.data;
 
   // Perform domain-specific validations
-  const isProduction = 
-    config.runtime.NODE_ENV === "production" || 
-    config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+  const isProduction =
+    config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   const allWarnings: string[] = [
     ...validateApplicationConfig(config.application, isProduction),
@@ -325,15 +323,15 @@ export function loadTelemetryConfigFromEnv() {
 
 /**
  * MODULAR CONFIGURATION EXPORTS
- * 
+ *
  * Export domain modules for advanced usage and testing
  */
-export { 
+export {
   loadApplicationConfigFromEnv,
-  loadCouchbaseConfigFromEnv, 
+  loadCouchbaseConfigFromEnv,
   loadTelemetryConfigFromEnv,
   loadRuntimeConfigFromEnv,
-  loadDeploymentConfigFromEnv 
+  loadDeploymentConfigFromEnv,
 };
 
 export { sanitizeConfigForLogging };

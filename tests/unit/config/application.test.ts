@@ -1,10 +1,10 @@
 // Unit tests for application configuration module
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
-import { 
-  ApplicationConfigSchema, 
-  loadApplicationConfigFromEnv, 
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import {
+  ApplicationConfigSchema,
   applicationDefaults,
-  validateApplicationConfig 
+  loadApplicationConfigFromEnv,
+  validateApplicationConfig,
 } from "../../../src/config/modules/application";
 
 describe("Application Configuration", () => {
@@ -24,13 +24,10 @@ describe("Application Configuration", () => {
     test("validates valid configuration", () => {
       const validConfig = {
         LOG_LEVEL: "info",
-        LOG_MAX_SIZE: "20m",
-        LOG_MAX_FILES: "14d",
         YOGA_RESPONSE_CACHE_TTL: 900000,
         PORT: 4000,
-        ENABLE_FILE_LOGGING: false,
         ALLOWED_ORIGINS: ["http://localhost:3000"],
-        BASE_URL: "http://localhost"
+        BASE_URL: "http://localhost",
       };
 
       const result = ApplicationConfigSchema.safeParse(validConfig);
@@ -40,7 +37,7 @@ describe("Application Configuration", () => {
     test("validates log level enum", () => {
       const invalidLogLevel = {
         ...applicationDefaults,
-        LOG_LEVEL: "invalid"
+        LOG_LEVEL: "invalid",
       };
 
       const result = ApplicationConfigSchema.safeParse(invalidLogLevel);
@@ -50,7 +47,7 @@ describe("Application Configuration", () => {
     test("validates port range", () => {
       const invalidPort = {
         ...applicationDefaults,
-        PORT: 70000 // Above valid range
+        PORT: 70000, // Above valid range
       };
 
       const result = ApplicationConfigSchema.safeParse(invalidPort);
@@ -60,7 +57,7 @@ describe("Application Configuration", () => {
     test("validates URL format for BASE_URL", () => {
       const invalidUrl = {
         ...applicationDefaults,
-        BASE_URL: "not-a-url"
+        BASE_URL: "not-a-url",
       };
 
       const result = ApplicationConfigSchema.safeParse(invalidUrl);
@@ -70,7 +67,7 @@ describe("Application Configuration", () => {
     test("validates ALLOWED_ORIGINS as URL array", () => {
       const invalidOrigins = {
         ...applicationDefaults,
-        ALLOWED_ORIGINS: ["not-a-url", "http://valid.com"]
+        ALLOWED_ORIGINS: ["not-a-url", "http://valid.com"],
       };
 
       const result = ApplicationConfigSchema.safeParse(invalidOrigins);
@@ -83,38 +80,32 @@ describe("Application Configuration", () => {
       // Clear relevant environment variables
       delete process.env.LOG_LEVEL;
       delete process.env.PORT;
-      delete process.env.ENABLE_FILE_LOGGING;
 
       const config = loadApplicationConfigFromEnv();
 
       expect(config.LOG_LEVEL).toBe(applicationDefaults.LOG_LEVEL);
       expect(config.PORT).toBe(applicationDefaults.PORT);
-      expect(config.ENABLE_FILE_LOGGING).toBe(applicationDefaults.ENABLE_FILE_LOGGING);
     });
 
     test("loads values from environment variables", () => {
       process.env.LOG_LEVEL = "debug";
       process.env.PORT = "8080";
-      process.env.ENABLE_FILE_LOGGING = "true";
       process.env.ALLOWED_ORIGINS = "http://example.com,https://api.example.com";
 
       const config = loadApplicationConfigFromEnv();
 
       expect(config.LOG_LEVEL).toBe("debug");
       expect(config.PORT).toBe(8080);
-      expect(config.ENABLE_FILE_LOGGING).toBe(true);
       expect(config.ALLOWED_ORIGINS).toEqual(["http://example.com", "https://api.example.com"]);
     });
 
     test("handles malformed environment variables gracefully", () => {
       process.env.PORT = "not-a-number";
-      process.env.ENABLE_FILE_LOGGING = "maybe";
 
       const config = loadApplicationConfigFromEnv();
 
       // Should fall back to defaults
       expect(config.PORT).toBe(applicationDefaults.PORT);
-      expect(config.ENABLE_FILE_LOGGING).toBe(applicationDefaults.ENABLE_FILE_LOGGING);
     });
   });
 
@@ -122,7 +113,7 @@ describe("Application Configuration", () => {
     test("detects NaN cache TTL", () => {
       const configWithNaN = {
         ...applicationDefaults,
-        YOGA_RESPONSE_CACHE_TTL: NaN
+        YOGA_RESPONSE_CACHE_TTL: NaN,
       };
 
       const warnings = validateApplicationConfig(configWithNaN, false);
@@ -132,17 +123,17 @@ describe("Application Configuration", () => {
     test("detects unreasonable cache TTL values", () => {
       const configWithBadTTL = {
         ...applicationDefaults,
-        YOGA_RESPONSE_CACHE_TTL: 0 // Too low
+        YOGA_RESPONSE_CACHE_TTL: 0, // Too low
       };
 
       const warnings = validateApplicationConfig(configWithBadTTL, false);
-      expect(warnings.some(w => w.includes("unreasonable"))).toBe(true);
+      expect(warnings.some((w) => w.includes("unreasonable"))).toBe(true);
     });
 
     test("validates production CORS origins", () => {
       const productionConfig = {
         ...applicationDefaults,
-        ALLOWED_ORIGINS: ["http://localhost:3000", "*"]
+        ALLOWED_ORIGINS: ["http://localhost:3000", "*"],
       };
 
       const warnings = validateApplicationConfig(productionConfig, true);
@@ -152,7 +143,7 @@ describe("Application Configuration", () => {
     test("allows localhost origins in development", () => {
       const devConfig = {
         ...applicationDefaults,
-        ALLOWED_ORIGINS: ["http://localhost:3000"]
+        ALLOWED_ORIGINS: ["http://localhost:3000"],
       };
 
       const warnings = validateApplicationConfig(devConfig, false);
@@ -162,15 +153,15 @@ describe("Application Configuration", () => {
     test("warns about privileged ports in development", () => {
       // Mock console.warn to capture warnings
       const warnSpy = mock(console, "warn");
-      
+
       const configWithPrivilegedPort = {
         ...applicationDefaults,
-        PORT: 80
+        PORT: 80,
       };
 
       validateApplicationConfig(configWithPrivilegedPort, false);
       expect(warnSpy).toHaveBeenCalledWith("Port 80 is a privileged port - ensure proper permissions");
-      
+
       warnSpy.mockRestore();
     });
   });
@@ -178,7 +169,7 @@ describe("Application Configuration", () => {
   describe("Error Path Mapping", () => {
     test("maps configuration paths to environment variables", () => {
       const { getApplicationEnvVarPath } = require("../../../src/config/modules/application");
-      
+
       expect(getApplicationEnvVarPath("application.LOG_LEVEL")).toBe("LOG_LEVEL");
       expect(getApplicationEnvVarPath("application.PORT")).toBe("PORT");
       expect(getApplicationEnvVarPath("application.BASE_URL")).toBe("BASE_URL");

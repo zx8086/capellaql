@@ -1,8 +1,8 @@
 /* src/graphql/resolvers/looks.ts */
 
+import { SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
 import { getCluster } from "$lib/clusterProvider";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
-import { withSQLiteCache, SQLiteCacheKeys } from "$lib/bunSQLiteCache";
 import { debug, error as err, log } from "../../telemetry/logger";
 
 // Cached resolver implementation with SQLite cache
@@ -19,7 +19,7 @@ const looksResolver = async (_: unknown, args: { brand: string; season: string; 
           err("Error in getCluster:", error);
           throw error;
         });
-        
+
         const query = `EXECUTE FUNCTION \`default\`.\`media_assets\`.get_looks($brand, $season, $division)`;
         const queryOptions = {
           parameters: { brand, season, division },

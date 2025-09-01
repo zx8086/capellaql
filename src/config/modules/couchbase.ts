@@ -1,7 +1,7 @@
 // Couchbase configuration module
 import { z } from "zod";
 import type { CapellaConfig } from "../base";
-import { parseEnvVar, getEnvVar } from "../utils/env-parser";
+import { getEnvVar, parseEnvVar } from "../utils/env-parser";
 
 // Environment variable mapping for couchbase section
 export const couchbaseEnvMapping = {
@@ -108,11 +108,8 @@ export function loadCouchbaseConfigFromEnv(): CapellaConfig {
       couchbaseDefaults.COUCHBASE_SCOPE,
 
     COUCHBASE_COLLECTION:
-      (parseEnvVar(
-        getEnvVar(couchbaseEnvMapping.COUCHBASE_COLLECTION),
-        "string",
-        "COUCHBASE_COLLECTION"
-      ) as string) || couchbaseDefaults.COUCHBASE_COLLECTION,
+      (parseEnvVar(getEnvVar(couchbaseEnvMapping.COUCHBASE_COLLECTION), "string", "COUCHBASE_COLLECTION") as string) ||
+      couchbaseDefaults.COUCHBASE_COLLECTION,
 
     // SDK timeout configurations
     COUCHBASE_KV_TIMEOUT:
@@ -120,28 +117,46 @@ export function loadCouchbaseConfigFromEnv(): CapellaConfig {
       couchbaseDefaults.COUCHBASE_KV_TIMEOUT,
 
     COUCHBASE_KV_DURABLE_TIMEOUT:
-      (parseEnvVar(getEnvVar(couchbaseEnvMapping.COUCHBASE_KV_DURABLE_TIMEOUT), "number", "COUCHBASE_KV_DURABLE_TIMEOUT") as number) ||
-      couchbaseDefaults.COUCHBASE_KV_DURABLE_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(couchbaseEnvMapping.COUCHBASE_KV_DURABLE_TIMEOUT),
+        "number",
+        "COUCHBASE_KV_DURABLE_TIMEOUT"
+      ) as number) || couchbaseDefaults.COUCHBASE_KV_DURABLE_TIMEOUT,
 
     COUCHBASE_QUERY_TIMEOUT:
-      (parseEnvVar(getEnvVar(couchbaseEnvMapping.COUCHBASE_QUERY_TIMEOUT), "number", "COUCHBASE_QUERY_TIMEOUT") as number) ||
-      couchbaseDefaults.COUCHBASE_QUERY_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(couchbaseEnvMapping.COUCHBASE_QUERY_TIMEOUT),
+        "number",
+        "COUCHBASE_QUERY_TIMEOUT"
+      ) as number) || couchbaseDefaults.COUCHBASE_QUERY_TIMEOUT,
 
     COUCHBASE_ANALYTICS_TIMEOUT:
-      (parseEnvVar(getEnvVar(couchbaseEnvMapping.COUCHBASE_ANALYTICS_TIMEOUT), "number", "COUCHBASE_ANALYTICS_TIMEOUT") as number) ||
-      couchbaseDefaults.COUCHBASE_ANALYTICS_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(couchbaseEnvMapping.COUCHBASE_ANALYTICS_TIMEOUT),
+        "number",
+        "COUCHBASE_ANALYTICS_TIMEOUT"
+      ) as number) || couchbaseDefaults.COUCHBASE_ANALYTICS_TIMEOUT,
 
     COUCHBASE_SEARCH_TIMEOUT:
-      (parseEnvVar(getEnvVar(couchbaseEnvMapping.COUCHBASE_SEARCH_TIMEOUT), "number", "COUCHBASE_SEARCH_TIMEOUT") as number) ||
-      couchbaseDefaults.COUCHBASE_SEARCH_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(couchbaseEnvMapping.COUCHBASE_SEARCH_TIMEOUT),
+        "number",
+        "COUCHBASE_SEARCH_TIMEOUT"
+      ) as number) || couchbaseDefaults.COUCHBASE_SEARCH_TIMEOUT,
 
     COUCHBASE_CONNECT_TIMEOUT:
-      (parseEnvVar(getEnvVar(couchbaseEnvMapping.COUCHBASE_CONNECT_TIMEOUT), "number", "COUCHBASE_CONNECT_TIMEOUT") as number) ||
-      couchbaseDefaults.COUCHBASE_CONNECT_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(couchbaseEnvMapping.COUCHBASE_CONNECT_TIMEOUT),
+        "number",
+        "COUCHBASE_CONNECT_TIMEOUT"
+      ) as number) || couchbaseDefaults.COUCHBASE_CONNECT_TIMEOUT,
 
     COUCHBASE_BOOTSTRAP_TIMEOUT:
-      (parseEnvVar(getEnvVar(couchbaseEnvMapping.COUCHBASE_BOOTSTRAP_TIMEOUT), "number", "COUCHBASE_BOOTSTRAP_TIMEOUT") as number) ||
-      couchbaseDefaults.COUCHBASE_BOOTSTRAP_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(couchbaseEnvMapping.COUCHBASE_BOOTSTRAP_TIMEOUT),
+        "number",
+        "COUCHBASE_BOOTSTRAP_TIMEOUT"
+      ) as number) || couchbaseDefaults.COUCHBASE_BOOTSTRAP_TIMEOUT,
   };
 }
 

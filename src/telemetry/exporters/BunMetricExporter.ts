@@ -1,7 +1,8 @@
 // Bun-optimized OTLP Metric Exporter
+
+import type { ExportResult } from "@opentelemetry/core";
 import { hrTimeToMicroseconds } from "@opentelemetry/core";
 import type { PushMetricExporter, ResourceMetrics } from "@opentelemetry/sdk-metrics";
-import type { ExportResult } from "@opentelemetry/core";
 import { BunOTLPExporter, type BunOTLPExporterConfig } from "./BunOTLPExporter";
 
 /**
@@ -10,7 +11,7 @@ import { BunOTLPExporter, type BunOTLPExporterConfig } from "./BunOTLPExporter";
  */
 export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implements PushMetricExporter {
   constructor(config: BunOTLPExporterConfig) {
-    super('metrics', config);
+    super("metrics", config);
   }
 
   /**
@@ -18,16 +19,16 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
    */
   protected serializePayload(resourceMetrics: ResourceMetrics[]): string {
     const otlpPayload = {
-      resourceMetrics: resourceMetrics.map(resourceMetric => ({
+      resourceMetrics: resourceMetrics.map((resourceMetric) => ({
         resource: {
           attributes: this.serializeAttributes(resourceMetric.resource.attributes),
         },
-        scopeMetrics: resourceMetric.scopeMetrics.map(scopeMetric => ({
+        scopeMetrics: resourceMetric.scopeMetrics.map((scopeMetric) => ({
           scope: {
             name: scopeMetric.scope.name,
-            version: scopeMetric.scope.version || '1.0.0',
+            version: scopeMetric.scope.version || "1.0.0",
           },
-          metrics: scopeMetric.metrics.map(metric => this.serializeMetric(metric)),
+          metrics: scopeMetric.metrics.map((metric) => this.serializeMetric(metric)),
         })),
       })),
     };
@@ -41,24 +42,24 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
   private serializeMetric(metric: any): any {
     const baseMetric = {
       name: metric.descriptor.name,
-      description: metric.descriptor.description || '',
-      unit: metric.descriptor.unit || '',
+      description: metric.descriptor.description || "",
+      unit: metric.descriptor.unit || "",
     };
 
     // Handle different metric types
     switch (metric.descriptor.type) {
-      case 'COUNTER':
-      case 'UP_DOWN_COUNTER':
+      case "COUNTER":
+      case "UP_DOWN_COUNTER":
         return {
           ...baseMetric,
           sum: {
             dataPoints: metric.dataPoints.map((dp: any) => this.serializeDataPoint(dp)),
             aggregationTemporality: metric.aggregationTemporality,
-            isMonotonic: metric.descriptor.type === 'COUNTER',
+            isMonotonic: metric.descriptor.type === "COUNTER",
           },
         };
 
-      case 'HISTOGRAM':
+      case "HISTOGRAM":
         return {
           ...baseMetric,
           histogram: {
@@ -67,7 +68,7 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
           },
         };
 
-      case 'GAUGE':
+      case "GAUGE":
         return {
           ...baseMetric,
           gauge: {
@@ -112,7 +113,7 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
       attributes: this.serializeAttributes(dataPoint.attributes),
       startTimeUnixNano: startTimeUnixNano?.toString(),
       timeUnixNano: timeUnixNano.toString(),
-      count: dataPoint.value.count?.toString() || '0',
+      count: dataPoint.value.count?.toString() || "0",
       sum: dataPoint.value.sum || 0,
       bucketCounts: (dataPoint.value.buckets?.counts || []).map((c: number) => c.toString()),
       explicitBounds: dataPoint.value.buckets?.boundaries || [],
@@ -125,11 +126,11 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
    * Extract numeric value from data point value
    */
   private getNumericValue(value: any): number {
-    if (typeof value === 'number') {
+    if (typeof value === "number") {
       return value;
-    } else if (value && typeof value.value === 'number') {
+    } else if (value && typeof value.value === "number") {
       return value.value;
-    } else if (value && typeof value.sum === 'number') {
+    } else if (value && typeof value.sum === "number") {
       return value.sum;
     }
     return 0;
@@ -151,20 +152,20 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
    * Serialize attribute value based on its type
    */
   private serializeAttributeValue(value: any): any {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       return { stringValue: value };
-    } else if (typeof value === 'number') {
+    } else if (typeof value === "number") {
       if (Number.isInteger(value)) {
         return { intValue: value.toString() };
       } else {
         return { doubleValue: value };
       }
-    } else if (typeof value === 'boolean') {
+    } else if (typeof value === "boolean") {
       return { boolValue: value };
     } else if (Array.isArray(value)) {
       return {
         arrayValue: {
-          values: value.map(v => this.serializeAttributeValue(v)),
+          values: value.map((v) => this.serializeAttributeValue(v)),
         },
       };
     } else {

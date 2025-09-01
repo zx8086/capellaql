@@ -23,24 +23,24 @@ export const options = {
     http_req_failed: performanceThresholds.errors.stress,
   },
   tags: {
-    test_type: 'stress',
-    component: 'health'
-  }
+    test_type: "stress",
+    component: "health",
+  },
 };
 
-import { getConfig, performanceThresholds, getHealthEndpoint } from './utils/config.js';
+import { getConfig, getHealthEndpoint, performanceThresholds } from "./utils/config.js";
 
 const config = getConfig();
 console.log(`Base URL: ${config.baseUrl}`);
 
 export default function () {
   const params = {
-    tags: { 
-      testType: 'stress-test', 
-      endpoint: '/health',
-      component: 'health'
+    tags: {
+      testType: "stress-test",
+      endpoint: "/health",
+      component: "health",
     },
-    timeout: config.timeout
+    timeout: config.timeout,
   };
 
   const res = http.get(getHealthEndpoint(), params);
@@ -50,11 +50,11 @@ export default function () {
     "response is valid": (r) => {
       try {
         const body = JSON.parse(r.body);
-        return ['healthy', 'ok', 'up'].includes(body.status?.toLowerCase());
+        return ["healthy", "ok", "up"].includes(body.status?.toLowerCase());
       } catch {
         return false;
       }
-    }
+    },
   });
   sleep(1);
 }

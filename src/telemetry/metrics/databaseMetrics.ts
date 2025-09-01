@@ -107,7 +107,6 @@ export function recordDatabaseOperation(
     // Record success for health monitoring
     telemetryHealthMonitor.recordExporterSuccess("metrics");
     circuitBreaker.recordSuccess();
-
   } catch (error) {
     console.error("Error recording database operation metrics:", error);
     telemetryHealthMonitor.recordExporterFailure("metrics", error as Error);

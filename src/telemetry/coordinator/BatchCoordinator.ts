@@ -52,25 +52,25 @@ interface MemoryPressureInfo {
   heapUsageRatio: number;
   bufferMemoryUsageMB: number;
   totalMemoryUsageMB: number;
-  pressureLevel: 'low' | 'medium' | 'high' | 'critical';
+  pressureLevel: "low" | "medium" | "high" | "critical";
 }
 
 export class TelemetryBatchCoordinator {
   private traceBuffer: SpanData[] = [];
   private metricBuffer: MetricData[] = [];
   private logBuffer: LogRecord[] = [];
-  
+
   private batchTimer: Timer | null = null;
   private memoryCheckTimer: Timer | null = null;
   private isExporting = false;
   private isShutdown = false;
-  
+
   // Memory management tracking
   private currentMemoryUsage = 0;
   private maxMemorySeen = 0;
   private lastMemoryCheck = 0;
   private lastEmergencyFlush = 0;
-  
+
   private statistics: ExportStatistics = {
     totalBatches: 0,
     successfulBatches: 0,
@@ -88,9 +88,7 @@ export class TelemetryBatchCoordinator {
 
   private readonly config: BatchCoordinatorConfig;
 
-  constructor(
-    config?: Partial<BatchCoordinatorConfig>
-  ) {
+  constructor(config?: Partial<BatchCoordinatorConfig>) {
     this.config = {
       batchInterval: config?.batchInterval || 5000, // 5 seconds
       maxBatchSize: config?.maxBatchSize || 1000,
@@ -104,7 +102,9 @@ export class TelemetryBatchCoordinator {
 
     this.startBatchTimer();
     this.startMemoryMonitoring();
-    console.debug('TelemetryBatchCoordinator initialized with memory management', this.config);
+    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+      console.debug("TelemetryBatchCoordinator initialized with memory management", this.config);
+    }
   }
 
   private startBatchTimer(): void {
@@ -120,14 +120,14 @@ export class TelemetryBatchCoordinator {
     if (this.isShutdown || spans.length === 0) return;
 
     const spanSize = this.estimateSpanArraySize(spans);
-    
+
     // Check memory pressure BEFORE adding data
     if (this.shouldPerformMemoryCheck()) {
       const memoryPressure = this.checkMemoryPressure();
-      if (memoryPressure.pressureLevel === 'critical') {
+      if (memoryPressure.pressureLevel === "critical") {
         this.handleCriticalMemoryPressure();
         return; // Drop the spans to prevent OOM
-      } else if (memoryPressure.pressureLevel === 'high') {
+      } else if (memoryPressure.pressureLevel === "high") {
         this.emergencyFlush();
       }
     }
@@ -135,10 +135,12 @@ export class TelemetryBatchCoordinator {
     this.traceBuffer.push(...spans);
     this.currentMemoryUsage += spanSize;
     this.updateMemoryStats();
-    
+
     // Trigger immediate flush if buffer is getting large or memory pressure
-    if (this.traceBuffer.length >= this.config.maxBatchSize || 
-        this.currentMemoryUsage > this.config.maxMemoryMB * 1024 * 1024 * this.config.emergencyFlushThreshold) {
+    if (
+      this.traceBuffer.length >= this.config.maxBatchSize ||
+      this.currentMemoryUsage > this.config.maxMemoryMB * 1024 * 1024 * this.config.emergencyFlushThreshold
+    ) {
       this.flushBatch();
     }
   }
@@ -147,14 +149,14 @@ export class TelemetryBatchCoordinator {
     if (this.isShutdown || metrics.length === 0) return;
 
     const metricsSize = this.estimateMetricArraySize(metrics);
-    
+
     // Check memory pressure
     if (this.shouldPerformMemoryCheck()) {
       const memoryPressure = this.checkMemoryPressure();
-      if (memoryPressure.pressureLevel === 'critical') {
+      if (memoryPressure.pressureLevel === "critical") {
         this.handleCriticalMemoryPressure();
         return;
-      } else if (memoryPressure.pressureLevel === 'high') {
+      } else if (memoryPressure.pressureLevel === "high") {
         this.emergencyFlush();
       }
     }
@@ -162,9 +164,11 @@ export class TelemetryBatchCoordinator {
     this.metricBuffer.push(...metrics);
     this.currentMemoryUsage += metricsSize;
     this.updateMemoryStats();
-    
-    if (this.metricBuffer.length >= this.config.maxBatchSize ||
-        this.currentMemoryUsage > this.config.maxMemoryMB * 1024 * 1024 * this.config.emergencyFlushThreshold) {
+
+    if (
+      this.metricBuffer.length >= this.config.maxBatchSize ||
+      this.currentMemoryUsage > this.config.maxMemoryMB * 1024 * 1024 * this.config.emergencyFlushThreshold
+    ) {
       this.flushBatch();
     }
   }
@@ -173,14 +177,14 @@ export class TelemetryBatchCoordinator {
     if (this.isShutdown || logs.length === 0) return;
 
     const logsSize = this.estimateLogArraySize(logs);
-    
+
     // Check memory pressure
     if (this.shouldPerformMemoryCheck()) {
       const memoryPressure = this.checkMemoryPressure();
-      if (memoryPressure.pressureLevel === 'critical') {
+      if (memoryPressure.pressureLevel === "critical") {
         this.handleCriticalMemoryPressure();
         return;
-      } else if (memoryPressure.pressureLevel === 'high') {
+      } else if (memoryPressure.pressureLevel === "high") {
         this.emergencyFlush();
       }
     }
@@ -188,9 +192,11 @@ export class TelemetryBatchCoordinator {
     this.logBuffer.push(...logs);
     this.currentMemoryUsage += logsSize;
     this.updateMemoryStats();
-    
-    if (this.logBuffer.length >= this.config.maxBatchSize ||
-        this.currentMemoryUsage > this.config.maxMemoryMB * 1024 * 1024 * this.config.emergencyFlushThreshold) {
+
+    if (
+      this.logBuffer.length >= this.config.maxBatchSize ||
+      this.currentMemoryUsage > this.config.maxMemoryMB * 1024 * 1024 * this.config.emergencyFlushThreshold
+    ) {
       this.flushBatch();
     }
   }
@@ -200,10 +206,7 @@ export class TelemetryBatchCoordinator {
     if (this.isExporting || this.isShutdown) return;
 
     // Check if we have data to export
-    const hasData = 
-      this.traceBuffer.length > 0 ||
-      this.metricBuffer.length > 0 ||
-      this.logBuffer.length > 0;
+    const hasData = this.traceBuffer.length > 0 || this.metricBuffer.length > 0 || this.logBuffer.length > 0;
 
     if (!hasData) return;
 
@@ -218,11 +221,9 @@ export class TelemetryBatchCoordinator {
       const logs = this.logBuffer.splice(0, this.config.maxBatchSize);
 
       // Update memory usage after removing data from buffers
-      const removedSize = 
-        this.estimateSpanArraySize(traces) +
-        this.estimateMetricArraySize(metrics) +
-        this.estimateLogArraySize(logs);
-      
+      const removedSize =
+        this.estimateSpanArraySize(traces) + this.estimateMetricArraySize(metrics) + this.estimateLogArraySize(logs);
+
       this.currentMemoryUsage -= removedSize;
       this.updateMemoryStats();
 
@@ -234,11 +235,13 @@ export class TelemetryBatchCoordinator {
         batchId,
       };
 
-      console.debug(`Exporting batch ${batchId}`, {
-        traces: batch.traces.length,
-        metrics: batch.metrics.length,
-        logs: batch.logs.length,
-      });
+      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+        console.debug(`Exporting batch ${batchId}`, {
+          traces: batch.traces.length,
+          metrics: batch.metrics.length,
+          logs: batch.logs.length,
+        });
+      }
 
       // Execute coordinated export with timeout
       const exportResult = await this.executeCoordinatedExport(batch);
@@ -252,11 +255,10 @@ export class TelemetryBatchCoordinator {
       } else {
         console.error(`Batch ${batchId} export failed:`, exportResult.error);
       }
-
     } catch (error) {
       const duration = Date.now() - startTime;
       console.error(`Batch ${batchId} export error:`, error);
-      
+
       this.updateStatistics({ success: false, exportedCount: 0, duration, error: String(error) }, duration);
     } finally {
       this.isExporting = false;
@@ -284,12 +286,9 @@ export class TelemetryBatchCoordinator {
       }
 
       // Execute all exports in parallel with shared timeout
-      const results = await Promise.race([
-        Promise.allSettled(exports),
-        this.timeout(this.config.exportTimeout)
-      ]);
+      const results = await Promise.race([Promise.allSettled(exports), this.timeout(this.config.exportTimeout)]);
 
-      if (results === 'timeout') {
+      if (results === "timeout") {
         throw new Error(`Batch export timeout after ${this.config.exportTimeout}ms`);
       }
 
@@ -298,16 +297,16 @@ export class TelemetryBatchCoordinator {
       const errors: string[] = [];
 
       (results as PromiseSettledResult<ExportResult>[]).forEach((result, index) => {
-        if (result.status === 'fulfilled') {
+        if (result.status === "fulfilled") {
           if (result.value.success) {
             totalExported += result.value.exportedCount;
           } else {
             allSuccessful = false;
-            errors.push(result.value.error || 'Unknown export error');
+            errors.push(result.value.error || "Unknown export error");
           }
         } else {
           allSuccessful = false;
-          errors.push(result.reason?.message || 'Export rejected');
+          errors.push(result.reason?.message || "Export rejected");
         }
       });
 
@@ -315,9 +314,8 @@ export class TelemetryBatchCoordinator {
         success: allSuccessful,
         exportedCount: totalExported,
         duration: Date.now() - batch.timestamp,
-        error: errors.length > 0 ? errors.join('; ') : undefined,
+        error: errors.length > 0 ? errors.join("; ") : undefined,
       };
-
     } catch (error) {
       return {
         success: false,
@@ -330,14 +328,14 @@ export class TelemetryBatchCoordinator {
 
   private async exportTraces(spans: SpanData[], batchId: string): Promise<ExportResult> {
     const startTime = Date.now();
-    
+
     try {
       // Simulate trace export - in real implementation, this would use actual OTLP exporters
       console.debug(`Exporting ${spans.length} traces for batch ${batchId}`);
-      
+
       // For now, we'll simulate successful export
       // In real implementation: await this.traceExporter.export(spans);
-      
+
       return {
         success: true,
         exportedCount: spans.length,
@@ -355,13 +353,13 @@ export class TelemetryBatchCoordinator {
 
   private async exportMetrics(metrics: MetricData[], batchId: string): Promise<ExportResult> {
     const startTime = Date.now();
-    
+
     try {
       console.debug(`Exporting ${metrics.length} metrics for batch ${batchId}`);
-      
+
       // Simulate metric export
       // In real implementation: await this.metricExporter.export(metrics);
-      
+
       return {
         success: true,
         exportedCount: metrics.length,
@@ -379,13 +377,13 @@ export class TelemetryBatchCoordinator {
 
   private async exportLogs(logs: LogRecord[], batchId: string): Promise<ExportResult> {
     const startTime = Date.now();
-    
+
     try {
       console.debug(`Exporting ${logs.length} logs for batch ${batchId}`);
-      
+
       // Simulate log export
       // In real implementation: await this.logExporter.export(logs);
-      
+
       return {
         success: true,
         exportedCount: logs.length,
@@ -401,8 +399,8 @@ export class TelemetryBatchCoordinator {
     }
   }
 
-  private timeout(ms: number): Promise<'timeout'> {
-    return new Promise(resolve => setTimeout(() => resolve('timeout'), ms));
+  private timeout(ms: number): Promise<"timeout"> {
+    return new Promise((resolve) => setTimeout(() => resolve("timeout"), ms));
   }
 
   private generateBatchId(): string {
@@ -412,7 +410,7 @@ export class TelemetryBatchCoordinator {
   private updateStatistics(result: ExportResult, duration: number): void {
     this.statistics.totalBatches++;
     this.statistics.lastExportTime = Date.now();
-    
+
     if (result.success) {
       this.statistics.successfulBatches++;
       this.statistics.totalSpansExported += result.exportedCount;
@@ -430,10 +428,10 @@ export class TelemetryBatchCoordinator {
     return { ...this.statistics };
   }
 
-  getBufferStatus(): { 
-    traces: number; 
-    metrics: number; 
-    logs: number; 
+  getBufferStatus(): {
+    traces: number;
+    metrics: number;
+    logs: number;
     memoryUsageMB: number;
     memoryPressure: MemoryPressureInfo;
   } {
@@ -447,12 +445,12 @@ export class TelemetryBatchCoordinator {
   }
 
   async forceFlush(): Promise<void> {
-    console.debug('Force flushing telemetry batch coordinator');
+    console.debug("Force flushing telemetry batch coordinator");
     await this.flushBatch();
   }
 
   async shutdown(): Promise<void> {
-    console.debug('Shutting down telemetry batch coordinator');
+    console.debug("Shutting down telemetry batch coordinator");
     this.isShutdown = true;
 
     if (this.batchTimer) {
@@ -470,7 +468,7 @@ export class TelemetryBatchCoordinator {
       await this.flushBatch();
     }
 
-    console.info('Telemetry batch coordinator shutdown complete', this.statistics);
+    console.info("Telemetry batch coordinator shutdown complete", this.statistics);
   }
 
   // Memory Management Methods
@@ -483,9 +481,9 @@ export class TelemetryBatchCoordinator {
 
     this.memoryCheckTimer = setInterval(() => {
       const memoryPressure = this.checkMemoryPressure();
-      
+
       // Debug logging for troubleshooting
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         console.debug(`Memory check: ${memoryPressure.pressureLevel}`, {
           heapUsageRatio: memoryPressure.heapUsageRatio.toFixed(3),
           bufferMemoryMB: memoryPressure.bufferMemoryUsageMB.toFixed(2),
@@ -493,19 +491,19 @@ export class TelemetryBatchCoordinator {
           bufferCounts: {
             traces: this.traceBuffer.length,
             metrics: this.metricBuffer.length,
-            logs: this.logBuffer.length
-          }
+            logs: this.logBuffer.length,
+          },
         });
       }
-      
-      if (memoryPressure.pressureLevel === 'high' || memoryPressure.pressureLevel === 'critical') {
+
+      if (memoryPressure.pressureLevel === "high" || memoryPressure.pressureLevel === "critical") {
         console.warn(`Telemetry memory pressure detected: ${memoryPressure.pressureLevel}`, {
           heapUsageRatio: memoryPressure.heapUsageRatio,
           bufferMemoryMB: memoryPressure.bufferMemoryUsageMB,
           totalMemoryMB: memoryPressure.totalMemoryUsageMB,
         });
-        
-        if (memoryPressure.pressureLevel === 'critical') {
+
+        if (memoryPressure.pressureLevel === "critical") {
           this.handleCriticalMemoryPressure();
         } else {
           this.emergencyFlush();
@@ -520,13 +518,13 @@ export class TelemetryBatchCoordinator {
   private shouldPerformMemoryCheck(): boolean {
     const now = Date.now();
     const timeSinceLastCheck = now - this.lastMemoryCheck;
-    
+
     // Check memory at most every 1 second to avoid performance impact
     if (timeSinceLastCheck > 1000) {
       this.lastMemoryCheck = now;
       return true;
     }
-    
+
     return false;
   }
 
@@ -541,20 +539,19 @@ export class TelemetryBatchCoordinator {
     const bufferMemoryMB = this.currentMemoryUsage / (1024 * 1024);
     const totalMemoryMB = memoryUsage.rss / (1024 * 1024);
 
-    let pressureLevel: 'low' | 'medium' | 'high' | 'critical' = 'low';
-    
+    let pressureLevel: "low" | "medium" | "high" | "critical" = "low";
+
     // More realistic thresholds based on RSS
     if (totalMemoryMB > 512 || bufferMemoryMB > this.config.maxMemoryMB) {
-      pressureLevel = 'critical';
-    } else if (totalMemoryMB > 256 || 
-               bufferMemoryMB > this.config.maxMemoryMB * this.config.emergencyFlushThreshold) {
-      pressureLevel = 'high';
+      pressureLevel = "critical";
+    } else if (totalMemoryMB > 256 || bufferMemoryMB > this.config.maxMemoryMB * this.config.emergencyFlushThreshold) {
+      pressureLevel = "high";
     } else if (totalMemoryMB > 128 || bufferMemoryMB > this.config.maxMemoryMB * 0.7) {
-      pressureLevel = 'medium';
+      pressureLevel = "medium";
     }
 
     return {
-      isUnderPressure: pressureLevel !== 'low',
+      isUnderPressure: pressureLevel !== "low",
       heapUsageRatio,
       bufferMemoryUsageMB: bufferMemoryMB,
       totalMemoryUsageMB: totalMemoryMB,
@@ -567,16 +564,16 @@ export class TelemetryBatchCoordinator {
    */
   private emergencyFlush(): void {
     const now = Date.now();
-    
+
     // Prevent too frequent emergency flushes
     if (now - this.lastEmergencyFlush < 2000) {
       return;
     }
-    
+
     this.lastEmergencyFlush = now;
     this.statistics.emergencyFlushCount++;
 
-    console.warn('Emergency telemetry flush due to memory pressure', {
+    console.warn("Emergency telemetry flush due to memory pressure", {
       bufferSizes: {
         traces: this.traceBuffer.length,
         metrics: this.metricBuffer.length,
@@ -586,8 +583,8 @@ export class TelemetryBatchCoordinator {
     });
 
     // Force immediate flush
-    this.flushBatch().catch(error => {
-      console.error('Emergency flush failed:', error);
+    this.flushBatch().catch((error) => {
+      console.error("Emergency flush failed:", error);
     });
 
     // Force garbage collection if available
@@ -595,7 +592,7 @@ export class TelemetryBatchCoordinator {
       try {
         global.gc();
       } catch (error) {
-        console.debug('Manual garbage collection failed:', error);
+        console.debug("Manual garbage collection failed:", error);
       }
     }
   }
@@ -604,8 +601,8 @@ export class TelemetryBatchCoordinator {
    * Handle critical memory pressure by dropping data
    */
   private handleCriticalMemoryPressure(): void {
-    console.error('CRITICAL: Telemetry memory pressure - dropping oldest data to prevent OOM');
-    
+    console.error("CRITICAL: Telemetry memory pressure - dropping oldest data to prevent OOM");
+
     const initialTraceCount = this.traceBuffer.length;
     const initialMetricCount = this.metricBuffer.length;
     const initialLogCount = this.logBuffer.length;
@@ -621,7 +618,7 @@ export class TelemetryBatchCoordinator {
     const droppedLogs = this.logBuffer.splice(0, logsToDrop);
 
     // Update memory usage
-    const droppedSize = 
+    const droppedSize =
       this.estimateSpanArraySize(droppedTraces) +
       this.estimateMetricArraySize(droppedMetrics) +
       this.estimateLogArraySize(droppedLogs);
@@ -629,7 +626,7 @@ export class TelemetryBatchCoordinator {
     this.currentMemoryUsage -= droppedSize;
     this.statistics.dataDropCount += tracesToDrop + metricsToDrop + logsToDrop;
 
-    console.error('Telemetry data dropped due to memory pressure', {
+    console.error("Telemetry data dropped due to memory pressure", {
       dropped: {
         traces: tracesToDrop,
         metrics: metricsToDrop,
@@ -642,7 +639,7 @@ export class TelemetryBatchCoordinator {
         metrics: this.metricBuffer.length,
         logs: this.logBuffer.length,
         memoryUsageMB: this.currentMemoryUsage / (1024 * 1024),
-      }
+      },
     });
 
     // Force garbage collection
@@ -650,7 +647,7 @@ export class TelemetryBatchCoordinator {
       try {
         global.gc();
       } catch (error) {
-        console.debug('Manual garbage collection failed:', error);
+        console.debug("Manual garbage collection failed:", error);
       }
     }
 
@@ -664,7 +661,7 @@ export class TelemetryBatchCoordinator {
   private updateMemoryStats(): void {
     const currentMB = this.currentMemoryUsage / (1024 * 1024);
     this.statistics.currentMemoryUsageMB = currentMB;
-    
+
     if (currentMB > this.maxMemorySeen) {
       this.maxMemorySeen = currentMB;
       this.statistics.maxMemorySeenMB = currentMB;
@@ -676,7 +673,7 @@ export class TelemetryBatchCoordinator {
    */
   private estimateSpanArraySize(spans: SpanData[]): number {
     if (spans.length === 0) return 0;
-    
+
     // Rough estimation: each span ~2KB on average
     return spans.length * 2048;
   }
@@ -686,7 +683,7 @@ export class TelemetryBatchCoordinator {
    */
   private estimateMetricArraySize(metrics: MetricData[]): number {
     if (metrics.length === 0) return 0;
-    
+
     // Rough estimation: each metric ~1KB on average
     return metrics.length * 1024;
   }
@@ -696,7 +693,7 @@ export class TelemetryBatchCoordinator {
    */
   private estimateLogArraySize(logs: LogRecord[]): number {
     if (logs.length === 0) return 0;
-    
+
     // Rough estimation: each log entry ~512B on average
     return logs.length * 512;
   }

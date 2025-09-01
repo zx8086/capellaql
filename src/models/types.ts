@@ -4,11 +4,8 @@ import { z } from "zod";
 
 export interface ApplicationConfig {
   LOG_LEVEL: string;
-  LOG_MAX_SIZE: string;
-  LOG_MAX_FILES: string;
   YOGA_RESPONSE_CACHE_TTL: number;
   PORT: number;
-  ENABLE_FILE_LOGGING: boolean;
   ALLOWED_ORIGINS: string[];
   BASE_URL: string;
 }
@@ -90,8 +87,6 @@ const EnvArray = z.string().transform((val) =>
 
 const ApplicationConfigSchema = z.object({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  LOG_MAX_SIZE: z.string().default("20m"),
-  LOG_MAX_FILES: z.string().default("14d"),
   YOGA_RESPONSE_CACHE_TTL: z.coerce
     .number()
     .min(0)
@@ -99,7 +94,6 @@ const ApplicationConfigSchema = z.object({
     .default(900000)
     .refine((val) => !Number.isNaN(val), "Cache TTL cannot be NaN"),
   PORT: z.coerce.number().min(1).max(65535).default(4000),
-  ENABLE_FILE_LOGGING: z.coerce.boolean().default(false),
   ALLOWED_ORIGINS: z.array(z.string().url()).default(["http://localhost:3000"]),
   BASE_URL: z.string().url("BASE_URL must be a valid URL").default("http://localhost"),
 });

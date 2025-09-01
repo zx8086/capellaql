@@ -1,6 +1,7 @@
 // Custom metric reader for Bun that uses our BunMetricExporter directly
-import { MetricReader, MeterProvider } from "@opentelemetry/sdk-metrics";
+
 import type { ResourceMetrics } from "@opentelemetry/sdk-metrics";
+import { MeterProvider, MetricReader } from "@opentelemetry/sdk-metrics";
 import { BunMetricExporter, type BunOTLPExporterConfig } from "./BunMetricExporter";
 
 /**
@@ -20,8 +21,8 @@ export class BunMetricReader extends MetricReader {
   protected onInitialized(): void {
     // Start periodic export
     this.startPeriodicExport();
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`BunMetricReader initialized with ${this.exportIntervalMillis}ms interval`);
+    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+      console.debug(`BunMetricReader initialized with ${this.exportIntervalMillis}ms interval`);
     }
   }
 
@@ -34,12 +35,12 @@ export class BunMetricReader extends MetricReader {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
-    
+
     // Final export before shutdown
     await this.collectAndExport();
     await this.exporter.shutdown();
-    if (process.env.NODE_ENV === 'development') {
-      console.log('BunMetricReader shutdown complete');
+    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+      console.debug("BunMetricReader shutdown complete");
     }
   }
 
@@ -52,8 +53,8 @@ export class BunMetricReader extends MetricReader {
     }
 
     this.intervalId = setInterval(() => {
-      this.collectAndExport().catch(error => {
-        console.error('Error during periodic metric export:', error);
+      this.collectAndExport().catch((error) => {
+        console.error("Error during periodic metric export:", error);
       });
     }, this.exportIntervalMillis);
   }
@@ -67,21 +68,23 @@ export class BunMetricReader extends MetricReader {
         timeoutMillis: 5000, // 5 second collection timeout
       });
 
-      // Debug: Check the actual structure (development only)
-      if (process.env.NODE_ENV === 'development') {
+      // Debug: Check the actual structure (only when explicitly enabled)
+      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
         console.debug(`Metric collection result type: ${typeof collectionResult}`, {
-          hasResourceMetrics: !!(collectionResult && 'resourceMetrics' in collectionResult),
-          resourceMetricsType: collectionResult?.resourceMetrics ? typeof collectionResult.resourceMetrics : 'undefined'
+          hasResourceMetrics: !!(collectionResult && "resourceMetrics" in collectionResult),
+          resourceMetricsType: collectionResult?.resourceMetrics
+            ? typeof collectionResult.resourceMetrics
+            : "undefined",
         });
       }
 
       // Handle different possible return types from collect()
       let resourceMetrics: any[];
-      
+
       if (!collectionResult) {
         return; // No metrics to export
       }
-      
+
       if (Array.isArray(collectionResult)) {
         resourceMetrics = collectionResult;
       } else if (collectionResult.resourceMetrics && Array.isArray(collectionResult.resourceMetrics)) {
@@ -90,12 +93,12 @@ export class BunMetricReader extends MetricReader {
       } else if (collectionResult.resourceMetrics && !Array.isArray(collectionResult.resourceMetrics)) {
         // If resourceMetrics is a single object, wrap it in an array
         resourceMetrics = [collectionResult.resourceMetrics];
-      } else if (typeof collectionResult === 'object' && collectionResult.resource) {
+      } else if (typeof collectionResult === "object" && collectionResult.resource) {
         // If it's a single resource metric object, wrap it in an array
         resourceMetrics = [collectionResult];
       } else {
-        if (process.env.NODE_ENV === 'development') {
-          console.warn('Unexpected metric collection result structure:', JSON.stringify(collectionResult, null, 2));
+        if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+          console.debug("Unexpected metric collection result structure:", JSON.stringify(collectionResult, null, 2));
         }
         return;
       }
@@ -104,24 +107,24 @@ export class BunMetricReader extends MetricReader {
         return; // No metrics to export
       }
 
-      // Success: Export metrics (log only in development)
-      if (process.env.NODE_ENV === 'development') {
+      // Success: Export metrics (only when explicitly enabled)
+      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
         console.debug(`Exporting ${resourceMetrics.length} metric resources`);
       }
 
       // Use our custom BunMetricExporter
       await new Promise<void>((resolve, reject) => {
-        this.exporter.export(resourceMetrics, result => {
-          if (result.code === 0) { // ExportResultCode.SUCCESS
+        this.exporter.export(resourceMetrics, (result) => {
+          if (result.code === 0) {
+            // ExportResultCode.SUCCESS
             resolve();
           } else {
-            reject(new Error(result.error || 'Metric export failed'));
+            reject(new Error(result.error || "Metric export failed"));
           }
         });
       });
-
     } catch (error) {
-      console.error('Error collecting and exporting metrics:', error);
+      console.error("Error collecting and exporting metrics:", error);
       // Don't rethrow to prevent crashing the periodic export
     }
   }

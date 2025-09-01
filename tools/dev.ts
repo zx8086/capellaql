@@ -41,7 +41,7 @@ const server = spawn(["bun", "run", "--hot", "--watch", "src/index.ts"], {
   env: {
     ...Bun.env,
     FORCE_COLOR: "1",
-    BUN_CONFIG_VERBOSE_FETCH: "true",
+    BUN_CONFIG_VERBOSE_FETCH: Bun.env.VERBOSE_HTTP || "false", // Set to "true" for HTTP debugging
     NODE_ENV: "development",
   },
 });
@@ -61,12 +61,12 @@ async function checkHealth() {
       if (!serverReady) {
         console.log("\n✅ Server is ready and healthy!");
         console.log("🎯 All monitoring endpoints active: Health, Performance & Telemetry");
-        
+
         // Quick verification that new endpoints are working
         try {
           const systemHealthResponse = await fetch("http://localhost:4000/health/system");
           const performanceResponse = await fetch("http://localhost:4000/health/performance");
-          
+
           if (systemHealthResponse.ok && performanceResponse.ok) {
             console.log("🔍 Enhanced monitoring: System Health & Performance Analytics ready");
           } else {
@@ -75,7 +75,7 @@ async function checkHealth() {
         } catch (_monitoringError) {
           console.log("ℹ️ Enhanced monitoring endpoints initializing...");
         }
-        
+
         displayDashboard();
         serverReady = true;
       }

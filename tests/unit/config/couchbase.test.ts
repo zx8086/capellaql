@@ -1,10 +1,10 @@
 // Unit tests for Couchbase configuration module
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { 
-  CouchbaseConfigSchema, 
-  loadCouchbaseConfigFromEnv, 
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+  CouchbaseConfigSchema,
   couchbaseDefaults,
-  validateCouchbaseConfig 
+  loadCouchbaseConfigFromEnv,
+  validateCouchbaseConfig,
 } from "../../../src/config/modules/couchbase";
 
 describe("Couchbase Configuration", () => {
@@ -45,7 +45,7 @@ describe("Couchbase Configuration", () => {
     test("validates URL format", () => {
       const invalidUrl = {
         ...couchbaseDefaults,
-        COUCHBASE_URL: "not-a-url"
+        COUCHBASE_URL: "not-a-url",
       };
 
       const result = CouchbaseConfigSchema.safeParse(invalidUrl);
@@ -55,7 +55,7 @@ describe("Couchbase Configuration", () => {
     test("validates timeout ranges", () => {
       const invalidTimeout = {
         ...couchbaseDefaults,
-        COUCHBASE_KV_TIMEOUT: 500 // Below minimum
+        COUCHBASE_KV_TIMEOUT: 500, // Below minimum
       };
 
       const result = CouchbaseConfigSchema.safeParse(invalidTimeout);
@@ -65,7 +65,7 @@ describe("Couchbase Configuration", () => {
     test("validates username is not empty", () => {
       const emptyUsername = {
         ...couchbaseDefaults,
-        COUCHBASE_USERNAME: ""
+        COUCHBASE_USERNAME: "",
       };
 
       const result = CouchbaseConfigSchema.safeParse(emptyUsername);
@@ -75,7 +75,7 @@ describe("Couchbase Configuration", () => {
     test("validates password is not empty", () => {
       const emptyPassword = {
         ...couchbaseDefaults,
-        COUCHBASE_PASSWORD: ""
+        COUCHBASE_PASSWORD: "",
       };
 
       const result = CouchbaseConfigSchema.safeParse(emptyPassword);
@@ -127,7 +127,7 @@ describe("Couchbase Configuration", () => {
     test("detects default password in production", () => {
       const productionConfig = {
         ...couchbaseDefaults,
-        COUCHBASE_PASSWORD: "password" // Default password
+        COUCHBASE_PASSWORD: "password", // Default password
       };
 
       const warnings = validateCouchbaseConfig(productionConfig, true);
@@ -138,7 +138,7 @@ describe("Couchbase Configuration", () => {
       const productionConfig = {
         ...couchbaseDefaults,
         COUCHBASE_USERNAME: "Administrator",
-        COUCHBASE_PASSWORD: "strongpassword"
+        COUCHBASE_PASSWORD: "strongpassword",
       };
 
       const warnings = validateCouchbaseConfig(productionConfig, true);
@@ -158,7 +158,7 @@ describe("Couchbase Configuration", () => {
       const configWithBadTimeouts = {
         ...couchbaseDefaults,
         COUCHBASE_KV_TIMEOUT: 20000,
-        COUCHBASE_QUERY_TIMEOUT: 15000 // Lower than KV timeout
+        COUCHBASE_QUERY_TIMEOUT: 15000, // Lower than KV timeout
       };
 
       const warnings = validateCouchbaseConfig(configWithBadTimeouts, false);
@@ -169,7 +169,7 @@ describe("Couchbase Configuration", () => {
       const configWithBadTimeouts = {
         ...couchbaseDefaults,
         COUCHBASE_CONNECT_TIMEOUT: 20000,
-        COUCHBASE_BOOTSTRAP_TIMEOUT: 15000 // Lower than connect timeout
+        COUCHBASE_BOOTSTRAP_TIMEOUT: 15000, // Lower than connect timeout
       };
 
       const warnings = validateCouchbaseConfig(configWithBadTimeouts, false);
@@ -182,7 +182,7 @@ describe("Couchbase Configuration", () => {
         COUCHBASE_KV_TIMEOUT: 5000,
         COUCHBASE_QUERY_TIMEOUT: 15000,
         COUCHBASE_CONNECT_TIMEOUT: 10000,
-        COUCHBASE_BOOTSTRAP_TIMEOUT: 15000
+        COUCHBASE_BOOTSTRAP_TIMEOUT: 15000,
       };
 
       const warnings = validateCouchbaseConfig(configWithGoodTimeouts, false);
@@ -193,7 +193,7 @@ describe("Couchbase Configuration", () => {
   describe("Error Path Mapping", () => {
     test("maps configuration paths to environment variables", () => {
       const { getCouchbaseEnvVarPath } = require("../../../src/config/modules/couchbase");
-      
+
       expect(getCouchbaseEnvVarPath("capella.COUCHBASE_URL")).toBe("COUCHBASE_URL");
       expect(getCouchbaseEnvVarPath("capella.COUCHBASE_USERNAME")).toBe("COUCHBASE_USERNAME");
       expect(getCouchbaseEnvVarPath("capella.COUCHBASE_KV_TIMEOUT")).toBe("COUCHBASE_KV_TIMEOUT");

@@ -39,17 +39,17 @@ function getEnvironmentConfig(): EnvironmentConfig {
       "@opentelemetry/instrumentation",
       "@opentelemetry/exporter-otlp-http",
       "@opentelemetry/semantic-conventions",
-      
+
       // Database drivers
       "couchbase",
-      
+
       // Node.js built-ins that Bun handles natively
       "dns",
       "crypto",
       "fs",
       "path",
       "url",
-      
+
       // Bun built-ins
       "bun:sqlite",
       "bun:test",
@@ -65,7 +65,7 @@ function getEnvironmentConfig(): EnvironmentConfig {
         ...baseConfig.define,
         "process.env.NODE_ENV": '"production"',
         // Remove debug code in production
-        "__DEV__": "false",
+        __DEV__: "false",
         "console.debug": "(() => {})", // Remove debug logs
       },
     };
@@ -79,7 +79,7 @@ function getEnvironmentConfig(): EnvironmentConfig {
       splitting: false, // Disable splitting for faster rebuilds
       define: {
         ...baseConfig.define,
-        "__DEV__": "true",
+        __DEV__: "true",
       },
     };
   }
@@ -92,7 +92,7 @@ function getEnvironmentConfig(): EnvironmentConfig {
       splitting: false,
       define: {
         ...baseConfig.define,
-        "__DEV__": "true",
+        __DEV__: "true",
         "process.env.NODE_ENV": '"test"',
       },
     };
@@ -109,10 +109,10 @@ export const bunBuildConfig: BuildConfig = {
   outdir: "./dist",
   target: "bun",
   format: "esm",
-  
+
   // Environment-specific settings
   ...getEnvironmentConfig(),
-  
+
   // Advanced optimization settings
   naming: {
     // Use content hashes for better caching
@@ -123,7 +123,7 @@ export const bunBuildConfig: BuildConfig = {
 
   // Advanced code splitting
   experimentalCss: false, // Disable CSS processing for server-side app
-  
+
   // Bundle analysis (only in development)
   ...(process.env.ANALYZE_BUNDLE && {
     plugins: [
@@ -141,11 +141,11 @@ export const devBuildConfig: BuildConfig = {
   sourcemap: "inline",
   splitting: false,
   watch: true,
-  
+
   // Development-specific optimizations
   define: {
     ...bunBuildConfig.define,
-    "__DEV__": "true",
+    __DEV__: "true",
     "process.env.NODE_ENV": '"development"',
     // Enable more verbose logging in development
     "console.debug": "console.debug",
@@ -160,17 +160,17 @@ export const prodBuildConfig: BuildConfig = {
   minify: true,
   sourcemap: "external",
   splitting: true,
-  
+
   // Production-specific optimizations
   define: {
     ...bunBuildConfig.define,
     "process.env.NODE_ENV": '"production"',
-    "__DEV__": "false",
-    
+    __DEV__: "false",
+
     // Remove development-only code
     "console.debug": "(() => {})",
     "console.trace": "(() => {})",
-    
+
     // Optimize feature flags
     "process.env.ENABLE_DEBUG_LOGGING": JSON.stringify(process.env.ENABLE_DEBUG_LOGGING || "false"),
     "process.env.ENABLE_PERFORMANCE_MONITORING": JSON.stringify(process.env.ENABLE_PERFORMANCE_MONITORING || "true"),
@@ -192,16 +192,16 @@ export const testBuildConfig: BuildConfig = {
   minify: false,
   sourcemap: "inline",
   splitting: false,
-  
+
   define: {
     ...bunBuildConfig.define,
     "process.env.NODE_ENV": '"test"',
-    "__DEV__": "true",
+    __DEV__: "true",
   },
-  
+
   // Test-specific externals
   external: [
-    ...bunBuildConfig.external.filter(ext => ext !== "bun:test"), // Don't external bun:test
+    ...bunBuildConfig.external.filter((ext) => ext !== "bun:test"), // Don't external bun:test
   ],
 };
 
@@ -210,19 +210,19 @@ export const testBuildConfig: BuildConfig = {
  */
 export const dockerBuildConfig: BuildConfig = {
   ...prodBuildConfig,
-  
+
   // Container-specific optimizations
   define: {
     ...prodBuildConfig.define,
-    
+
     // Container environment defaults
     "process.env.PORT": JSON.stringify(process.env.PORT || "4000"),
     "process.env.LOG_LEVEL": JSON.stringify(process.env.LOG_LEVEL || "info"),
-    
+
     // Optimize for container runtime
     "process.env.UV_THREADPOOL_SIZE": JSON.stringify(process.env.UV_THREADPOOL_SIZE || "16"),
   },
-  
+
   // Container-friendly paths
   naming: {
     entry: "[dir]/[name].[ext]", // Simpler naming for containers
@@ -236,17 +236,17 @@ export const dockerBuildConfig: BuildConfig = {
  */
 export const serverlessBuildConfig: BuildConfig = {
   ...prodBuildConfig,
-  
+
   // Serverless optimizations
   splitting: false, // Single bundle for serverless
-  
+
   define: {
     ...prodBuildConfig.define,
-    
+
     // Serverless environment optimizations
     "process.env.AWS_NODEJS_CONNECTION_REUSE_ENABLED": "1",
   },
-  
+
   // Minimize bundle size for serverless
   external: [
     // Only external truly external dependencies in serverless
@@ -292,28 +292,26 @@ export interface BuildMetrics {
 /**
  * Enhanced build function with metrics
  */
-export async function buildWithMetrics(
-  config: BuildConfig = bunBuildConfig
-): Promise<BuildMetrics> {
+export async function buildWithMetrics(config: BuildConfig = bunBuildConfig): Promise<BuildMetrics> {
   const startTime = Date.now();
-  
+
   console.log("🔨 Starting optimized build with Bun...");
   console.log(`📦 Target: ${config.target}`);
   console.log(`🎯 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`📁 Output: ${config.outdir}`);
-  
+
   try {
     // Perform the build
     const result = await Bun.build(config);
-    
+
     const endTime = Date.now();
     const duration = endTime - startTime;
-    
+
     // Calculate metrics
     let totalSize = 0;
     let chunkCount = 0;
     let assetCount = 0;
-    
+
     for (const output of result.outputs) {
       if (output.kind === "entry-point" || output.kind === "chunk") {
         chunkCount++;
@@ -322,7 +320,7 @@ export async function buildWithMetrics(
         assetCount++;
       }
     }
-    
+
     const metrics: BuildMetrics = {
       startTime,
       endTime,
@@ -331,27 +329,27 @@ export async function buildWithMetrics(
       chunkCount,
       assetCount,
     };
-    
+
     // Log build results
     console.log("✅ Build completed successfully!");
     console.log(`⏱️  Duration: ${duration}ms`);
     console.log(`📊 Bundle size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
     console.log(`🧩 Chunks: ${chunkCount}`);
     console.log(`🎨 Assets: ${assetCount}`);
-    
+
     if (result.logs.length > 0) {
       console.log("📋 Build logs:");
-      result.logs.forEach(log => console.log(`  ${log.message}`));
+      result.logs.forEach((log) => console.log(`  ${log.message}`));
     }
-    
+
     return metrics;
   } catch (error) {
     const endTime = Date.now();
     const duration = endTime - startTime;
-    
+
     console.error("❌ Build failed:");
     console.error(error);
-    
+
     throw error;
   }
 }
@@ -360,9 +358,9 @@ export async function buildWithMetrics(
  * Build with environment detection
  */
 export async function autoBuild(): Promise<BuildMetrics> {
-  const target = (process.env.BUILD_TARGET as any) || 
-                 (process.env.NODE_ENV === "production" ? "production" : "development");
-  
+  const target =
+    (process.env.BUILD_TARGET as any) || (process.env.NODE_ENV === "production" ? "production" : "development");
+
   const config = getBuildConfig(target);
   return buildWithMetrics(config);
 }
@@ -373,10 +371,10 @@ export default bunBuildConfig;
 // Main execution when run directly
 if (import.meta.main) {
   console.log("🚀 CapellaQL Build System");
-  
+
   try {
     const metrics = await autoBuild();
-    
+
     // Exit with success
     process.exit(0);
   } catch (error) {

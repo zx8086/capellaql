@@ -5,16 +5,19 @@ import { yoga } from "@elysiajs/graphql-yoga";
 import { useResponseCache } from "@graphql-yoga/plugin-response-cache";
 import { metrics, context as otelContext, SpanStatusCode, trace } from "@opentelemetry/api";
 import { Elysia } from "elysia";
+import { readFileSync } from "fs";
 import depthLimit from "graphql-depth-limit";
 import { isIP } from "net";
 import * as path from "path";
-import { readFileSync } from "fs";
 import { ulid } from "ulid";
 import { fileURLToPath } from "url";
 import config from "./config";
 import resolvers from "./graphql/resolvers";
 import typeDefs from "./graphql/typeDefs";
+import { getPerformanceHistory, getPerformanceMetrics, getPerformanceTrends } from "./lib/performanceMonitor";
+import { getSystemHealth, getSystemHealthSummary } from "./lib/systemHealth";
 import {
+  debug,
   err,
   getTelemetryHealth,
   initializeHttpMetrics,
@@ -23,8 +26,6 @@ import {
   recordHttpResponseTime,
 } from "./telemetry";
 import { createHealthcheck } from "./utils/bunUtils";
-import { getSystemHealth, getSystemHealthSummary } from "./lib/systemHealth";
-import { getPerformanceMetrics, getPerformanceHistory, getPerformanceTrends } from "./lib/performanceMonitor";
 import "source-map-support/register";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -59,6 +60,9 @@ const ALLOWED_ORIGINS = Array.isArray(config.application.ALLOWED_ORIGINS)
 console.log("Parsed ALLOWED_ORIGINS:", ALLOWED_ORIGINS);
 const IS_DEVELOPMENT =
   config.telemetry.DEPLOYMENT_ENVIRONMENT === "development" || config.runtime.NODE_ENV === "development";
+
+// Configurable HTTP verbosity for better log control
+const VERBOSE_HTTP = process.env.VERBOSE_HTTP === "true" || IS_DEVELOPMENT;
 
 const RATE_LIMIT = 500;
 const RATE_LIMIT_WINDOW = 60 * 1000;
@@ -145,24 +149,42 @@ const createYogaOptions = () => ({
     // Query size validation plugin
     {
       onParse({ params, addError }) {
-        if (params.source.length > 10000) { // 10KB limit
-          addError(new Error('Query too large - maximum 10KB allowed'));
+        if (params.source.length > 10000) {
+          // 10KB limit
+          addError(new Error("Query too large - maximum 10KB allowed"));
         }
       },
     },
-    // Lifecycle hooks plugin (separate)
+    // Enhanced request logging plugin
     {
+      onRequest: ({ request, url, serverContext }) => {
+        if (VERBOSE_HTTP) {
+          const clientIp = getClientIp(request);
+          log("GraphQL Request", {
+            method: request.method,
+            url: url.pathname,
+            clientIp,
+            userAgent: request.headers.get("user-agent")?.substring(0, 100),
+            origin: request.headers.get("origin"),
+            timestamp: new Date().toISOString(),
+          });
+        }
+      },
       onExecute: ({ args }) => {
-        log("GraphQL Execute", {
-          operation: args.operationName,
-          variables: args.variableValues,
-        });
+        if (VERBOSE_HTTP) {
+          log("GraphQL Execute", {
+            operation: args.operationName,
+            variables: args.variableValues,
+          });
+        }
       },
       onSubscribe: ({ args }) => {
-        log("GraphQL Subscribe", {
-          operation: args.operationName,
-          variables: args.variableValues,
-        });
+        if (VERBOSE_HTTP) {
+          log("GraphQL Subscribe", {
+            operation: args.operationName,
+            variables: args.variableValues,
+          });
+        }
       },
       onError: ({ error }) => {
         err("GraphQL Error", {
@@ -195,8 +217,18 @@ const createYogaOptions = () => ({
 });
 
 const healthCheck = new Elysia()
-  .get("/health", async () => {
-    log("Health check called");
+  .get("/health", async ({ request }) => {
+    // Log request details when verbose HTTP is enabled
+    if (VERBOSE_HTTP) {
+      const clientIp = getClientIp(request);
+      log("Health check request", {
+        method: request.method,
+        url: "/health",
+        clientIp,
+        userAgent: request.headers.get("user-agent")?.substring(0, 100),
+        timestamp: new Date().toISOString(),
+      });
+    }
 
     try {
       const healthStatus = await createHealthcheck();
@@ -212,7 +244,7 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/telemetry", async () => {
-    log("Telemetry health check called");
+    debug("Telemetry health check called");
 
     try {
       const telemetryHealth = getTelemetryHealth();
@@ -227,7 +259,7 @@ const healthCheck = new Elysia()
     }
   })
   .get("/health/system", async () => {
-    log("System health check called");
+    debug("System health check called");
 
     try {
       const systemHealth = await getSystemHealth();
@@ -239,16 +271,31 @@ const healthCheck = new Elysia()
         timestamp: new Date().toISOString(),
         error: error instanceof Error ? error.message : String(error),
         components: {
-          database: { status: "unhealthy", error: "Health check failed", circuitBreaker: { state: "unknown", failures: 0, successes: 0 } },
-          runtime: { status: "unhealthy", error: "Health check failed", memory: { used: 0, free: 0, total: 0, heapUsed: 0, heapTotal: 0 }, environment: "unknown", version: "unknown" },
-          telemetry: { status: "unhealthy", error: "Health check failed", exporters: { traces: false, metrics: false, logs: false }, circuitBreaker: { state: "unknown", failures: 0 } }
+          database: {
+            status: "unhealthy",
+            error: "Health check failed",
+            circuitBreaker: { state: "unknown", failures: 0, successes: 0 },
+          },
+          runtime: {
+            status: "unhealthy",
+            error: "Health check failed",
+            memory: { used: 0, free: 0, total: 0, heapUsed: 0, heapTotal: 0 },
+            environment: "unknown",
+            version: "unknown",
+          },
+          telemetry: {
+            status: "unhealthy",
+            error: "Health check failed",
+            exporters: { traces: false, metrics: false, logs: false },
+            circuitBreaker: { state: "unknown", failures: 0 },
+          },
         },
-        performance: { memoryUsage: 0 }
+        performance: { memoryUsage: 0 },
       };
     }
   })
   .get("/health/summary", async () => {
-    log("System health summary called");
+    debug("System health summary called");
 
     try {
       const healthSummary = await getSystemHealthSummary();
@@ -258,12 +305,12 @@ const healthCheck = new Elysia()
       return {
         status: "unhealthy",
         message: "Health check failed",
-        criticalIssues: [error instanceof Error ? error.message : String(error)]
+        criticalIssues: [error instanceof Error ? error.message : String(error)],
       };
     }
   })
   .get("/health/performance", async () => {
-    log("Performance metrics called");
+    debug("Performance metrics called");
 
     try {
       const performanceMetrics = await getPerformanceMetrics();
@@ -272,16 +319,22 @@ const healthCheck = new Elysia()
       err("Performance metrics collection failed", error);
       return {
         timestamp: new Date().toISOString(),
-        database: { latency: -1, connectionStatus: 'disconnected', errorRate: 1 },
+        database: { latency: -1, connectionStatus: "disconnected", errorRate: 1 },
         runtime: { memoryUsage: -1, heapUsage: -1 },
-        telemetry: { exportLatency: -1, droppedSpans: -1, batchSize: -1, samplingRate: -1, circuitBreakerState: 'unknown' },
-        correlations: { databaseToMemory: 0, telemetryToPerformance: 0, overallHealth: 'unhealthy' as const },
-        error: error instanceof Error ? error.message : String(error)
+        telemetry: {
+          exportLatency: -1,
+          droppedSpans: -1,
+          batchSize: -1,
+          samplingRate: -1,
+          circuitBreakerState: "unknown",
+        },
+        correlations: { databaseToMemory: 0, telemetryToPerformance: 0, overallHealth: "unhealthy" as const },
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   })
   .get("/health/performance/history", async ({ query }) => {
-    log("Performance history called");
+    debug("Performance history called");
 
     try {
       const count = query?.count ? parseInt(query.count as string) : 10;
@@ -289,20 +342,20 @@ const healthCheck = new Elysia()
       return {
         metrics: performanceHistory,
         count: performanceHistory.length,
-        trends: getPerformanceTrends()
+        trends: getPerformanceTrends(),
       };
     } catch (error) {
       err("Performance history collection failed", error);
       return {
         metrics: [],
         count: 0,
-        trends: { databaseLatencyTrend: 'stable', memoryUsageTrend: 'stable', overallTrend: 'stable' },
-        error: error instanceof Error ? error.message : String(error)
+        trends: { databaseLatencyTrend: "stable", memoryUsageTrend: "stable", overallTrend: "stable" },
+        error: error instanceof Error ? error.message : String(error),
       };
     }
   })
   .get("/health/cache", async () => {
-    log("Cache metrics called");
+    debug("Cache metrics called");
 
     try {
       const { bunSQLiteCache } = await import("./lib/bunSQLiteCache");
@@ -321,16 +374,17 @@ const healthCheck = new Elysia()
         },
         mapCache: {
           ...mapCacheStats,
-          hitRate: mapCacheStats.hits + mapCacheStats.misses > 0 
-            ? ((mapCacheStats.hits / (mapCacheStats.hits + mapCacheStats.misses)) * 100).toFixed(2)
-            : 0,
+          hitRate:
+            mapCacheStats.hits + mapCacheStats.misses > 0
+              ? ((mapCacheStats.hits / (mapCacheStats.hits + mapCacheStats.misses)) * 100).toFixed(2)
+              : 0,
         },
         comparison: {
           totalHits: sqliteStats.hits + mapCacheStats.hits,
           totalMisses: sqliteStats.misses + mapCacheStats.misses,
           totalMemoryMB: (sqliteStats.memoryUsage + mapCacheStats.memoryUsage) / (1024 * 1024),
           preferredCache: typeof Bun !== "undefined" ? "sqlite" : "map",
-        }
+        },
       };
     } catch (error) {
       err("Cache metrics collection failed", error);
@@ -339,17 +393,17 @@ const healthCheck = new Elysia()
         error: error instanceof Error ? error.message : String(error),
         sqlite: { enabled: false, hits: 0, misses: 0, size: 0, memoryUsage: 0, hitRate: 0 },
         mapCache: { hits: 0, misses: 0, size: 0, memoryUsage: 0, hitRate: 0 },
-        comparison: { totalHits: 0, totalMisses: 0, totalMemoryMB: 0, preferredCache: "none" }
+        comparison: { totalHits: 0, totalMisses: 0, totalMemoryMB: 0, preferredCache: "none" },
       };
     }
   })
   .get("/health/telemetry/detailed", async () => {
-    log("Detailed telemetry metrics called");
+    debug("Detailed telemetry metrics called");
 
     try {
       const { getBatchCoordinator } = await import("./telemetry/coordinator/BatchCoordinator");
       const batchCoordinator = getBatchCoordinator();
-      
+
       const statistics = batchCoordinator.getStatistics();
       const bufferStatus = batchCoordinator.getBufferStatus();
       const telemetryHealth = getTelemetryHealth();
@@ -367,19 +421,25 @@ const healthCheck = new Elysia()
           memoryPressure: bufferStatus.memoryPressure,
           performance: {
             averageExportDuration: statistics.averageExportDuration,
-            successRate: statistics.totalBatches > 0 
-              ? ((statistics.successfulBatches / statistics.totalBatches) * 100).toFixed(2)
-              : 100,
-            emergencyFlushRate: statistics.totalBatches > 0
-              ? ((statistics.emergencyFlushCount / statistics.totalBatches) * 100).toFixed(2)
-              : 0,
-            dataLossRate: statistics.totalSpansExported > 0
-              ? ((statistics.dataDropCount / (statistics.totalSpansExported + statistics.dataDropCount)) * 100).toFixed(2)
-              : 0,
-          }
+            successRate:
+              statistics.totalBatches > 0
+                ? ((statistics.successfulBatches / statistics.totalBatches) * 100).toFixed(2)
+                : 100,
+            emergencyFlushRate:
+              statistics.totalBatches > 0
+                ? ((statistics.emergencyFlushCount / statistics.totalBatches) * 100).toFixed(2)
+                : 0,
+            dataLossRate:
+              statistics.totalSpansExported > 0
+                ? (
+                    (statistics.dataDropCount / (statistics.totalSpansExported + statistics.dataDropCount)) *
+                    100
+                  ).toFixed(2)
+                : 0,
+          },
         },
         exporters: telemetryHealth,
-        recommendations: generateTelemetryRecommendations(statistics, bufferStatus.memoryPressure)
+        recommendations: generateTelemetryRecommendations(statistics, bufferStatus.memoryPressure),
       };
     } catch (error) {
       err("Detailed telemetry metrics collection failed", error);
@@ -388,30 +448,31 @@ const healthCheck = new Elysia()
         error: error instanceof Error ? error.message : String(error),
         batchCoordinator: { statistics: {}, buffers: {}, memoryPressure: { pressureLevel: "unknown" } },
         exporters: {},
-        recommendations: []
+        recommendations: [],
       };
     }
   })
   .get("/health/comprehensive", async () => {
-    log("Comprehensive health metrics called");
+    debug("Comprehensive health metrics called");
 
     try {
       // Collect all health metrics in parallel for performance
-      const [systemHealth, telemetryHealth, performanceMetrics, cacheResponse, detailedTelemetry] = await Promise.allSettled([
-        getSystemHealth(),
-        getTelemetryHealth(),
-        getPerformanceMetrics(),
-        // Get cache metrics
-        (async () => {
-          const { bunSQLiteCache } = await import("./lib/bunSQLiteCache");
-          return bunSQLiteCache.getStats();
-        })(),
-        // Get batch coordinator status
-        (async () => {
-          const { getBatchCoordinator } = await import("./telemetry/coordinator/BatchCoordinator");
-          return getBatchCoordinator().getBufferStatus();
-        })()
-      ]);
+      const [systemHealth, telemetryHealth, performanceMetrics, cacheResponse, detailedTelemetry] =
+        await Promise.allSettled([
+          getSystemHealth(),
+          getTelemetryHealth(),
+          getPerformanceMetrics(),
+          // Get cache metrics
+          (async () => {
+            const { bunSQLiteCache } = await import("./lib/bunSQLiteCache");
+            return bunSQLiteCache.getStats();
+          })(),
+          // Get batch coordinator status
+          (async () => {
+            const { getBatchCoordinator } = await import("./telemetry/coordinator/BatchCoordinator");
+            return getBatchCoordinator().getBufferStatus();
+          })(),
+        ]);
 
       const timestamp = new Date().toISOString();
 
@@ -420,49 +481,73 @@ const healthCheck = new Elysia()
         version: "2.0.0",
         environment: process.env.NODE_ENV || "development",
         uptime: process.uptime(),
-        
+
         // System health
-        system: systemHealth.status === 'fulfilled' ? systemHealth.value : { 
-          overall: "unhealthy", 
-          error: systemHealth.reason?.message 
-        },
-        
+        system:
+          systemHealth.status === "fulfilled"
+            ? systemHealth.value
+            : {
+                overall: "unhealthy",
+                error: systemHealth.reason?.message,
+              },
+
         // Performance metrics
-        performance: performanceMetrics.status === 'fulfilled' ? performanceMetrics.value : {
-          error: performanceMetrics.reason?.message
-        },
-        
+        performance:
+          performanceMetrics.status === "fulfilled"
+            ? performanceMetrics.value
+            : {
+                error: performanceMetrics.reason?.message,
+              },
+
         // Cache performance
-        cache: cacheResponse.status === 'fulfilled' ? {
-          ...cacheResponse.value,
-          status: cacheResponse.value.hitRate > 50 ? "optimal" : 
-                  cacheResponse.value.hitRate > 20 ? "good" : "poor"
-        } : {
-          error: cacheResponse.reason?.message,
-          status: "unknown"
-        },
-        
+        cache:
+          cacheResponse.status === "fulfilled"
+            ? {
+                ...cacheResponse.value,
+                status:
+                  cacheResponse.value.hitRate > 50 ? "optimal" : cacheResponse.value.hitRate > 20 ? "good" : "poor",
+              }
+            : {
+                error: cacheResponse.reason?.message,
+                status: "unknown",
+              },
+
         // Telemetry health
         telemetry: {
-          exporters: telemetryHealth.status === 'fulfilled' ? telemetryHealth.value : {
-            error: telemetryHealth.reason?.message
-          },
-          batchCoordinator: detailedTelemetry.status === 'fulfilled' ? {
-            ...detailedTelemetry.value,
-            status: detailedTelemetry.value.memoryPressure.pressureLevel === 'low' ? "healthy" :
-                    detailedTelemetry.value.memoryPressure.pressureLevel === 'medium' ? "warning" : "critical"
-          } : {
-            error: detailedTelemetry.reason?.message,
-            status: "unknown"
-          }
+          exporters:
+            telemetryHealth.status === "fulfilled"
+              ? telemetryHealth.value
+              : {
+                  error: telemetryHealth.reason?.message,
+                },
+          batchCoordinator:
+            detailedTelemetry.status === "fulfilled"
+              ? {
+                  ...detailedTelemetry.value,
+                  status:
+                    detailedTelemetry.value.memoryPressure.pressureLevel === "low"
+                      ? "healthy"
+                      : detailedTelemetry.value.memoryPressure.pressureLevel === "medium"
+                        ? "warning"
+                        : "critical",
+                }
+              : {
+                  error: detailedTelemetry.reason?.message,
+                  status: "unknown",
+                },
         },
-        
+
         // Overall assessment
         overall: {
           status: assessOverallHealth([systemHealth, telemetryHealth, performanceMetrics, cacheResponse]),
           criticalIssues: extractCriticalIssues([systemHealth, telemetryHealth, performanceMetrics, cacheResponse]),
-          recommendations: generateOverallRecommendations([systemHealth, telemetryHealth, performanceMetrics, cacheResponse])
-        }
+          recommendations: generateOverallRecommendations([
+            systemHealth,
+            telemetryHealth,
+            performanceMetrics,
+            cacheResponse,
+          ]),
+        },
       };
     } catch (error) {
       err("Comprehensive health check failed", error);
@@ -472,25 +557,26 @@ const healthCheck = new Elysia()
         overall: {
           status: "unhealthy",
           criticalIssues: ["Health check system failure"],
-          recommendations: ["Investigate health check system", "Check system resources", "Review error logs"]
-        }
+          recommendations: ["Investigate health check system", "Check system resources", "Review error logs"],
+        },
       };
     }
   })
   .get("/dashboard", async () => {
     // Serve the development dashboard
     try {
-      const dashboardPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'dashboard', 'index.html');
-      const dashboardHtml = readFileSync(dashboardPath, 'utf-8');
-      
+      const dashboardPath = path.join(path.dirname(fileURLToPath(import.meta.url)), "dashboard", "index.html");
+      const dashboardHtml = readFileSync(dashboardPath, "utf-8");
+
       return new Response(dashboardHtml, {
         headers: {
-          'Content-Type': 'text/html',
+          "Content-Type": "text/html",
         },
       });
     } catch (error) {
       err("Dashboard loading failed", error);
-      return new Response(`
+      return new Response(
+        `
         <html>
           <head><title>Dashboard Error</title></head>
           <body>
@@ -499,61 +585,60 @@ const healthCheck = new Elysia()
             <p><a href="/health">Basic Health Check</a></p>
           </body>
         </html>
-      `, {
-        status: 500,
-        headers: { 'Content-Type': 'text/html' },
-      });
+      `,
+        {
+          status: 500,
+          headers: { "Content-Type": "text/html" },
+        }
+      );
     }
   });
 
 // Helper functions for enhanced health endpoints
-function generateTelemetryRecommendations(
-  statistics: any, 
-  memoryPressure: any
-): string[] {
+function generateTelemetryRecommendations(statistics: any, memoryPressure: any): string[] {
   const recommendations: string[] = [];
-  
-  if (memoryPressure.pressureLevel === 'high' || memoryPressure.pressureLevel === 'critical') {
+
+  if (memoryPressure.pressureLevel === "high" || memoryPressure.pressureLevel === "critical") {
     recommendations.push("Reduce telemetry buffer sizes or increase export frequency");
     recommendations.push("Consider increasing available memory for the service");
   }
-  
+
   if (statistics.failedBatches > 0 && statistics.totalBatches > 0) {
     const failureRate = (statistics.failedBatches / statistics.totalBatches) * 100;
     if (failureRate > 10) {
       recommendations.push("High telemetry export failure rate detected - check OTLP endpoint connectivity");
     }
   }
-  
+
   if (statistics.emergencyFlushCount > 0) {
     recommendations.push("Emergency flushes detected - consider tuning memory pressure thresholds");
   }
-  
+
   if (statistics.dataDropCount > 0) {
     recommendations.push("Telemetry data loss detected - increase memory limits or reduce data volume");
   }
-  
+
   return recommendations;
 }
 
 function assessOverallHealth(results: PromiseSettledResult<any>[]): string {
   let healthyCount = 0;
-  let totalCount = results.length;
-  
+  const totalCount = results.length;
+
   for (const result of results) {
-    if (result.status === 'fulfilled') {
+    if (result.status === "fulfilled") {
       // Check if the result indicates healthy status
-      if (result.value && 
-          (result.value.status === 'healthy' || 
-           result.value.overall === 'healthy' ||
-           result.value.state === 'healthy')) {
+      if (
+        result.value &&
+        (result.value.status === "healthy" || result.value.overall === "healthy" || result.value.state === "healthy")
+      ) {
         healthyCount++;
       }
     }
   }
-  
+
   const healthyPercentage = (healthyCount / totalCount) * 100;
-  
+
   if (healthyPercentage >= 80) return "healthy";
   if (healthyPercentage >= 60) return "warning";
   return "unhealthy";
@@ -561,33 +646,33 @@ function assessOverallHealth(results: PromiseSettledResult<any>[]): string {
 
 function extractCriticalIssues(results: PromiseSettledResult<any>[]): string[] {
   const issues: string[] = [];
-  
+
   for (const result of results) {
-    if (result.status === 'rejected') {
-      issues.push(`System component failure: ${result.reason?.message || 'Unknown error'}`);
+    if (result.status === "rejected") {
+      issues.push(`System component failure: ${result.reason?.message || "Unknown error"}`);
     } else if (result.value?.error) {
       issues.push(result.value.error);
     }
   }
-  
+
   return issues;
 }
 
 function generateOverallRecommendations(results: PromiseSettledResult<any>[]): string[] {
   const recommendations: string[] = [];
   const issues = extractCriticalIssues(results);
-  
+
   if (issues.length > 0) {
     recommendations.push("Address critical system issues immediately");
     recommendations.push("Review error logs for detailed diagnostics");
   }
-  
+
   // Add general recommendations based on patterns
-  const failedResults = results.filter(r => r.status === 'rejected');
+  const failedResults = results.filter((r) => r.status === "rejected");
   if (failedResults.length > 0) {
     recommendations.push("Multiple system components are failing - investigate resource constraints");
   }
-  
+
   return recommendations;
 }
 
@@ -608,11 +693,6 @@ const getClientIp = (request: Request): string => {
     if (ip && isIP(ip)) return ip;
   }
 
-  // Log all headers for debugging
-  console.log("All headers:", Object.fromEntries(request.headers.entries()));
-
-  // Log the entire request object (be cautious with sensitive data)
-  console.log("Request object:", JSON.stringify(request, null, 2));
 
   const remoteAddress = (request as any).socket?.remoteAddress;
   if (remoteAddress && isIP(remoteAddress)) return remoteAddress;
@@ -665,12 +745,12 @@ const app = new Elysia()
     },
 
     open(_ws) {
-      log("WebSocket connection opened");
+      debug("WebSocket connection opened");
       activeConnections.add(1);
     },
 
     close(_ws, code, reason) {
-      log("WebSocket connection closed", { code, reason });
+      debug("WebSocket connection closed", { code, reason });
       activeConnections.add(-1);
     },
 
@@ -679,10 +759,14 @@ const app = new Elysia()
     },
   })
   .options("*", ({ set, request }) => {
-    log("Handling OPTIONS request");
-    log("Origin:", request.headers.get("origin"));
-    log("Access-Control-Request-Method:", request.headers.get("access-control-request-method"));
-    log("Access-Control-Request-Headers:", request.headers.get("access-control-request-headers"));
+    // Only log OPTIONS when HTTP verbosity is enabled
+    if (VERBOSE_HTTP) {
+      log("CORS preflight request", {
+        origin: request.headers.get("origin"),
+        method: request.headers.get("access-control-request-method"),
+        headers: request.headers.get("access-control-request-headers"),
+      });
+    }
 
     set.headers["Access-Control-Allow-Origin"] = "*";
     set.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS";
@@ -693,18 +777,29 @@ const app = new Elysia()
   .onRequest(async (context) => {
     context.set.headers["Access-Control-Allow-Origin"] = "*";
 
+    // Define request variables at the start
+    const method = context.request.method;
+    const url = new URL(context.request.url);
+    const route = url.pathname;
+    const clientIp = getClientIp(context.request);
+
     // Record custom metrics
     requestCounter.add(1, {
-      method: context.request.method,
-      path: new URL(context.request.url).pathname,
+      method,
+      path: route,
     });
     activeConnections.add(1);
 
-    log("Incoming request");
-    log("Method:", context.request.method);
-    log("Origin:", context.request.headers.get("origin"));
-    log("Access-Control-Request-Method:", context.request.headers.get("access-control-request-method"));
-    log("Access-Control-Request-Headers:", context.request.headers.get("access-control-request-headers"));
+    // Only log detailed request info for non-health endpoints when verbose HTTP is enabled
+    const isHealthEndpoint = route.startsWith("/health");
+    if ((!isHealthEndpoint && VERBOSE_HTTP) || (isHealthEndpoint && IS_DEVELOPMENT)) {
+      log("Request", {
+        method,
+        route,
+        userAgent: context.request.headers.get("user-agent")?.substring(0, 50) + "...",
+        clientIp,
+      });
+    }
     if (checkRateLimit(context.request)) {
       context.set.status = 429;
       return { error: "Too Many Requests" };
@@ -714,8 +809,6 @@ const app = new Elysia()
       try {
         const requestId = ulid();
         context.set.headers["X-Request-ID"] = requestId;
-
-        const clientIp = getClientIp(context.request);
 
         const cspDirectives = [
           "default-src 'self'",
@@ -744,9 +837,6 @@ const app = new Elysia()
 
         const startTime = Date.now();
         context.store = { startTime };
-        const method = context.request.method;
-        const url = new URL(context.request.url);
-        const route = url.pathname;
         recordHttpRequest(method, route);
 
         const ctx = otelContext.active();
@@ -759,14 +849,17 @@ const app = new Elysia()
           });
         }
 
-        log("Incoming request", {
-          requestId,
-          method,
-          url: context.request.url,
-          userAgent: context.request.headers.get("user-agent"),
-          forwardedFor: context.request.headers.get("x-forwarded-for"),
-          clientIp,
-        });
+        // Only log detailed request info when verbose HTTP is enabled
+        const isHealthCheck = route.startsWith("/health");
+        if (VERBOSE_HTTP && (!isHealthCheck || IS_DEVELOPMENT)) {
+          log("Request details", {
+            requestId,
+            method,
+            route,
+            userAgent: context.request.headers.get("user-agent")?.substring(0, 100),
+            clientIp,
+          });
+        }
 
         if (context.request.url.includes("/graphql")) {
           const clonedRequest = context.request.clone();
@@ -816,13 +909,21 @@ const app = new Elysia()
     });
     activeConnections.add(-1); // Decrement active connections
 
-    log("Outgoing response", {
-      requestId: context.set.headers["X-Request-ID"],
-      method: context.request.method,
-      url: context.request.url,
-      status: context.set.status,
-      duration: `${duration}ms`,
-    });
+    // Only log response details for non-health endpoints when verbose HTTP is enabled, or slow requests
+    const route = new URL(context.request.url).pathname;
+    const isHealthEndpoint = route.startsWith("/health");
+    const isSlowRequest = duration > 1000; // Log slow requests regardless
+
+    if (isSlowRequest || (VERBOSE_HTTP && !isHealthEndpoint) || (isHealthEndpoint && IS_DEVELOPMENT)) {
+      log("Response", {
+        requestId: context.set.headers["X-Request-ID"],
+        method: context.request.method,
+        route,
+        status: context.set.status,
+        duration: `${duration}ms`,
+        ...(isSlowRequest && { slow: true }),
+      });
+    }
   });
 
 const server = app.listen(SERVER_PORT);
@@ -866,19 +967,19 @@ const gracefulShutdown = async (signal: string) => {
     const { shutdownPerformanceMonitor } = await import("$lib/performanceMonitor");
     const { shutdownBatchCoordinator } = await import("$telemetry/coordinator/BatchCoordinator");
     const { closeConnection } = await import("$lib/clusterProvider");
-    
+
     // Shutdown telemetry batch coordinator first (ensure all data is exported)
     await shutdownBatchCoordinator();
     log("Telemetry batch coordinator shutdown completed");
-    
+
     // Close database connection to prevent resource leaks
     await closeConnection();
     log("Database connection shutdown completed");
-    
+
     // Shutdown performance monitor
     shutdownPerformanceMonitor();
     log("Performance monitor shutdown completed");
-    
+
     // Finally shutdown server
     await server.stop();
     log("Server closed successfully");

@@ -6,11 +6,8 @@ import { type Config, ConfigSchema, generateConfigHealthReport, validateConfig }
 const envVarMapping = {
   application: {
     LOG_LEVEL: "LOG_LEVEL",
-    LOG_MAX_SIZE: "LOG_MAX_SIZE",
-    LOG_MAX_FILES: "LOG_MAX_FILES",
     YOGA_RESPONSE_CACHE_TTL: "YOGA_RESPONSE_CACHE_TTL",
     PORT: "PORT",
-    ENABLE_FILE_LOGGING: "ENABLE_FILE_LOGGING",
     ALLOWED_ORIGINS: "ALLOWED_ORIGINS",
     BASE_URL: "BASE_URL",
   },
@@ -91,11 +88,8 @@ class ConfigurationError extends Error {
     const mapping: Record<string, string> = {
       // Application section
       "application.LOG_LEVEL": "LOG_LEVEL",
-      "application.LOG_MAX_SIZE": "LOG_MAX_SIZE",
-      "application.LOG_MAX_FILES": "LOG_MAX_FILES",
       "application.YOGA_RESPONSE_CACHE_TTL": "YOGA_RESPONSE_CACHE_TTL",
       "application.PORT": "PORT",
-      "application.ENABLE_FILE_LOGGING": "ENABLE_FILE_LOGGING",
       "application.ALLOWED_ORIGINS": "ALLOWED_ORIGINS",
       "application.BASE_URL": "BASE_URL",
 
@@ -152,11 +146,8 @@ class ConfigurationError extends Error {
 const defaultConfig: Config = {
   application: {
     LOG_LEVEL: "info",
-    LOG_MAX_SIZE: "20m",
-    LOG_MAX_FILES: "14d",
     YOGA_RESPONSE_CACHE_TTL: 900000, // 15 minutes
     PORT: 4000,
-    ENABLE_FILE_LOGGING: false,
     ALLOWED_ORIGINS: ["http://localhost:3000"],
     BASE_URL: "http://localhost",
   },
@@ -313,14 +304,6 @@ function loadConfigFromEnv(): Partial<Config> {
       (parseEnvVar(getEnvVar(envVarMapping.application.LOG_LEVEL), "string", "LOG_LEVEL") as string) ||
       defaultConfig.application.LOG_LEVEL,
 
-    LOG_MAX_SIZE:
-      (parseEnvVar(getEnvVar(envVarMapping.application.LOG_MAX_SIZE), "string", "LOG_MAX_SIZE") as string) ||
-      defaultConfig.application.LOG_MAX_SIZE,
-
-    LOG_MAX_FILES:
-      (parseEnvVar(getEnvVar(envVarMapping.application.LOG_MAX_FILES), "string", "LOG_MAX_FILES") as string) ||
-      defaultConfig.application.LOG_MAX_FILES,
-
     YOGA_RESPONSE_CACHE_TTL:
       (parseEnvVar(
         getEnvVar(envVarMapping.application.YOGA_RESPONSE_CACHE_TTL),
@@ -331,13 +314,6 @@ function loadConfigFromEnv(): Partial<Config> {
     PORT:
       (parseEnvVar(getEnvVar(envVarMapping.application.PORT), "number", "PORT") as number) ||
       defaultConfig.application.PORT,
-
-    ENABLE_FILE_LOGGING:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.application.ENABLE_FILE_LOGGING),
-        "boolean",
-        "ENABLE_FILE_LOGGING"
-      ) as boolean) ?? defaultConfig.application.ENABLE_FILE_LOGGING,
 
     ALLOWED_ORIGINS:
       (parseEnvVar(getEnvVar(envVarMapping.application.ALLOWED_ORIGINS), "array", "ALLOWED_ORIGINS") as string[]) ||
@@ -379,32 +355,53 @@ function loadConfigFromEnv(): Partial<Config> {
 
     // SDK timeout configurations
     COUCHBASE_KV_TIMEOUT:
-      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_KV_TIMEOUT), "number", "COUCHBASE_KV_TIMEOUT") as number) ||
-      defaultConfig.capella.COUCHBASE_KV_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(envVarMapping.capella.COUCHBASE_KV_TIMEOUT),
+        "number",
+        "COUCHBASE_KV_TIMEOUT"
+      ) as number) || defaultConfig.capella.COUCHBASE_KV_TIMEOUT,
 
     COUCHBASE_KV_DURABLE_TIMEOUT:
-      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_KV_DURABLE_TIMEOUT), "number", "COUCHBASE_KV_DURABLE_TIMEOUT") as number) ||
-      defaultConfig.capella.COUCHBASE_KV_DURABLE_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(envVarMapping.capella.COUCHBASE_KV_DURABLE_TIMEOUT),
+        "number",
+        "COUCHBASE_KV_DURABLE_TIMEOUT"
+      ) as number) || defaultConfig.capella.COUCHBASE_KV_DURABLE_TIMEOUT,
 
     COUCHBASE_QUERY_TIMEOUT:
-      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_QUERY_TIMEOUT), "number", "COUCHBASE_QUERY_TIMEOUT") as number) ||
-      defaultConfig.capella.COUCHBASE_QUERY_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(envVarMapping.capella.COUCHBASE_QUERY_TIMEOUT),
+        "number",
+        "COUCHBASE_QUERY_TIMEOUT"
+      ) as number) || defaultConfig.capella.COUCHBASE_QUERY_TIMEOUT,
 
     COUCHBASE_ANALYTICS_TIMEOUT:
-      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_ANALYTICS_TIMEOUT), "number", "COUCHBASE_ANALYTICS_TIMEOUT") as number) ||
-      defaultConfig.capella.COUCHBASE_ANALYTICS_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(envVarMapping.capella.COUCHBASE_ANALYTICS_TIMEOUT),
+        "number",
+        "COUCHBASE_ANALYTICS_TIMEOUT"
+      ) as number) || defaultConfig.capella.COUCHBASE_ANALYTICS_TIMEOUT,
 
     COUCHBASE_SEARCH_TIMEOUT:
-      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_SEARCH_TIMEOUT), "number", "COUCHBASE_SEARCH_TIMEOUT") as number) ||
-      defaultConfig.capella.COUCHBASE_SEARCH_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(envVarMapping.capella.COUCHBASE_SEARCH_TIMEOUT),
+        "number",
+        "COUCHBASE_SEARCH_TIMEOUT"
+      ) as number) || defaultConfig.capella.COUCHBASE_SEARCH_TIMEOUT,
 
     COUCHBASE_CONNECT_TIMEOUT:
-      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_CONNECT_TIMEOUT), "number", "COUCHBASE_CONNECT_TIMEOUT") as number) ||
-      defaultConfig.capella.COUCHBASE_CONNECT_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(envVarMapping.capella.COUCHBASE_CONNECT_TIMEOUT),
+        "number",
+        "COUCHBASE_CONNECT_TIMEOUT"
+      ) as number) || defaultConfig.capella.COUCHBASE_CONNECT_TIMEOUT,
 
     COUCHBASE_BOOTSTRAP_TIMEOUT:
-      (parseEnvVar(getEnvVar(envVarMapping.capella.COUCHBASE_BOOTSTRAP_TIMEOUT), "number", "COUCHBASE_BOOTSTRAP_TIMEOUT") as number) ||
-      defaultConfig.capella.COUCHBASE_BOOTSTRAP_TIMEOUT,
+      (parseEnvVar(
+        getEnvVar(envVarMapping.capella.COUCHBASE_BOOTSTRAP_TIMEOUT),
+        "number",
+        "COUCHBASE_BOOTSTRAP_TIMEOUT"
+      ) as number) || defaultConfig.capella.COUCHBASE_BOOTSTRAP_TIMEOUT,
   };
 
   // LOAD RUNTIME CONFIGURATION

@@ -16,7 +16,7 @@
     "start:prod": "NODE_ENV=production bun run src/index.ts",
     "build": "bun run build.config.ts",
     "build:dev": "BUILD_TARGET=development bun run build.config.ts",
-    "build:prod": "BUILD_TARGET=production bun run build.config.ts", 
+    "build:prod": "BUILD_TARGET=production bun run build.config.ts",
     "build:docker": "BUILD_TARGET=docker bun run build.config.ts",
     "build:serverless": "BUILD_TARGET=serverless bun run build.config.ts",
     "build:test": "BUILD_TARGET=test bun run build.config.ts",
@@ -118,7 +118,9 @@
   ],
   "snyk": true,
   "workspaces": {
-    "packages": ["packages/*"],
+    "packages": [
+      "packages/*"
+    ],
     "catalog": {
       "typescript": "^5.3.3",
       "bun-types": "latest",
@@ -130,8 +132,14 @@
   "bun": {
     "test": {
       "coverage": {
-        "include": ["src/**/*.ts"],
-        "exclude": ["src/**/*.test.ts", "src/**/*.spec.ts", "test/**/*"],
+        "include": [
+          "src/**/*.ts"
+        ],
+        "exclude": [
+          "src/**/*.test.ts",
+          "src/**/*.spec.ts",
+          "test/**/*"
+        ],
         "threshold": {
           "line": 80,
           "function": 80,

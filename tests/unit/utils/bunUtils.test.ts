@@ -1,7 +1,14 @@
 /* src/utils/bunUtils.test.ts - Test Bun-specific utilities */
 
 import { beforeEach, describe, expect, mock, test } from "bun:test";
-import { BunEnv, BunPerf, CircuitBreaker, createHealthcheck, retryWithBackoff, sleep } from "../../../src/utils/bunUtils";
+import {
+  BunEnv,
+  BunPerf,
+  CircuitBreaker,
+  createHealthcheck,
+  retryWithBackoff,
+  sleep,
+} from "../../../src/utils/bunUtils";
 
 describe("BunUtils", () => {
   describe("sleep", () => {

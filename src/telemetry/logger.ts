@@ -3,6 +3,7 @@
 import { context, type SpanContext, trace } from "@opentelemetry/api";
 import * as api from "@opentelemetry/api-logs";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
+import config from "$config";
 
 export enum LogLevel {
   DEBUG = "debug",
@@ -17,6 +18,8 @@ export interface LogContext {
   requestId?: string;
   userId?: string;
   sessionId?: string;
+  operationType?: string;
+  businessContext?: string;
 }
 
 export interface StructuredLogData {
@@ -29,6 +32,11 @@ export interface StructuredLogData {
     name: string;
     message: string;
     stack?: string;
+  };
+  businessImpact?: {
+    severity: "low" | "medium" | "high" | "critical";
+    operationCategory: "query" | "mutation" | "subscription" | "system" | "health";
+    costTier: "standard" | "priority" | "critical";
   };
 }
 
@@ -129,6 +137,11 @@ class TelemetryLogger {
   }
 
   private emit(logData: StructuredLogData): void {
+    // Apply log-level specific sampling before processing
+    if (!this.shouldSampleLog(logData)) {
+      return; // Skip this log based on sampling rate
+    }
+
     // Check circuit breaker
     const circuitBreaker = telemetryHealthMonitor.getCircuitBreaker();
 
@@ -140,7 +153,7 @@ class TelemetryLogger {
 
     if (this.isInitialized && this.logger) {
       try {
-        // Enhanced log record with 2025 compliance
+        // Enhanced log record with 2025 compliance and business context
         this.logger.emit({
           timestamp: logData.timestamp,
           severityText: logData.level.toUpperCase(),
@@ -156,6 +169,16 @@ class TelemetryLogger {
             "service.version": "2.0.0",
             // Runtime information
             "runtime.name": typeof Bun !== "undefined" ? "bun" : "node",
+            // Log retention metadata for cloud management
+            "log.retention.days": this.getRetentionDays(logData.level),
+            "log.priority": this.getLogPriority(logData.level),
+            "log.cost.tier": this.getCostTier(logData.level),
+            // Business impact metadata
+            ...(logData.businessImpact && {
+              "business.impact.severity": logData.businessImpact.severity,
+              "business.operation.category": logData.businessImpact.operationCategory,
+              "business.cost.tier": logData.businessImpact.costTier,
+            }),
           },
         });
 
@@ -180,7 +203,14 @@ class TelemetryLogger {
   }
 
   private fallbackToConsole(logData: StructuredLogData, error?: unknown): void {
-    const timestamp = new Date(logData.timestamp).toISOString();
+    // Show local time in development for better developer experience
+    const isDevelopment = process.env.NODE_ENV === "development" || process.env.BUN_ENV === "development";
+    const date = new Date(logData.timestamp);
+
+    const timestamp = isDevelopment
+      ? `${date.toLocaleDateString()} ${date.toLocaleTimeString()} (${Intl.DateTimeFormat().resolvedOptions().timeZone})`
+      : date.toISOString();
+
     const contextStr = logData.context
       ? `[${logData.context.traceId?.slice(0, 8)}:${logData.context.spanId?.slice(0, 8)}]`
       : "";
@@ -230,6 +260,90 @@ class TelemetryLogger {
         return 17; // ERROR
       default:
         return 9; // INFO
+    }
+  }
+
+  /**
+   * Deterministic sampling based on trace ID for consistency across distributed systems
+   */
+  private shouldSampleLog(logData: StructuredLogData): boolean {
+    const samplingRate = this.getSamplingRate(logData.level);
+    
+    // Always sample errors to maintain 100% error visibility
+    if (logData.level === LogLevel.ERROR) {
+      return true;
+    }
+    
+    // Use trace ID for deterministic sampling if available
+    const traceId = logData.context?.traceId;
+    if (traceId) {
+      // Use last 8 characters of trace ID for sampling decision
+      const hash = parseInt(traceId.slice(-8), 16);
+      const normalizedHash = (hash % 1000000) / 1000000; // Normalize to 0-1
+      return normalizedHash < samplingRate;
+    }
+    
+    // Fallback to random sampling
+    return Math.random() < samplingRate;
+  }
+
+  private getSamplingRate(level: LogLevel): number {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return config.telemetry.LOG_SAMPLING_DEBUG;
+      case LogLevel.INFO:
+        return config.telemetry.LOG_SAMPLING_INFO;
+      case LogLevel.WARN:
+        return config.telemetry.LOG_SAMPLING_WARN;
+      case LogLevel.ERROR:
+        return config.telemetry.LOG_SAMPLING_ERROR;
+      default:
+        return 0.5;
+    }
+  }
+
+  private getRetentionDays(level: LogLevel): number {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return config.telemetry.LOG_RETENTION_DEBUG_DAYS;
+      case LogLevel.INFO:
+        return config.telemetry.LOG_RETENTION_INFO_DAYS;
+      case LogLevel.WARN:
+        return config.telemetry.LOG_RETENTION_WARN_DAYS;
+      case LogLevel.ERROR:
+        return config.telemetry.LOG_RETENTION_ERROR_DAYS;
+      default:
+        return 7;
+    }
+  }
+
+  private getLogPriority(level: LogLevel): number {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return 1; // Lowest priority
+      case LogLevel.INFO:
+        return 2; // Standard priority
+      case LogLevel.WARN:
+        return 3; // High priority
+      case LogLevel.ERROR:
+        return 4; // Critical priority
+      default:
+        return 2;
+    }
+  }
+
+  private getCostTier(level: LogLevel): string {
+    switch (level) {
+      case LogLevel.DEBUG:
+        return "standard"; // Cost-optimized storage
+      case LogLevel.INFO:
+        return "standard"; // Standard storage
+      case LogLevel.WARN:
+        return "priority"; // Priority storage for faster access
+      case LogLevel.ERROR:
+        return "critical"; // Critical storage with highest availability
+      default:
+        return "standard";
     }
   }
 }

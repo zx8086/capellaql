@@ -1,10 +1,10 @@
 // Unit tests for telemetry configuration module
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
-import { 
-  TelemetryConfigSchema, 
-  loadTelemetryConfigFromEnv, 
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
+import {
+  loadTelemetryConfigFromEnv,
+  TelemetryConfigSchema,
   telemetryDefaults,
-  validateTelemetryConfig 
+  validateTelemetryConfig,
 } from "../../../src/config/modules/telemetry";
 
 describe("Telemetry Configuration", () => {
@@ -47,7 +47,7 @@ describe("Telemetry Configuration", () => {
     test("validates deployment environment enum", () => {
       const invalidEnvironment = {
         ...telemetryDefaults,
-        DEPLOYMENT_ENVIRONMENT: "invalid"
+        DEPLOYMENT_ENVIRONMENT: "invalid",
       };
 
       const result = TelemetryConfigSchema.safeParse(invalidEnvironment);
@@ -57,7 +57,7 @@ describe("Telemetry Configuration", () => {
     test("validates URL format for endpoints", () => {
       const invalidEndpoint = {
         ...telemetryDefaults,
-        TRACES_ENDPOINT: "not-a-url"
+        TRACES_ENDPOINT: "not-a-url",
       };
 
       const result = TelemetryConfigSchema.safeParse(invalidEndpoint);
@@ -67,7 +67,7 @@ describe("Telemetry Configuration", () => {
     test("validates 2025 compliance - export timeout", () => {
       const invalidTimeout = {
         ...telemetryDefaults,
-        EXPORT_TIMEOUT_MS: 35000 // Exceeds 2025 standard
+        EXPORT_TIMEOUT_MS: 35000, // Exceeds 2025 standard
       };
 
       const result = TelemetryConfigSchema.safeParse(invalidTimeout);
@@ -77,7 +77,7 @@ describe("Telemetry Configuration", () => {
     test("validates sampling rate range", () => {
       const invalidSamplingRate = {
         ...telemetryDefaults,
-        SAMPLING_RATE: 1.5 // Above 100%
+        SAMPLING_RATE: 1.5, // Above 100%
       };
 
       const result = TelemetryConfigSchema.safeParse(invalidSamplingRate);
@@ -87,7 +87,7 @@ describe("Telemetry Configuration", () => {
     test("validates batch size limits", () => {
       const invalidBatchSize = {
         ...telemetryDefaults,
-        BATCH_SIZE: 5000 // Above recommended maximum
+        BATCH_SIZE: 5000, // Above recommended maximum
       };
 
       const result = TelemetryConfigSchema.safeParse(invalidBatchSize);
@@ -141,7 +141,7 @@ describe("Telemetry Configuration", () => {
     test("detects NaN metric reader interval", () => {
       const configWithNaN = {
         ...telemetryDefaults,
-        METRIC_READER_INTERVAL: NaN
+        METRIC_READER_INTERVAL: NaN,
       };
 
       const warnings = validateTelemetryConfig(configWithNaN, false);
@@ -151,7 +151,7 @@ describe("Telemetry Configuration", () => {
     test("detects NaN summary log interval", () => {
       const configWithNaN = {
         ...telemetryDefaults,
-        SUMMARY_LOG_INTERVAL: NaN
+        SUMMARY_LOG_INTERVAL: NaN,
       };
 
       const warnings = validateTelemetryConfig(configWithNaN, false);
@@ -161,7 +161,7 @@ describe("Telemetry Configuration", () => {
     test("validates high sampling rate in production", () => {
       const productionConfig = {
         ...telemetryDefaults,
-        SAMPLING_RATE: 0.8 // 80% sampling
+        SAMPLING_RATE: 0.8, // 80% sampling
       };
 
       const warnings = validateTelemetryConfig(productionConfig, true);
@@ -171,7 +171,7 @@ describe("Telemetry Configuration", () => {
     test("validates export timeout compliance in production", () => {
       const productionConfig = {
         ...telemetryDefaults,
-        EXPORT_TIMEOUT_MS: 35000 // Above 2025 standard
+        EXPORT_TIMEOUT_MS: 35000, // Above 2025 standard
       };
 
       const warnings = validateTelemetryConfig(productionConfig, true);
@@ -181,7 +181,7 @@ describe("Telemetry Configuration", () => {
     test("validates batch size optimization in production", () => {
       const productionConfig = {
         ...telemetryDefaults,
-        BATCH_SIZE: 512 // Below recommended
+        BATCH_SIZE: 512, // Below recommended
       };
 
       const warnings = validateTelemetryConfig(productionConfig, true);
@@ -202,18 +202,18 @@ describe("Telemetry Configuration", () => {
         ...telemetryDefaults,
         TRACES_ENDPOINT: "http://traces.example.com:4318/v1/traces",
         METRICS_ENDPOINT: "http://metrics.example.com:4318/v1/metrics",
-        LOGS_ENDPOINT: "http://logs.example.com:4318/v1/logs"
+        LOGS_ENDPOINT: "http://logs.example.com:4318/v1/logs",
       };
 
       // Mock console.warn to capture warnings
       const warnSpy = mock(console, "warn");
-      
+
       validateTelemetryConfig(configWithDifferentHosts, false);
-      
+
       expect(warnSpy).toHaveBeenCalledWith(
         "Telemetry endpoints use different hosts - consider using the same OTLP collector"
       );
-      
+
       warnSpy.mockRestore();
     });
 
@@ -222,16 +222,16 @@ describe("Telemetry Configuration", () => {
         ...telemetryDefaults,
         TRACES_ENDPOINT: "http://otel.example.com:4318/v1/traces",
         METRICS_ENDPOINT: "http://otel.example.com:4318/v1/metrics",
-        LOGS_ENDPOINT: "http://otel.example.com:4318/v1/logs"
+        LOGS_ENDPOINT: "http://otel.example.com:4318/v1/logs",
       };
 
       // Mock console.warn to ensure it's not called
       const warnSpy = mock(console, "warn");
-      
+
       validateTelemetryConfig(configWithSameHost, false);
-      
+
       expect(warnSpy).not.toHaveBeenCalled();
-      
+
       warnSpy.mockRestore();
     });
   });
@@ -239,7 +239,7 @@ describe("Telemetry Configuration", () => {
   describe("Error Path Mapping", () => {
     test("maps configuration paths to environment variables", () => {
       const { getTelemetryEnvVarPath } = require("../../../src/config/modules/telemetry");
-      
+
       expect(getTelemetryEnvVarPath("telemetry.ENABLE_OPENTELEMETRY")).toBe("ENABLE_OPENTELEMETRY");
       expect(getTelemetryEnvVarPath("telemetry.SERVICE_NAME")).toBe("SERVICE_NAME");
       expect(getTelemetryEnvVarPath("telemetry.BATCH_SIZE")).toBe("BATCH_SIZE");

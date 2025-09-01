@@ -1,9 +1,9 @@
 /* test/k6/utils/graphql-helpers.ts */
 
-import http, { Response } from 'k6/http';
-import { check } from 'k6';
-import { getGraphQLEndpoint, commonParams } from './config.ts';
-import { recordGraphQLOperation, type GraphQLOperationMetrics } from './metrics.ts';
+import { check } from "k6";
+import http, { type Response } from "k6/http";
+import { commonParams, getGraphQLEndpoint } from "./config.ts";
+import { type GraphQLOperationMetrics, recordGraphQLOperation } from "./metrics.ts";
 
 export interface GraphQLQuery {
   query: string;
@@ -23,33 +23,30 @@ export interface GraphQLResponse {
 
 export interface GraphQLTestOptions {
   operation: string;
-  complexity?: 'simple' | 'complex';
+  complexity?: "simple" | "complex";
   timeout?: string;
   tags?: Record<string, string>;
   expectedFields?: string[];
 }
 
-export const executeGraphQLQuery = (
-  query: GraphQLQuery,
-  options: GraphQLTestOptions
-): Response => {
+export const executeGraphQLQuery = (query: GraphQLQuery, options: GraphQLTestOptions): Response => {
   const startTime = Date.now();
-  
+
   const payload = JSON.stringify({
     query: query.query,
     variables: query.variables || {},
-    operationName: query.operationName
+    operationName: query.operationName,
   });
 
   const params = {
     ...commonParams,
     tags: {
-      testType: 'graphql',
+      testType: "graphql",
       operation: options.operation,
-      complexity: options.complexity || 'simple',
-      ...options.tags
+      complexity: options.complexity || "simple",
+      ...options.tags,
     },
-    timeout: options.timeout || commonParams.timeout
+    timeout: options.timeout || commonParams.timeout,
   };
 
   const response = http.post(getGraphQLEndpoint(), payload, params);
@@ -58,13 +55,13 @@ export const executeGraphQLQuery = (
   // Record metrics
   const success = response.status === 200 && !hasGraphQLErrors(response);
   const graphqlResponse = parseGraphQLResponse(response);
-  
+
   const metrics: GraphQLOperationMetrics = {
     operation: options.operation,
     duration,
     success,
     complexity: options.complexity,
-    errors: graphqlResponse?.errors
+    errors: graphqlResponse?.errors,
   };
 
   recordGraphQLOperation(metrics);
@@ -86,13 +83,10 @@ export const hasGraphQLErrors = (response: Response): boolean => {
   return !!(graphqlResponse?.errors && graphqlResponse.errors.length > 0);
 };
 
-export const validateGraphQLResponse = (
-  response: Response,
-  options: GraphQLTestOptions
-): boolean => {
+export const validateGraphQLResponse = (response: Response, options: GraphQLTestOptions): boolean => {
   const checks = {
-    'is status 200': (r: Response) => r.status === 200,
-    'is valid JSON': (r: Response) => {
+    "is status 200": (r: Response) => r.status === 200,
+    "is valid JSON": (r: Response) => {
       try {
         JSON.parse(r.body as string);
         return true;
@@ -101,7 +95,7 @@ export const validateGraphQLResponse = (
         return false;
       }
     },
-    'no GraphQL errors': (r: Response) => {
+    "no GraphQL errors": (r: Response) => {
       const graphqlResponse = parseGraphQLResponse(r);
       if (graphqlResponse?.errors && graphqlResponse.errors.length > 0) {
         console.error(`GraphQL errors in ${options.operation}:`, graphqlResponse.errors);
@@ -109,10 +103,10 @@ export const validateGraphQLResponse = (
       }
       return true;
     },
-    'has data field': (r: Response) => {
+    "has data field": (r: Response) => {
       const graphqlResponse = parseGraphQLResponse(r);
-      return !!(graphqlResponse?.data);
-    }
+      return !!graphqlResponse?.data;
+    },
   };
 
   // Add expected field validation if provided
@@ -120,8 +114,8 @@ export const validateGraphQLResponse = (
     checks[`has expected fields`] = (r: Response) => {
       const graphqlResponse = parseGraphQLResponse(r);
       if (!graphqlResponse?.data) return false;
-      
-      return options.expectedFields!.every(field => {
+
+      return options.expectedFields!.every((field) => {
         const hasField = hasNestedField(graphqlResponse.data, field);
         if (!hasField) {
           console.error(`Missing expected field '${field}' in ${options.operation} response`);
@@ -137,7 +131,7 @@ export const validateGraphQLResponse = (
     console.error(`GraphQL ${options.operation} failed:`, {
       status: response.status,
       body: response.body,
-      duration: response.timings.duration
+      duration: response.timings.duration,
     });
   }
 
@@ -145,28 +139,31 @@ export const validateGraphQLResponse = (
 };
 
 const hasNestedField = (obj: any, fieldPath: string): boolean => {
-  const fields = fieldPath.split('.');
+  const fields = fieldPath.split(".");
   let current = obj;
-  
+
   for (const field of fields) {
     if (current === null || current === undefined || !(field in current)) {
       return false;
     }
     current = current[field];
   }
-  
+
   return true;
 };
 
-export const createRandomSelector = <T>(items: T[]): () => T => {
+export const createRandomSelector = <T>(items: T[]): (() => T) => {
   return () => items[Math.floor(Math.random() * items.length)];
 };
 
-export const generateQueryVariables = (template: Record<string, any>, selectors: Record<string, () => any>): Record<string, any> => {
+export const generateQueryVariables = (
+  template: Record<string, any>,
+  selectors: Record<string, () => any>
+): Record<string, any> => {
   const variables: Record<string, any> = {};
-  
+
   for (const [key, value] of Object.entries(template)) {
-    if (typeof value === 'string' && value.startsWith('${') && value.endsWith('}')) {
+    if (typeof value === "string" && value.startsWith("${") && value.endsWith("}")) {
       const selectorKey = value.slice(2, -1);
       if (selectors[selectorKey]) {
         variables[key] = selectors[selectorKey]();
@@ -178,18 +175,18 @@ export const generateQueryVariables = (template: Record<string, any>, selectors:
       variables[key] = value;
     }
   }
-  
+
   return variables;
 };
 
-export const measureQueryComplexity = (query: string): 'simple' | 'complex' => {
+export const measureQueryComplexity = (query: string): "simple" | "complex" => {
   const depth = (query.match(/{/g) || []).length;
   const fieldCount = (query.match(/\w+:/g) || []).length;
-  
+
   // Simple heuristic: complex if deeply nested or many fields
   if (depth > 3 || fieldCount > 10) {
-    return 'complex';
+    return "complex";
   }
-  
-  return 'simple';
+
+  return "simple";
 };

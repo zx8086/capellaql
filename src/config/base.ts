@@ -3,11 +3,8 @@
 
 export interface ApplicationConfig {
   LOG_LEVEL: string;
-  LOG_MAX_SIZE: string;
-  LOG_MAX_FILES: string;
   YOGA_RESPONSE_CACHE_TTL: number;
   PORT: number;
-  ENABLE_FILE_LOGGING: boolean;
   ALLOWED_ORIGINS: string[];
   BASE_URL: string;
 }
@@ -64,6 +61,16 @@ export interface TelemetryConfig {
   SAMPLING_RATE: number;
   CIRCUIT_BREAKER_THRESHOLD: number;
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
+  // Log-level specific sampling rates
+  LOG_SAMPLING_DEBUG: number;
+  LOG_SAMPLING_INFO: number;
+  LOG_SAMPLING_WARN: number;
+  LOG_SAMPLING_ERROR: number;
+  // Log retention policy (days)
+  LOG_RETENTION_DEBUG_DAYS: number;
+  LOG_RETENTION_INFO_DAYS: number;
+  LOG_RETENTION_WARN_DAYS: number;
+  LOG_RETENTION_ERROR_DAYS: number;
 }
 
 export interface Config {

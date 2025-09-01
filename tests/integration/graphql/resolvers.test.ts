@@ -1,5 +1,5 @@
 // Integration tests for GraphQL resolvers
-import { describe, test, expect, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { createServer } from "http";
 import { yoga } from "../../../src/index";
 
@@ -12,7 +12,7 @@ describe("GraphQL Resolver Integration", () => {
     // Create test server on a random port
     const testPort = Math.floor(Math.random() * 10000) + 20000;
     server = createServer(yoga);
-    
+
     await new Promise<void>((resolve) => {
       server.listen(testPort, () => {
         serverUrl = `http://localhost:${testPort}/graphql`;
@@ -66,25 +66,25 @@ describe("GraphQL Resolver Integration", () => {
       });
 
       expect(response.status).toBe(200);
-      
+
       const result = await response.json();
       expect(result.errors).toBeUndefined();
       expect(result.data).toBeDefined();
       expect(result.data.health).toBeDefined();
-      
+
       const health = result.data.health;
       expect(health.status).toMatch(/^(healthy|degraded|unhealthy)$/);
       expect(typeof health.timestamp).toBe("string");
       expect(typeof health.uptime).toBe("number");
       expect(typeof health.version).toBe("string");
       expect(typeof health.environment).toBe("string");
-      
+
       // Database health
       expect(health.database).toBeDefined();
       expect(health.database.status).toMatch(/^(healthy|degraded|unhealthy)$/);
       expect(typeof health.database.latency).toBe("number");
       expect(health.database.connection).toMatch(/^(connected|disconnected)$/);
-      
+
       // Runtime health
       expect(health.runtime).toBeDefined();
       expect(typeof health.runtime.memory).toBe("number");
@@ -109,7 +109,7 @@ describe("GraphQL Resolver Integration", () => {
       const variables = {
         brand: "test",
         season: "SS24",
-        division: "womens"
+        division: "womens",
       };
 
       const response = await fetch(serverUrl, {
@@ -121,9 +121,9 @@ describe("GraphQL Resolver Integration", () => {
       });
 
       expect(response.status).toBe(200);
-      
+
       const result = await response.json();
-      
+
       // Even if database operations fail, GraphQL should return proper structure
       if (result.errors) {
         // If there are errors, they should be properly formatted GraphQL errors
@@ -136,7 +136,7 @@ describe("GraphQL Resolver Integration", () => {
         // If successful, should return proper data structure
         expect(result.data).toBeDefined();
         expect(result.data.looks).toBeDefined();
-        
+
         if (Array.isArray(result.data.looks) && result.data.looks.length > 0) {
           const look = result.data.looks[0];
           expect(typeof look.id).toBe("string");
@@ -165,9 +165,9 @@ describe("GraphQL Resolver Integration", () => {
       });
 
       expect(response.status).toBe(200);
-      
+
       const result = await response.json();
-      
+
       // Should handle missing parameters gracefully
       if (result.errors) {
         // Errors should be validation errors, not server crashes
@@ -193,7 +193,7 @@ describe("GraphQL Resolver Integration", () => {
       `;
 
       const variables = {
-        key: "test-document-key"
+        key: "test-document-key",
       };
 
       const response = await fetch(serverUrl, {
@@ -205,9 +205,9 @@ describe("GraphQL Resolver Integration", () => {
       });
 
       expect(response.status).toBe(200);
-      
+
       const result = await response.json();
-      
+
       // Should handle document search gracefully
       if (result.errors) {
         expect(Array.isArray(result.errors)).toBe(true);
@@ -219,7 +219,7 @@ describe("GraphQL Resolver Integration", () => {
       } else {
         expect(result.data).toBeDefined();
         expect(result.data.documentSearch).toBeDefined();
-        
+
         const docResult = result.data.documentSearch;
         expect(typeof docResult.id).toBe("string");
         expect(typeof docResult.found).toBe("boolean");
@@ -238,7 +238,7 @@ describe("GraphQL Resolver Integration", () => {
       `;
 
       const variables = {
-        key: "" // Invalid empty key
+        key: "", // Invalid empty key
       };
 
       const response = await fetch(serverUrl, {
@@ -250,9 +250,9 @@ describe("GraphQL Resolver Integration", () => {
       });
 
       expect(response.status).toBe(200);
-      
+
       const result = await response.json();
-      
+
       // Should handle invalid input gracefully
       if (result.errors) {
         expect(Array.isArray(result.errors)).toBe(true);
@@ -287,12 +287,12 @@ describe("GraphQL Resolver Integration", () => {
       });
 
       expect(response.status).toBe(400);
-      
+
       const result = await response.json();
       expect(result.errors).toBeDefined();
       expect(Array.isArray(result.errors)).toBe(true);
       expect(result.errors.length).toBeGreaterThan(0);
-      
+
       const error = result.errors[0];
       expect(error.message).toBeDefined();
       expect(typeof error.message).toBe("string");
@@ -348,9 +348,9 @@ describe("GraphQL Resolver Integration", () => {
 
       // Should process normal depth queries successfully
       expect(response.status).toBe(200);
-      
+
       const result = await response.json();
-      
+
       if (result.errors) {
         // If there are depth limit errors, they should be proper GraphQL errors
         result.errors.forEach((error: any) => {
@@ -382,7 +382,7 @@ describe("GraphQL Resolver Integration", () => {
 
       // Should handle large queries appropriately (either process or reject with proper error)
       expect(response.status).toBeLessThan(500);
-      
+
       if (response.status === 413 || response.status === 400) {
         // Query size limit hit - this is expected and good
         const result = await response.json();

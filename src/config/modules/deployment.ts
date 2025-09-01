@@ -1,7 +1,7 @@
 // Deployment configuration module
 import { z } from "zod";
 import type { DeploymentConfig } from "../base";
-import { parseEnvVar, getEnvVar } from "../utils/env-parser";
+import { getEnvVar, parseEnvVar } from "../utils/env-parser";
 
 // Environment variable mapping for deployment section
 export const deploymentEnvMapping = {

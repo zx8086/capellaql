@@ -1,7 +1,8 @@
 // Bun-optimized OTLP Trace Exporter
+
+import type { ExportResult } from "@opentelemetry/core";
 import { hrTimeToMicroseconds } from "@opentelemetry/core";
 import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
-import type { ExportResult } from "@opentelemetry/core";
 import { BunOTLPExporter, type BunOTLPExporterConfig } from "./BunOTLPExporter";
 
 /**
@@ -10,7 +11,7 @@ import { BunOTLPExporter, type BunOTLPExporterConfig } from "./BunOTLPExporter";
  */
 export class BunTraceExporter extends BunOTLPExporter<ReadableSpan> implements SpanExporter {
   constructor(config: BunOTLPExporterConfig) {
-    super('traces', config);
+    super("traces", config);
   }
 
   /**
@@ -18,19 +19,21 @@ export class BunTraceExporter extends BunOTLPExporter<ReadableSpan> implements S
    */
   protected serializePayload(spans: ReadableSpan[]): string {
     const resourceSpans = this.groupSpansByResource(spans);
-    
+
     const otlpPayload = {
-      resourceSpans: resourceSpans.map(group => ({
+      resourceSpans: resourceSpans.map((group) => ({
         resource: {
           attributes: this.serializeAttributes(group.resource.attributes),
         },
-        scopeSpans: [{
-          scope: {
-            name: group.instrumentationLibrary?.name || 'unknown',
-            version: group.instrumentationLibrary?.version || '1.0.0',
+        scopeSpans: [
+          {
+            scope: {
+              name: group.instrumentationLibrary?.name || "unknown",
+              version: group.instrumentationLibrary?.version || "1.0.0",
+            },
+            spans: group.spans.map((span) => this.serializeSpan(span)),
           },
-          spans: group.spans.map(span => this.serializeSpan(span)),
-        }],
+        ],
       })),
     };
 
@@ -49,7 +52,7 @@ export class BunTraceExporter extends BunOTLPExporter<ReadableSpan> implements S
 
     for (const span of spans) {
       const resourceKey = JSON.stringify(span.resource.attributes);
-      const libraryKey = span.instrumentationLibrary?.name || 'unknown';
+      const libraryKey = span.instrumentationLibrary?.name || "unknown";
       const key = `${resourceKey}:${libraryKey}`;
 
       if (!groups.has(key)) {
@@ -86,12 +89,12 @@ export class BunTraceExporter extends BunOTLPExporter<ReadableSpan> implements S
         code: span.status.code,
         message: span.status.message,
       },
-      events: span.events.map(event => ({
+      events: span.events.map((event) => ({
         timeUnixNano: (hrTimeToMicroseconds(event.time) * 1000).toString(),
         name: event.name,
         attributes: this.serializeAttributes(event.attributes),
       })),
-      links: span.links.map(link => ({
+      links: span.links.map((link) => ({
         traceId: link.context.traceId,
         spanId: link.context.spanId,
         attributes: this.serializeAttributes(link.attributes),
@@ -118,20 +121,20 @@ export class BunTraceExporter extends BunOTLPExporter<ReadableSpan> implements S
    * Serialize attribute value based on its type
    */
   private serializeAttributeValue(value: any): any {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
       return { stringValue: value };
-    } else if (typeof value === 'number') {
+    } else if (typeof value === "number") {
       if (Number.isInteger(value)) {
         return { intValue: value.toString() };
       } else {
         return { doubleValue: value };
       }
-    } else if (typeof value === 'boolean') {
+    } else if (typeof value === "boolean") {
       return { boolValue: value };
     } else if (Array.isArray(value)) {
       return {
         arrayValue: {
-          values: value.map(v => this.serializeAttributeValue(v)),
+          values: value.map((v) => this.serializeAttributeValue(v)),
         },
       };
     } else {

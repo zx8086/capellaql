@@ -1,7 +1,7 @@
 // Runtime configuration module
 import { z } from "zod";
 import type { RuntimeConfig } from "../base";
-import { parseEnvVar, getEnvVar } from "../utils/env-parser";
+import { getEnvVar, parseEnvVar } from "../utils/env-parser";
 
 // Environment variable mapping for runtime section
 export const runtimeEnvMapping = {
@@ -42,12 +42,10 @@ export const RuntimeConfigSchema = z.object({
 export function loadRuntimeConfigFromEnv(): RuntimeConfig {
   return {
     NODE_ENV:
-      (parseEnvVar(getEnvVar(runtimeEnvMapping.NODE_ENV), "string", "NODE_ENV") as string) ||
-      runtimeDefaults.NODE_ENV,
+      (parseEnvVar(getEnvVar(runtimeEnvMapping.NODE_ENV), "string", "NODE_ENV") as string) || runtimeDefaults.NODE_ENV,
 
     CN_ROOT:
-      (parseEnvVar(getEnvVar(runtimeEnvMapping.CN_ROOT), "string", "CN_ROOT") as string) ||
-      runtimeDefaults.CN_ROOT,
+      (parseEnvVar(getEnvVar(runtimeEnvMapping.CN_ROOT), "string", "CN_ROOT") as string) || runtimeDefaults.CN_ROOT,
 
     CN_CXXCBC_CACHE_DIR:
       (parseEnvVar(getEnvVar(runtimeEnvMapping.CN_CXXCBC_CACHE_DIR), "string", "CN_CXXCBC_CACHE_DIR") as string) ||
@@ -58,11 +56,8 @@ export function loadRuntimeConfigFromEnv(): RuntimeConfig {
       runtimeDefaults.SOURCE_MAP_SUPPORT,
 
     PRESERVE_SOURCE_MAPS:
-      (parseEnvVar(
-        getEnvVar(runtimeEnvMapping.PRESERVE_SOURCE_MAPS),
-        "boolean",
-        "PRESERVE_SOURCE_MAPS"
-      ) as boolean) ?? runtimeDefaults.PRESERVE_SOURCE_MAPS,
+      (parseEnvVar(getEnvVar(runtimeEnvMapping.PRESERVE_SOURCE_MAPS), "boolean", "PRESERVE_SOURCE_MAPS") as boolean) ??
+      runtimeDefaults.PRESERVE_SOURCE_MAPS,
 
     BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS:
       (parseEnvVar(

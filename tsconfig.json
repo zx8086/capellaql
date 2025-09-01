@@ -82,21 +82,8 @@
     "importsNotUsedAsValues": "error",
     "preserveValueImports": false
   },
-  "include": [
-    "src/**/*",
-    "src/global.d.ts",
-    "tests/**/*.test.ts",
-    "tools/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    ".bun-cache",
-    "coverage",
-    "test/k6/**/*.js",
-    "**/*.min.js",
-    "**/*.d.ts"
-  ],
+  "include": ["src/**/*", "src/global.d.ts", "tests/**/*.test.ts", "tools/**/*.ts"],
+  "exclude": ["node_modules", "dist", ".bun-cache", "coverage", "test/k6/**/*.js", "**/*.min.js", "**/*.d.ts"],
   "ts-node": {
     "esm": true,
     "experimentalSpecifierResolution": "node"

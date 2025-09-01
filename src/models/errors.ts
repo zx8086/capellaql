@@ -18,7 +18,7 @@ export abstract class AppError extends Error {
     this.name = this.constructor.name;
     this.context = context;
     this.timestamp = new Date().toISOString();
-    
+
     // Maintains proper stack trace for where our error was thrown (Node.js only)
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, this.constructor);
@@ -46,7 +46,7 @@ export abstract class AppError extends Error {
  */
 export class DatabaseError extends AppError {
   readonly statusCode = 500;
-  readonly code = 'DATABASE_ERROR';
+  readonly code = "DATABASE_ERROR";
 
   constructor(message: string, cause?: Error, context?: Record<string, any>) {
     super(`Database operation failed: ${message}`, cause, context);
@@ -58,13 +58,13 @@ export class DatabaseError extends AppError {
  */
 export class DocumentNotFoundError extends DatabaseError {
   readonly statusCode = 404;
-  readonly code = 'DOCUMENT_NOT_FOUND';
+  readonly code = "DOCUMENT_NOT_FOUND";
 
   constructor(documentId: string, collection?: string, cause?: Error) {
-    const message = collection 
+    const message = collection
       ? `Document '${documentId}' not found in collection '${collection}'`
       : `Document '${documentId}' not found`;
-    
+
     super(message, cause, { documentId, collection });
   }
 }
@@ -74,7 +74,7 @@ export class DocumentNotFoundError extends DatabaseError {
  */
 export class ValidationError extends AppError {
   readonly statusCode = 400;
-  readonly code = 'VALIDATION_ERROR';
+  readonly code = "VALIDATION_ERROR";
 
   constructor(message: string, field?: string, value?: any, cause?: Error) {
     super(`Validation failed: ${message}`, cause, { field, value });
@@ -86,9 +86,9 @@ export class ValidationError extends AppError {
  */
 export class AuthenticationError extends AppError {
   readonly statusCode = 401;
-  readonly code = 'AUTHENTICATION_ERROR';
+  readonly code = "AUTHENTICATION_ERROR";
 
-  constructor(message: string = 'Authentication required', cause?: Error) {
+  constructor(message: string = "Authentication required", cause?: Error) {
     super(message, cause);
   }
 }
@@ -98,9 +98,9 @@ export class AuthenticationError extends AppError {
  */
 export class AuthorizationError extends AppError {
   readonly statusCode = 403;
-  readonly code = 'AUTHORIZATION_ERROR';
+  readonly code = "AUTHORIZATION_ERROR";
 
-  constructor(message: string = 'Access denied', resource?: string, cause?: Error) {
+  constructor(message: string = "Access denied", resource?: string, cause?: Error) {
     super(message, cause, { resource });
   }
 }
@@ -110,14 +110,9 @@ export class AuthorizationError extends AppError {
  */
 export class GraphQLError extends AppError {
   readonly statusCode = 400;
-  readonly code = 'GRAPHQL_ERROR';
+  readonly code = "GRAPHQL_ERROR";
 
-  constructor(
-    message: string,
-    operationName?: string,
-    variables?: Record<string, any>,
-    cause?: Error
-  ) {
+  constructor(message: string, operationName?: string, variables?: Record<string, any>, cause?: Error) {
     super(`GraphQL operation failed: ${message}`, cause, { operationName, variables });
   }
 }
@@ -127,14 +122,9 @@ export class GraphQLError extends AppError {
  */
 export class ExternalServiceError extends AppError {
   readonly statusCode = 502;
-  readonly code = 'EXTERNAL_SERVICE_ERROR';
+  readonly code = "EXTERNAL_SERVICE_ERROR";
 
-  constructor(
-    serviceName: string,
-    message: string,
-    endpoint?: string,
-    cause?: Error
-  ) {
+  constructor(serviceName: string, message: string, endpoint?: string, cause?: Error) {
     super(`External service '${serviceName}' error: ${message}`, cause, {
       serviceName,
       endpoint,
@@ -147,14 +137,10 @@ export class ExternalServiceError extends AppError {
  */
 export class RateLimitError extends AppError {
   readonly statusCode = 429;
-  readonly code = 'RATE_LIMIT_EXCEEDED';
+  readonly code = "RATE_LIMIT_EXCEEDED";
 
   constructor(limit: number, windowMs: number, clientId?: string, cause?: Error) {
-    super(
-      `Rate limit exceeded: ${limit} requests per ${windowMs}ms`,
-      cause,
-      { limit, windowMs, clientId }
-    );
+    super(`Rate limit exceeded: ${limit} requests per ${windowMs}ms`, cause, { limit, windowMs, clientId });
   }
 }
 
@@ -163,7 +149,7 @@ export class RateLimitError extends AppError {
  */
 export class ConfigurationError extends AppError {
   readonly statusCode = 500;
-  readonly code = 'CONFIGURATION_ERROR';
+  readonly code = "CONFIGURATION_ERROR";
 
   constructor(message: string, configKey?: string, cause?: Error) {
     super(`Configuration error: ${message}`, cause, { configKey });
@@ -175,7 +161,7 @@ export class ConfigurationError extends AppError {
  */
 export class CircuitBreakerError extends AppError {
   readonly statusCode = 503;
-  readonly code = 'CIRCUIT_BREAKER_OPEN';
+  readonly code = "CIRCUIT_BREAKER_OPEN";
 
   constructor(serviceName: string, cause?: Error) {
     super(`Circuit breaker is open for service: ${serviceName}`, cause, {
@@ -200,17 +186,10 @@ export function toAppError(error: any, defaultMessage?: string): AppError {
   }
 
   if (error instanceof Error) {
-    return new DatabaseError(
-      defaultMessage || error.message,
-      error
-    );
+    return new DatabaseError(defaultMessage || error.message, error);
   }
 
-  return new DatabaseError(
-    defaultMessage || 'An unknown error occurred',
-    undefined,
-    { originalError: error }
-  );
+  return new DatabaseError(defaultMessage || "An unknown error occurred", undefined, { originalError: error });
 }
 
 /**
@@ -231,25 +210,13 @@ export function formatErrorResponse(error: AppError) {
  * Map Couchbase errors to application errors
  */
 export function mapCouchbaseError(error: any, context?: Record<string, any>): AppError {
-  if (error?.name === 'DocumentNotFoundError') {
-    return new DocumentNotFoundError(
-      context?.documentId || 'unknown',
-      context?.collection,
-      error
-    );
+  if (error?.name === "DocumentNotFoundError") {
+    return new DocumentNotFoundError(context?.documentId || "unknown", context?.collection, error);
   }
 
-  if (error?.name === 'CouchbaseError') {
-    return new DatabaseError(
-      error.message || 'Couchbase operation failed',
-      error,
-      context
-    );
+  if (error?.name === "CouchbaseError") {
+    return new DatabaseError(error.message || "Couchbase operation failed", error, context);
   }
 
-  return new DatabaseError(
-    'Unexpected database error',
-    error,
-    context
-  );
+  return new DatabaseError("Unexpected database error", error, context);
 }

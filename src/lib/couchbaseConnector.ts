@@ -111,9 +111,9 @@ export async function clusterConn(): Promise<capellaConn> {
 }
 
 export async function getCouchbaseHealth(): Promise<{
-  status: 'healthy' | 'degraded' | 'unhealthy';
+  status: "healthy" | "degraded" | "unhealthy";
   details: {
-    connection: 'connected' | 'disconnected' | 'connecting';
+    connection: "connected" | "disconnected" | "connecting";
     ping?: any;
     diagnostics?: any;
     circuitBreaker: {
@@ -127,37 +127,37 @@ export async function getCouchbaseHealth(): Promise<{
   try {
     const connection = await clusterConn();
     const circuitBreakerStats = dbCircuitBreaker.getStats();
-    
+
     // Test basic connectivity
     const ping = await connection.cluster.ping();
     const diagnostics = await connection.cluster.diagnostics();
-    
+
     // Determine health status based on ping results
-    let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-    
-    if (circuitBreakerStats.state === 'open') {
-      status = 'unhealthy';
+    let status: "healthy" | "degraded" | "unhealthy" = "healthy";
+
+    if (circuitBreakerStats.state === "open") {
+      status = "unhealthy";
     } else if (circuitBreakerStats.failures > 0 || ping.services.length === 0) {
-      status = 'degraded';
+      status = "degraded";
     }
-    
+
     return {
       status,
       details: {
-        connection: 'connected',
+        connection: "connected",
         ping,
         diagnostics,
         circuitBreaker: circuitBreakerStats,
-      }
+      },
     };
   } catch (error) {
     return {
-      status: 'unhealthy',
+      status: "unhealthy",
       details: {
-        connection: 'disconnected',
+        connection: "disconnected",
         circuitBreaker: dbCircuitBreaker.getStats(),
         error: error instanceof Error ? error.message : String(error),
-      }
+      },
     };
   }
 }
@@ -173,7 +173,7 @@ export async function pingCouchbase(): Promise<{
     const startTime = Date.now();
     const pingResult = await connection.cluster.ping();
     const latency = Date.now() - startTime;
-    
+
     return {
       success: true,
       latency,

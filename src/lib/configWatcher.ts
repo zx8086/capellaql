@@ -1,10 +1,10 @@
 /* src/lib/configWatcher.ts */
 
-import { watch, type FSWatcher } from "fs";
-import { log, error as err } from "../telemetry/logger";
+import { type FSWatcher, watch } from "fs";
+import { error as err, log } from "../telemetry/logger";
 
 export interface ConfigChangeEvent {
-  type: 'change' | 'rename';
+  type: "change" | "rename";
   filename: string;
   timestamp: number;
 }
@@ -21,7 +21,7 @@ class ConfigurationWatcher {
    * Start watching configuration files
    */
   startWatching(files: string[]): void {
-    files.forEach(file => this.watchFile(file));
+    files.forEach((file) => this.watchFile(file));
     log(`Configuration watcher started for ${files.length} files`, { files });
   }
 
@@ -34,11 +34,11 @@ class ConfigurationWatcher {
       log(`Stopped watching configuration file: ${file}`);
     });
     this.watchers.clear();
-    
+
     if (this.debounceTimeout) {
       clearTimeout(this.debounceTimeout);
     }
-    
+
     log("Configuration watcher stopped");
   }
 
@@ -47,7 +47,7 @@ class ConfigurationWatcher {
    */
   onConfigChange(handler: ConfigChangeHandler): () => void {
     this.handlers.add(handler);
-    
+
     // Return unsubscribe function
     return () => {
       this.handlers.delete(handler);
@@ -67,7 +67,7 @@ class ConfigurationWatcher {
         this.handleFileChange(eventType, filename || filepath);
       });
 
-      watcher.on('error', (error) => {
+      watcher.on("error", (error) => {
         err(`Error watching configuration file ${filepath}:`, error);
       });
 
@@ -90,9 +90,9 @@ class ConfigurationWatcher {
     // Debounce the change event
     this.debounceTimeout = setTimeout(async () => {
       const event: ConfigChangeEvent = {
-        type: eventType as 'change' | 'rename',
+        type: eventType as "change" | "rename",
         filename,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       log(`Configuration file changed:`, event);
@@ -115,7 +115,7 @@ class ConfigurationWatcher {
     return {
       watchedFiles: Array.from(this.watchers.keys()),
       handlerCount: this.handlers.size,
-      active: this.watchers.size > 0
+      active: this.watchers.size > 0,
     };
   }
 }
@@ -137,8 +137,8 @@ export async function readConfigFile(filepath: string): Promise<string> {
     }
   } else {
     // Fallback to Node.js fs
-    const fs = await import('fs/promises');
-    return await fs.readFile(filepath, 'utf-8');
+    const fs = await import("fs/promises");
+    return await fs.readFile(filepath, "utf-8");
   }
 }
 
@@ -147,33 +147,32 @@ export async function readConfigFile(filepath: string): Promise<string> {
  */
 export function parseEnvContent(content: string): Record<string, string> {
   const envVars: Record<string, string> = {};
-  
-  content.split('\n').forEach(line => {
+
+  content.split("\n").forEach((line) => {
     line = line.trim();
-    
+
     // Skip empty lines and comments
-    if (!line || line.startsWith('#')) {
+    if (!line || line.startsWith("#")) {
       return;
     }
-    
+
     // Find the first = sign
-    const equalIndex = line.indexOf('=');
+    const equalIndex = line.indexOf("=");
     if (equalIndex === -1) {
       return;
     }
-    
+
     const key = line.substring(0, equalIndex).trim();
     let value = line.substring(equalIndex + 1).trim();
-    
+
     // Remove quotes if present
-    if ((value.startsWith('"') && value.endsWith('"')) || 
-        (value.startsWith("'") && value.endsWith("'"))) {
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
-    
+
     envVars[key] = value;
   });
-  
+
   return envVars;
 }
 
@@ -186,17 +185,17 @@ export function getConfigDifferences<T extends Record<string, any>>(
 ): { added: string[]; removed: string[]; changed: string[] } {
   const oldKeys = new Set(Object.keys(oldConfig));
   const newKeys = new Set(Object.keys(newConfig));
-  
-  const added = Array.from(newKeys).filter(key => !oldKeys.has(key));
-  const removed = Array.from(oldKeys).filter(key => !newKeys.has(key));
+
+  const added = Array.from(newKeys).filter((key) => !oldKeys.has(key));
+  const removed = Array.from(oldKeys).filter((key) => !newKeys.has(key));
   const changed: string[] = [];
-  
+
   // Check for changed values
   for (const key of oldKeys) {
     if (newKeys.has(key) && oldConfig[key] !== newConfig[key]) {
       changed.push(key);
     }
   }
-  
+
   return { added, removed, changed };
 }

@@ -1,12 +1,12 @@
 /* tests/integration/workflows/gracefulShutdown.test.ts */
 
-import { describe, test, expect, beforeAll, afterAll, mock, spyOn } from "bun:test";
-import { spawn, type Subprocess } from "bun";
+import { afterAll, beforeAll, describe, expect, mock, spyOn, test } from "bun:test";
+import { type Subprocess, spawn } from "bun";
 
 describe("Graceful Shutdown Workflow Integration", () => {
   let serverProcess: Subprocess;
   let serverReady = false;
-  
+
   beforeAll(async () => {
     // Start server in test mode
     serverProcess = spawn(["bun", "run", "src/index.ts"], {
@@ -18,12 +18,13 @@ describe("Graceful Shutdown Workflow Integration", () => {
         COUCHBASE_USERNAME: process.env.COUCHBASE_USERNAME || "Administrator",
         COUCHBASE_PASSWORD: process.env.COUCHBASE_PASSWORD || "password",
         ENABLE_OPENTELEMETRY: "false", // Disable telemetry for tests
-      }
+      },
     });
-    
+
     // Wait for server to be ready
     let attempts = 0;
-    while (!serverReady && attempts < 30) { // 30 second timeout
+    while (!serverReady && attempts < 30) {
+      // 30 second timeout
       try {
         const response = await fetch("http://localhost:4001/health");
         if (response.ok) {
@@ -33,15 +34,15 @@ describe("Graceful Shutdown Workflow Integration", () => {
       } catch (error) {
         // Server not ready yet
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       attempts++;
     }
-    
+
     if (!serverReady) {
       throw new Error("Server failed to start within timeout");
     }
   }, 35000);
-  
+
   afterAll(async () => {
     if (serverProcess) {
       serverProcess.kill();
@@ -51,18 +52,18 @@ describe("Graceful Shutdown Workflow Integration", () => {
 
   test("should handle SIGTERM gracefully with proper shutdown sequence", async () => {
     expect(serverReady).toBe(true);
-    
+
     // Verify server is responding
     const healthCheck = await fetch("http://localhost:4001/health");
     expect(healthCheck.ok).toBe(true);
-    
+
     // Send SIGTERM to server
     serverProcess.kill("SIGTERM");
-    
+
     // Wait for graceful shutdown
     const exitCode = await serverProcess.exited;
     expect(exitCode).toBe(0);
-    
+
     // Verify server is no longer responding
     try {
       await fetch("http://localhost:4001/health");
@@ -81,9 +82,9 @@ describe("Graceful Shutdown Workflow Integration", () => {
         NODE_ENV: "test",
         APPLICATION_PORT: "4002",
         ENABLE_OPENTELEMETRY: "false",
-      }
+      },
     });
-    
+
     // Wait for server to be ready
     let ready = false;
     let attempts = 0;
@@ -97,15 +98,15 @@ describe("Graceful Shutdown Workflow Integration", () => {
       } catch (error) {
         // Server not ready yet
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       attempts++;
     }
-    
+
     expect(ready).toBe(true);
-    
+
     // Send SIGINT to server
     testServerProcess.kill("SIGINT");
-    
+
     // Wait for graceful shutdown
     const exitCode = await testServerProcess.exited;
     expect(exitCode).toBe(0);
@@ -116,7 +117,7 @@ describe("Graceful Shutdown Workflow Integration", () => {
     // We can't directly test the internal connection state, but we can verify
     // that the shutdown process completes successfully which indicates
     // all resources were cleaned up properly
-    
+
     const testServerProcess = spawn(["bun", "run", "src/index.ts"], {
       env: {
         ...process.env,
@@ -125,9 +126,9 @@ describe("Graceful Shutdown Workflow Integration", () => {
         ENABLE_OPENTELEMETRY: "false",
       },
       stdout: "pipe",
-      stderr: "pipe"
+      stderr: "pipe",
     });
-    
+
     // Wait for server to be ready
     let ready = false;
     let attempts = 0;
@@ -144,27 +145,27 @@ describe("Graceful Shutdown Workflow Integration", () => {
       } catch (error) {
         // Server not ready yet
       }
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
       attempts++;
     }
-    
+
     expect(ready).toBe(true);
-    
+
     // Verify database connection is healthy
     const systemHealth = await fetch("http://localhost:4003/health/system");
     const healthData = await systemHealth.json();
     expect(healthData.components.database.status).toBe("healthy");
-    
+
     // Send shutdown signal
     testServerProcess.kill("SIGTERM");
-    
+
     // Collect stdout/stderr to verify proper shutdown logging
     const stdout = await new Response(testServerProcess.stdout).text();
     const stderr = await new Response(testServerProcess.stderr).text();
-    
+
     const exitCode = await testServerProcess.exited;
     expect(exitCode).toBe(0);
-    
+
     // Verify shutdown sequence in logs
     expect(stdout).toContain("Starting graceful shutdown");
     expect(stdout).toContain("Database connection shutdown completed");

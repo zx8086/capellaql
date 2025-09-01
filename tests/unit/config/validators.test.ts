@@ -1,24 +1,21 @@
 // Unit tests for configuration validators
-import { describe, test, expect, beforeEach, afterEach, mock } from "bun:test";
-import { 
-  validateCrossConfiguration, 
-  validateConfigHealth, 
-  generateConfigHealthReport 
-} from "../../../src/config/validators";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import type { Config } from "../../../src/config/base";
+import {
+  generateConfigHealthReport,
+  validateConfigHealth,
+  validateCrossConfiguration,
+} from "../../../src/config/validators";
 
 // Mock configuration for testing
 const createMockConfig = (overrides: Partial<Config> = {}): Config => ({
   application: {
     LOG_LEVEL: "info",
-    LOG_MAX_SIZE: "20m",
-    LOG_MAX_FILES: "14d",
     YOGA_RESPONSE_CACHE_TTL: 900000,
     PORT: 4000,
-    ENABLE_FILE_LOGGING: false,
     ALLOWED_ORIGINS: ["http://localhost:3000"],
     BASE_URL: "http://localhost",
-    ...overrides.application
+    ...overrides.application,
   },
   capella: {
     COUCHBASE_URL: "couchbase://localhost",
@@ -34,7 +31,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => ({
     COUCHBASE_SEARCH_TIMEOUT: 15000,
     COUCHBASE_CONNECT_TIMEOUT: 10000,
     COUCHBASE_BOOTSTRAP_TIMEOUT: 15000,
-    ...overrides.capella
+    ...overrides.capella,
   },
   runtime: {
     NODE_ENV: "development",
@@ -43,7 +40,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => ({
     SOURCE_MAP_SUPPORT: true,
     PRESERVE_SOURCE_MAPS: true,
     BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 120,
-    ...overrides.runtime
+    ...overrides.runtime,
   },
   deployment: {
     BASE_URL: "http://localhost",
@@ -52,7 +49,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => ({
     CONTAINER_ID: undefined,
     K8S_POD_NAME: undefined,
     K8S_NAMESPACE: undefined,
-    ...overrides.deployment
+    ...overrides.deployment,
   },
   telemetry: {
     ENABLE_OPENTELEMETRY: true,
@@ -70,7 +67,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => ({
     SAMPLING_RATE: 0.15,
     CIRCUIT_BREAKER_THRESHOLD: 5,
     CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
-    ...overrides.telemetry
+    ...overrides.telemetry,
   },
 });
 
@@ -88,9 +85,9 @@ describe("Configuration Validators", () => {
   describe("Cross-Configuration Validation", () => {
     test("detects environment mismatch", () => {
       const warnSpy = mock(console, "warn");
-      
+
       const config = createMockConfig({
-        runtime: { 
+        runtime: {
           NODE_ENV: "production",
           CN_ROOT: "/usr/src/app",
           SOURCE_MAP_SUPPORT: true,
@@ -113,7 +110,7 @@ describe("Configuration Validators", () => {
           SAMPLING_RATE: 0.15,
           CIRCUIT_BREAKER_THRESHOLD: 5,
           CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
-        }
+        },
       });
 
       validateCrossConfiguration(config);
@@ -121,7 +118,7 @@ describe("Configuration Validators", () => {
       expect(warnSpy).toHaveBeenCalledWith(
         "Environment mismatch: NODE_ENV=production but DEPLOYMENT_ENVIRONMENT=development"
       );
-      
+
       warnSpy.mockRestore();
     });
 
@@ -129,14 +126,11 @@ describe("Configuration Validators", () => {
       const config = createMockConfig({
         application: {
           LOG_LEVEL: "info",
-          LOG_MAX_SIZE: "20m",
-          LOG_MAX_FILES: "14d",
           YOGA_RESPONSE_CACHE_TTL: NaN, // Invalid!
           PORT: 4000,
-          ENABLE_FILE_LOGGING: false,
           ALLOWED_ORIGINS: ["http://localhost:3000"],
           BASE_URL: "http://localhost",
-        }
+        },
       });
 
       const warnings = validateCrossConfiguration(config);
@@ -161,7 +155,7 @@ describe("Configuration Validators", () => {
           SAMPLING_RATE: 0.15,
           CIRCUIT_BREAKER_THRESHOLD: 5,
           CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
-        }
+        },
       });
 
       const warnings = validateCrossConfiguration(config);
@@ -212,18 +206,17 @@ describe("Configuration Validators", () => {
         },
         application: {
           LOG_LEVEL: "info",
-          LOG_MAX_SIZE: "20m",
-          LOG_MAX_FILES: "14d",
           YOGA_RESPONSE_CACHE_TTL: 900000,
           PORT: 4000,
-          ENABLE_FILE_LOGGING: false,
           ALLOWED_ORIGINS: ["*"], // Insecure!
           BASE_URL: "http://localhost",
-        }
+        },
       });
 
       const warnings = validateCrossConfiguration(productionConfig);
-      expect(warnings).toContain("CRITICAL SECURITY: Default password not allowed in production - this is a security vulnerability");
+      expect(warnings).toContain(
+        "CRITICAL SECURITY: Default password not allowed in production - this is a security vulnerability"
+      );
       expect(warnings).toContain("WARNING: Using default Administrator username in production is not recommended");
       expect(warnings).toContain("Production CORS origins should not include localhost or wildcards");
     });
@@ -232,9 +225,9 @@ describe("Configuration Validators", () => {
   describe("Health Validation", () => {
     test("reports healthy configuration", () => {
       const config = createMockConfig();
-      
+
       const health = validateConfigHealth(config);
-      
+
       expect(health.healthy).toBe(true);
       expect(health.issues.length).toBe(0);
     });
@@ -243,11 +236,8 @@ describe("Configuration Validators", () => {
       const configWithIssues = createMockConfig({
         application: {
           LOG_LEVEL: "info",
-          LOG_MAX_SIZE: "20m",
-          LOG_MAX_FILES: "14d",
           YOGA_RESPONSE_CACHE_TTL: NaN, // Critical issue
           PORT: 4000,
-          ENABLE_FILE_LOGGING: false,
           ALLOWED_ORIGINS: ["http://localhost:3000"],
           BASE_URL: "http://localhost",
         },
@@ -272,11 +262,11 @@ describe("Configuration Validators", () => {
           COUCHBASE_SEARCH_TIMEOUT: 15000,
           COUCHBASE_CONNECT_TIMEOUT: 10000,
           COUCHBASE_BOOTSTRAP_TIMEOUT: 15000,
-        }
+        },
       });
 
       const health = validateConfigHealth(configWithIssues);
-      
+
       expect(health.healthy).toBe(false);
       expect(health.issues.length).toBeGreaterThan(0);
       expect(health.issues).toContain("YOGA_RESPONSE_CACHE_TTL is NaN - will cause runtime errors");
@@ -292,11 +282,11 @@ describe("Configuration Validators", () => {
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 4000, // Above recommended
-        }
+        },
       });
 
       const health = validateConfigHealth(configWithWarnings);
-      
+
       expect(health.healthy).toBe(true);
       expect(health.warnings.length).toBeGreaterThan(0);
       expect(health.warnings).toContain("DNS TTL exceeds 1 hour - may cause stale DNS resolution");
@@ -306,9 +296,9 @@ describe("Configuration Validators", () => {
   describe("Health Report Generation", () => {
     test("generates comprehensive health report for healthy config", () => {
       const config = createMockConfig();
-      
+
       const report = generateConfigHealthReport(config);
-      
+
       expect(report).toContain("Overall Status: HEALTHY");
       expect(report).toContain("Environment: DEVELOPMENT");
       expect(report).toContain("Total Issues: 0");
@@ -319,11 +309,8 @@ describe("Configuration Validators", () => {
       const configWithIssues = createMockConfig({
         application: {
           LOG_LEVEL: "info",
-          LOG_MAX_SIZE: "20m",
-          LOG_MAX_FILES: "14d",
           YOGA_RESPONSE_CACHE_TTL: NaN, // Issue
           PORT: 4000,
-          ENABLE_FILE_LOGGING: false,
           ALLOWED_ORIGINS: ["http://localhost:3000"],
           BASE_URL: "http://localhost",
         },
@@ -333,11 +320,11 @@ describe("Configuration Validators", () => {
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 4000, // Warning
-        }
+        },
       });
 
       const report = generateConfigHealthReport(configWithIssues);
-      
+
       expect(report).toContain("Overall Status: UNHEALTHY");
       expect(report).toContain("Environment: PRODUCTION");
       expect(report).toContain("CRITICAL ISSUES");
@@ -354,11 +341,11 @@ describe("Configuration Validators", () => {
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 4000, // Warning only
-        }
+        },
       });
 
       const report = generateConfigHealthReport(configWithWarnings);
-      
+
       expect(report).toContain("Overall Status: HEALTHY");
       expect(report).toContain("Total Issues: 0");
       expect(report).toContain("WARNINGS");

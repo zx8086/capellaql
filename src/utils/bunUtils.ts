@@ -81,12 +81,12 @@ export namespace BunFile {
     const stream = new ReadableStream({
       start(controller) {
         const readStream = fs.createReadStream(path);
-        readStream.on('data', (chunk) => {
+        readStream.on("data", (chunk) => {
           controller.enqueue(new Uint8Array(chunk));
         });
-        readStream.on('end', () => controller.close());
-        readStream.on('error', (err) => controller.error(err));
-      }
+        readStream.on("end", () => controller.close());
+        readStream.on("error", (err) => controller.error(err));
+      },
     });
     return stream;
   }
@@ -151,7 +151,7 @@ export class CircuitBreaker {
 
   async execute<T>(operation: () => Promise<T>): Promise<T> {
     const now = Date.now();
-    
+
     if (this.state === "open") {
       if (now >= this.nextAttemptTime) {
         this.state = "half-open";
@@ -270,7 +270,7 @@ export namespace BunProcess {
 
       if (options.timeout) {
         timeoutId = setTimeout(() => {
-          child.kill('SIGTERM');
+          child.kill("SIGTERM");
           reject(new Error(`Process timeout after ${options.timeout}ms`));
         }, options.timeout);
       }
@@ -325,7 +325,7 @@ export namespace BunEnv {
           fileStreaming: true,
           fastStartup: true,
           javaScriptCore: true,
-        }
+        },
       };
     }
 
@@ -339,7 +339,7 @@ export namespace BunEnv {
         fileStreaming: false,
         fastStartup: false,
         javaScriptCore: false,
-      }
+      },
     };
   }
 }
@@ -387,7 +387,7 @@ export namespace BunPerf {
         const duration = (end - start) / 1_000_000;
         const memoryAfter = process.memoryUsage().heapUsed;
         const memoryDelta = memoryAfter - memoryBefore;
-        
+
         console.log(`${label}: ${duration.toFixed(2)}ms (memory: ${formatBytes(memoryDelta)})`);
         return { duration, memoryDelta };
       },
@@ -400,7 +400,7 @@ export namespace BunPerf {
     iterations = 10
   ): Promise<Record<string, { avg: number; min: number; max: number; total: number }>> {
     const results: Record<string, number[]> = {};
-    
+
     // Initialize results
     for (const name of Object.keys(operations)) {
       results[name] = [];
@@ -422,12 +422,12 @@ export namespace BunPerf {
         avg: total / durations.length,
         min: Math.min(...durations),
         max: Math.max(...durations),
-        total
+        total,
       };
     }
 
     // Log results
-    console.log('\n📊 Benchmark Results:');
+    console.log("\n📊 Benchmark Results:");
     for (const [name, stat] of Object.entries(stats)) {
       console.log(`${name}: avg=${stat.avg.toFixed(2)}ms, min=${stat.min.toFixed(2)}ms, max=${stat.max.toFixed(2)}ms`);
     }
@@ -438,12 +438,12 @@ export namespace BunPerf {
 
 // Utility functions
 function formatBytes(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) return "0 B";
   const k = 1024;
-  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const sizes = ["B", "KB", "MB", "GB"];
   const i = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k));
-  const size = bytes / Math.pow(k, i);
-  return `${bytes >= 0 ? '+' : ''}${size.toFixed(1)} ${sizes[i]}`;
+  const size = bytes / k ** i;
+  return `${bytes >= 0 ? "+" : ""}${size.toFixed(1)} ${sizes[i]}`;
 }
 
 // Enhanced health check with more comprehensive system information
@@ -476,7 +476,7 @@ export async function createHealthcheck(): Promise<{
   let eventLoopLag: number | undefined;
   try {
     const start = Date.now();
-    await new Promise(resolve => setImmediate(resolve));
+    await new Promise((resolve) => setImmediate(resolve));
     eventLoopLag = Date.now() - start;
   } catch {
     // Ignore if setImmediate is not available
@@ -502,14 +502,14 @@ export async function createHealthcheck(): Promise<{
     performance: {
       ...(eventLoopLag !== undefined && { eventLoopLag }),
       // Add GC stats if available
-      ...(typeof process.memoryUsage.rss === 'function' && {
+      ...(typeof process.memoryUsage.rss === "function" && {
         gcStats: {
           rss: memoryUsage.rss,
           heapTotal: memoryUsage.heapTotal,
           heapUsed: memoryUsage.heapUsed,
           external: memoryUsage.external,
           arrayBuffers: memoryUsage.arrayBuffers,
-        }
+        },
       }),
     },
   };

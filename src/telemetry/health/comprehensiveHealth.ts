@@ -41,6 +41,21 @@ export interface ComprehensiveHealthReport {
     error_rate_percent: number;
     response_time_p95_ms: number;
   };
+  business_metrics: {
+    telemetry_cost_efficiency: number;
+    operation_impact_score: number;
+    log_sampling_effectiveness: {
+      debug_reduction_percent: number;
+      info_reduction_percent: number;
+      warn_reduction_percent: number;
+      error_retention_percent: number;
+    };
+    retention_optimization: {
+      storage_savings_percent: number;
+      estimated_monthly_cost_usd: number;
+      cost_tier_distribution: Record<string, number>;
+    };
+  };
 }
 
 export async function generateComprehensiveHealthReport(): Promise<ComprehensiveHealthReport> {
@@ -91,6 +106,9 @@ export async function generateComprehensiveHealthReport(): Promise<Comprehensive
     response_time_p95_ms: 250,
   };
 
+  // Calculate business metrics for telemetry optimization
+  const businessMetrics = generateBusinessMetrics(telemetryHealth, memoryUsagePercent);
+
   return {
     timestamp: Date.now(),
     service: {
@@ -120,6 +138,71 @@ export async function generateComprehensiveHealthReport(): Promise<Comprehensive
       couchbase: couchbaseStatus,
     },
     sli_compliance: sliCompliance,
+    business_metrics: businessMetrics,
+  };
+}
+
+function generateBusinessMetrics(telemetryHealth: TelemetryHealthData, memoryUsagePercent: number) {
+  // Calculate sampling effectiveness
+  const samplingRates = {
+    debug: config.telemetry.LOG_SAMPLING_DEBUG,
+    info: config.telemetry.LOG_SAMPLING_INFO,
+    warn: config.telemetry.LOG_SAMPLING_WARN,
+    error: config.telemetry.LOG_SAMPLING_ERROR,
+  };
+
+  const logSamplingEffectiveness = {
+    debug_reduction_percent: (1 - samplingRates.debug) * 100,
+    info_reduction_percent: (1 - samplingRates.info) * 100,
+    warn_reduction_percent: (1 - samplingRates.warn) * 100,
+    error_retention_percent: samplingRates.error * 100,
+  };
+
+  // Calculate retention optimization savings
+  const baseRetentionDays = 30; // Industry baseline
+  const smartRetention = 
+    (config.telemetry.LOG_RETENTION_DEBUG_DAYS * 0.2) + // 20% debug logs
+    (config.telemetry.LOG_RETENTION_INFO_DAYS * 0.5) +   // 50% info logs
+    (config.telemetry.LOG_RETENTION_WARN_DAYS * 0.2) +   // 20% warn logs
+    (config.telemetry.LOG_RETENTION_ERROR_DAYS * 0.1);   // 10% error logs
+
+  const storageSavingsPercent = ((baseRetentionDays - smartRetention) / baseRetentionDays) * 100;
+
+  // Estimate monthly cost based on log volume and retention
+  const estimatedDailyLogs = 10000; // Baseline estimation
+  const costPerLogMB = 0.50; // USD per MB-month
+  const avgLogSize = 0.001; // MB per log
+  const monthlyLogVolume = estimatedDailyLogs * 30 * avgLogSize;
+  const baseCost = monthlyLogVolume * baseRetentionDays * costPerLogMB;
+  const optimizedCost = monthlyLogVolume * smartRetention * costPerLogMB;
+  const estimatedMonthlyCost = optimizedCost;
+
+  // Cost tier distribution based on log levels and their storage costs
+  const costTierDistribution = {
+    standard: 70, // Debug + Info logs
+    priority: 20, // Warn logs  
+    critical: 10, // Error logs
+  };
+
+  // Calculate telemetry cost efficiency
+  const exportSuccessRate = telemetryHealth.exporters?.logs?.successRate || 0.95;
+  const circuitBreakerEfficiency = telemetryHealth.circuitBreaker?.state === "CLOSED" ? 1.0 : 0.7;
+  const telemetryCostEfficiency = exportSuccessRate * circuitBreakerEfficiency * (1 - memoryUsagePercent / 100);
+
+  // Operation impact score based on system health
+  const healthScore = telemetryHealth.status === "healthy" ? 1.0 :
+                     telemetryHealth.status === "degraded" ? 0.8 : 0.5;
+  const operationImpactScore = healthScore * telemetryCostEfficiency;
+
+  return {
+    telemetry_cost_efficiency: Math.round(telemetryCostEfficiency * 100) / 100,
+    operation_impact_score: Math.round(operationImpactScore * 100) / 100,
+    log_sampling_effectiveness: logSamplingEffectiveness,
+    retention_optimization: {
+      storage_savings_percent: Math.round(storageSavingsPercent * 100) / 100,
+      estimated_monthly_cost_usd: Math.round(estimatedMonthlyCost * 100) / 100,
+      cost_tier_distribution: costTierDistribution,
+    },
   };
 }
 
@@ -137,14 +220,23 @@ export function getHealthStatusCode(report: ComprehensiveHealthReport): number {
 }
 
 export function formatHealthReportForLog(report: ComprehensiveHealthReport): string {
-  return JSON.stringify({
-    status: report.status,
-    service: report.service.name,
-    version: report.service.version,
-    environment: report.service.environment,
-    uptime: `${report.service.uptime_seconds}s`,
-    memory: `${report.system.memory.usage_percent}%`,
-    telemetry_status: report.telemetry.status,
-    circuit_breaker: report.telemetry.circuitBreaker.state,
-  }, null, 2);
+  return JSON.stringify(
+    {
+      status: report.status,
+      service: report.service.name,
+      version: report.service.version,
+      environment: report.service.environment,
+      uptime: `${report.service.uptime_seconds}s`,
+      memory: `${report.system.memory.usage_percent}%`,
+      telemetry_status: report.telemetry.status,
+      circuit_breaker: report.telemetry.circuitBreaker.state,
+      business_metrics: {
+        cost_efficiency: report.business_metrics.telemetry_cost_efficiency,
+        storage_savings: `${report.business_metrics.retention_optimization.storage_savings_percent}%`,
+        monthly_cost_usd: report.business_metrics.retention_optimization.estimated_monthly_cost_usd,
+      },
+    },
+    null,
+    2
+  );
 }

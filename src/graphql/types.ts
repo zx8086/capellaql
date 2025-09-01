@@ -60,7 +60,7 @@ export interface AssignmentsArgs {
   offset?: number;
 }
 
-export interface HealthArgs {}
+export type HealthArgs = {};
 
 /**
  * Output types for GraphQL operations
@@ -321,9 +321,7 @@ export interface FilterArgs {
 /**
  * Combined arguments type for complex queries
  */
-export type ComplexArgs<T extends Record<string, any> = {}> = T & 
-  Partial<PaginationArgs> & 
-  Partial<FilterArgs>;
+export type ComplexArgs<T extends Record<string, any> = {}> = T & Partial<PaginationArgs> & Partial<FilterArgs>;
 
 /**
  * Resolver information interface

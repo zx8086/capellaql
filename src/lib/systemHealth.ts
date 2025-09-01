@@ -1,14 +1,14 @@
 import { getCouchbaseHealth, pingCouchbase } from "$lib/couchbaseConnector";
-import { createHealthcheck } from "$utils/bunUtils";
 import { getTelemetryHealth } from "$telemetry";
+import { createHealthcheck } from "$utils/bunUtils";
 
 export interface SystemHealthStatus {
-  overall: 'healthy' | 'degraded' | 'unhealthy';
+  overall: "healthy" | "degraded" | "unhealthy";
   timestamp: string;
   uptime: number;
   components: {
     database: {
-      status: 'healthy' | 'degraded' | 'unhealthy';
+      status: "healthy" | "degraded" | "unhealthy";
       latency?: number;
       circuitBreaker: {
         state: string;
@@ -19,7 +19,7 @@ export interface SystemHealthStatus {
       error?: string;
     };
     runtime: {
-      status: 'healthy' | 'degraded' | 'unhealthy';
+      status: "healthy" | "degraded" | "unhealthy";
       memory: {
         used: number;
         free: number;
@@ -32,7 +32,7 @@ export interface SystemHealthStatus {
       error?: string;
     };
     telemetry: {
-      status: 'healthy' | 'degraded' | 'unhealthy';
+      status: "healthy" | "degraded" | "unhealthy";
       exporters: {
         traces: boolean;
         metrics: boolean;
@@ -54,66 +54,62 @@ export interface SystemHealthStatus {
 
 export async function getSystemHealth(): Promise<SystemHealthStatus> {
   const startTime = Date.now();
-  
+
   try {
     // Run health checks in parallel for better performance
     const [databaseHealth, runtimeHealth, telemetryHealth, databasePing] = await Promise.allSettled([
       getCouchbaseHealth(),
       createHealthcheck(),
       getTelemetryHealth(),
-      pingCouchbase()
+      pingCouchbase(),
     ]);
 
     // Process database health
-    const dbHealth = databaseHealth.status === 'fulfilled' ? databaseHealth.value : null;
-    const dbPing = databasePing.status === 'fulfilled' ? databasePing.value : null;
-    
+    const dbHealth = databaseHealth.status === "fulfilled" ? databaseHealth.value : null;
+    const dbPing = databasePing.status === "fulfilled" ? databasePing.value : null;
+
     const databaseComponent = {
-      status: dbHealth?.status || 'unhealthy' as const,
+      status: dbHealth?.status || ("unhealthy" as const),
       latency: dbPing?.latency,
-      circuitBreaker: dbHealth?.details.circuitBreaker || { state: 'unknown', failures: 0, successes: 0 },
+      circuitBreaker: dbHealth?.details.circuitBreaker || { state: "unknown", failures: 0, successes: 0 },
       details: dbHealth?.details.ping,
-      error: dbHealth?.details.error || (databaseHealth.status === 'rejected' ? databaseHealth.reason?.message : undefined)
+      error:
+        dbHealth?.details.error || (databaseHealth.status === "rejected" ? databaseHealth.reason?.message : undefined),
     };
 
     // Process runtime health
-    const rtHealth = runtimeHealth.status === 'fulfilled' ? runtimeHealth.value : null;
+    const rtHealth = runtimeHealth.status === "fulfilled" ? runtimeHealth.value : null;
     const runtimeComponent = {
-      status: rtHealth?.status === 'healthy' ? 'healthy' as const : 'unhealthy' as const,
+      status: rtHealth?.status === "healthy" ? ("healthy" as const) : ("unhealthy" as const),
       memory: rtHealth?.memory || { used: 0, free: 0, total: 0, heapUsed: 0, heapTotal: 0 },
-      environment: rtHealth?.config.environment || 'unknown',
-      version: rtHealth?.runtime.version || 'unknown',
-      error: runtimeHealth.status === 'rejected' ? runtimeHealth.reason?.message : undefined
+      environment: rtHealth?.config.environment || "unknown",
+      version: rtHealth?.runtime.version || "unknown",
+      error: runtimeHealth.status === "rejected" ? runtimeHealth.reason?.message : undefined,
     };
 
     // Process telemetry health
-    const telHealth = telemetryHealth.status === 'fulfilled' ? telemetryHealth.value : null;
+    const telHealth = telemetryHealth.status === "fulfilled" ? telemetryHealth.value : null;
     const telemetryComponent = {
-      status: telHealth?.status || 'unhealthy' as const,
+      status: telHealth?.status || ("unhealthy" as const),
       exporters: telHealth?.exporters || { traces: false, metrics: false, logs: false },
-      circuitBreaker: telHealth?.circuitBreaker || { state: 'unknown', failures: 0 },
-      error: telHealth?.error || (telemetryHealth.status === 'rejected' ? telemetryHealth.reason?.message : undefined)
+      circuitBreaker: telHealth?.circuitBreaker || { state: "unknown", failures: 0 },
+      error: telHealth?.error || (telemetryHealth.status === "rejected" ? telemetryHealth.reason?.message : undefined),
     };
 
     // Calculate overall health status
-    const componentStatuses = [
-      databaseComponent.status,
-      runtimeComponent.status,
-      telemetryComponent.status
-    ];
+    const componentStatuses = [databaseComponent.status, runtimeComponent.status, telemetryComponent.status];
 
-    let overallStatus: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
-    
-    if (componentStatuses.includes('unhealthy')) {
-      overallStatus = 'unhealthy';
-    } else if (componentStatuses.includes('degraded')) {
-      overallStatus = 'degraded';
+    let overallStatus: "healthy" | "degraded" | "unhealthy" = "healthy";
+
+    if (componentStatuses.includes("unhealthy")) {
+      overallStatus = "unhealthy";
+    } else if (componentStatuses.includes("degraded")) {
+      overallStatus = "degraded";
     }
 
     // Calculate performance metrics
-    const memoryUsagePercent = runtimeComponent.memory.total > 0 
-      ? (runtimeComponent.memory.used / runtimeComponent.memory.total) * 100 
-      : 0;
+    const memoryUsagePercent =
+      runtimeComponent.memory.total > 0 ? (runtimeComponent.memory.used / runtimeComponent.memory.total) * 100 : 0;
 
     const result: SystemHealthStatus = {
       overall: overallStatus,
@@ -127,46 +123,45 @@ export async function getSystemHealth(): Promise<SystemHealthStatus> {
       performance: {
         databaseLatency: databaseComponent.latency,
         memoryUsage: memoryUsagePercent,
-      }
+      },
     };
 
     return result;
-
   } catch (error) {
     // Fallback health status if system health check fails
     return {
-      overall: 'unhealthy',
+      overall: "unhealthy",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       components: {
         database: {
-          status: 'unhealthy',
-          circuitBreaker: { state: 'unknown', failures: 0, successes: 0 },
-          error: 'Health check failed'
+          status: "unhealthy",
+          circuitBreaker: { state: "unknown", failures: 0, successes: 0 },
+          error: "Health check failed",
         },
         runtime: {
-          status: 'unhealthy',
+          status: "unhealthy",
           memory: { used: 0, free: 0, total: 0, heapUsed: 0, heapTotal: 0 },
-          environment: 'unknown',
-          version: 'unknown',
-          error: 'Health check failed'
+          environment: "unknown",
+          version: "unknown",
+          error: "Health check failed",
         },
         telemetry: {
-          status: 'unhealthy',
+          status: "unhealthy",
           exporters: { traces: false, metrics: false, logs: false },
-          circuitBreaker: { state: 'unknown', failures: 0 },
-          error: 'Health check failed'
-        }
+          circuitBreaker: { state: "unknown", failures: 0 },
+          error: "Health check failed",
+        },
       },
       performance: {
         memoryUsage: 0,
-      }
+      },
     };
   }
 }
 
 export async function getSystemHealthSummary(): Promise<{
-  status: 'healthy' | 'degraded' | 'unhealthy';
+  status: "healthy" | "degraded" | "unhealthy";
   message: string;
   criticalIssues: string[];
 }> {
@@ -174,16 +169,16 @@ export async function getSystemHealthSummary(): Promise<{
   const criticalIssues: string[] = [];
 
   // Check for critical issues
-  if (health.components.database.status === 'unhealthy') {
-    criticalIssues.push(`Database: ${health.components.database.error || 'Connection failed'}`);
+  if (health.components.database.status === "unhealthy") {
+    criticalIssues.push(`Database: ${health.components.database.error || "Connection failed"}`);
   }
 
-  if (health.components.runtime.status === 'unhealthy') {
-    criticalIssues.push(`Runtime: ${health.components.runtime.error || 'System failure'}`);
+  if (health.components.runtime.status === "unhealthy") {
+    criticalIssues.push(`Runtime: ${health.components.runtime.error || "System failure"}`);
   }
 
-  if (health.components.telemetry.status === 'unhealthy') {
-    criticalIssues.push(`Telemetry: ${health.components.telemetry.error || 'Observability failure'}`);
+  if (health.components.telemetry.status === "unhealthy") {
+    criticalIssues.push(`Telemetry: ${health.components.telemetry.error || "Observability failure"}`);
   }
 
   // Performance warnings
@@ -195,15 +190,15 @@ export async function getSystemHealthSummary(): Promise<{
     criticalIssues.push(`High database latency: ${health.performance.databaseLatency}ms`);
   }
 
-  let message = '';
+  let message = "";
   switch (health.overall) {
-    case 'healthy':
-      message = 'All systems operational';
+    case "healthy":
+      message = "All systems operational";
       break;
-    case 'degraded':
+    case "degraded":
       message = `System degraded: ${criticalIssues.length} issues detected`;
       break;
-    case 'unhealthy':
+    case "unhealthy":
       message = `System unhealthy: ${criticalIssues.length} critical issues`;
       break;
   }
@@ -211,6 +206,6 @@ export async function getSystemHealthSummary(): Promise<{
   return {
     status: health.overall,
     message,
-    criticalIssues
+    criticalIssues,
   };
 }

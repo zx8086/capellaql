@@ -1,6 +1,6 @@
 /* src/lib/queryCache.ts - Query Result Caching Layer */
 
-import { log, err } from "../telemetry";
+import { err, log } from "../telemetry";
 
 /**
  * Cache entry with TTL and metadata
@@ -50,12 +50,14 @@ export class QueryCache {
   private accessCounter = 0;
   private cleanupTimer?: Timer;
 
-  constructor(private config: CacheConfig = {
-    defaultTtl: 5 * 60 * 1000, // 5 minutes
-    maxSize: 1000,
-    maxMemory: 10 * 1024 * 1024, // 10MB
-    cleanupInterval: 60 * 1000, // 1 minute
-  }) {
+  constructor(
+    private config: CacheConfig = {
+      defaultTtl: 5 * 60 * 1000, // 5 minutes
+      maxSize: 1000,
+      maxMemory: 10 * 1024 * 1024, // 10MB
+      cleanupInterval: 60 * 1000, // 1 minute
+    }
+  ) {
     this.startCleanupTimer();
     log("QueryCache initialized", {
       maxSize: config.maxSize,
@@ -67,21 +69,17 @@ export class QueryCache {
   /**
    * Get cached data or execute fetcher function
    */
-  async getOrSet<T>(
-    key: string,
-    fetcher: () => Promise<T>,
-    ttl: number = this.config.defaultTtl
-  ): Promise<T> {
+  async getOrSet<T>(key: string, fetcher: () => Promise<T>, ttl: number = this.config.defaultTtl): Promise<T> {
     // Check if key exists and is not expired
     const cached = this.cache.get(key);
     const now = Date.now();
 
-    if (cached && (now - cached.timestamp) < cached.ttl) {
+    if (cached && now - cached.timestamp < cached.ttl) {
       // Cache hit - update access order and stats
       this.updateAccessOrder(key);
       cached.hits++;
       this.stats.hits++;
-      
+
       log("Cache hit", { key, age: now - cached.timestamp, hits: cached.hits });
       return cached.data;
     }
@@ -97,10 +95,10 @@ export class QueryCache {
     try {
       // Fetch fresh data
       const data = await fetcher();
-      
+
       // Store in cache
       this.set(key, data, ttl);
-      
+
       return data;
     } catch (error) {
       err("Cache fetcher failed", { key, error });
@@ -128,7 +126,7 @@ export class QueryCache {
 
     this.cache.set(key, entry);
     this.updateAccessOrder(key);
-    
+
     this.stats.size = this.cache.size;
     this.stats.memoryUsage += size;
 
@@ -142,7 +140,7 @@ export class QueryCache {
     const cached = this.cache.get(key);
     const now = Date.now();
 
-    if (!cached || (now - cached.timestamp) >= cached.ttl) {
+    if (!cached || now - cached.timestamp >= cached.ttl) {
       if (cached) {
         this.remove(key);
       }
@@ -153,7 +151,7 @@ export class QueryCache {
     this.updateAccessOrder(key);
     cached.hits++;
     this.stats.hits++;
-    
+
     return cached.data;
   }
 
@@ -164,7 +162,7 @@ export class QueryCache {
     const cached = this.cache.get(key);
     const now = Date.now();
 
-    if (!cached || (now - cached.timestamp) >= cached.ttl) {
+    if (!cached || now - cached.timestamp >= cached.ttl) {
       if (cached) {
         this.remove(key);
       }
@@ -184,7 +182,7 @@ export class QueryCache {
       this.accessOrder.delete(key);
       this.stats.size = this.cache.size;
       this.stats.memoryUsage -= entry.size;
-      
+
       log("Cache remove", { key, size: entry.size });
       return true;
     }
@@ -205,7 +203,7 @@ export class QueryCache {
       evictions: this.stats.evictions,
       memoryUsage: 0,
     };
-    
+
     log("Cache cleared", { oldSize });
   }
 
@@ -221,14 +219,14 @@ export class QueryCache {
    */
   invalidatePattern(pattern: RegExp): number {
     let count = 0;
-    
+
     for (const key of this.cache.keys()) {
       if (pattern.test(key)) {
         this.remove(key);
         count++;
       }
     }
-    
+
     log("Cache pattern invalidation", { pattern: pattern.toString(), count });
     return count;
   }
@@ -236,18 +234,10 @@ export class QueryCache {
   /**
    * Create a cache key from query parameters
    */
-  static createKey(
-    operation: string,
-    params: Record<string, any>,
-    collection?: string
-  ): string {
-    const keyParts = [
-      operation,
-      collection || 'default',
-      JSON.stringify(params, Object.keys(params).sort()),
-    ];
-    
-    return keyParts.join(':');
+  static createKey(operation: string, params: Record<string, any>, collection?: string): string {
+    const keyParts = [operation, collection || "default", JSON.stringify(params, Object.keys(params).sort())];
+
+    return keyParts.join(":");
   }
 
   /**
@@ -285,7 +275,7 @@ export class QueryCache {
 
     for (const { key } of entries) {
       if (freedSpace >= requiredSpace) break;
-      
+
       const entry = this.cache.get(key);
       if (entry) {
         freedSpace += entry.size;
@@ -319,7 +309,7 @@ export class QueryCache {
    */
   private estimateSize(data: any): number {
     if (data === null || data === undefined) return 8;
-    
+
     const jsonString = JSON.stringify(data);
     return jsonString.length * 2; // Rough estimate for UTF-16
   }
@@ -341,7 +331,7 @@ export class QueryCache {
     let cleaned = 0;
 
     for (const [key, entry] of this.cache.entries()) {
-      if ((now - entry.timestamp) >= entry.ttl) {
+      if (now - entry.timestamp >= entry.ttl) {
         this.remove(key);
         cleaned++;
       }
@@ -370,11 +360,7 @@ export const defaultQueryCache = new QueryCache();
 /**
  * Helper function to cache database operations
  */
-export async function withCache<T>(
-  key: string,
-  fetcher: () => Promise<T>,
-  ttl?: number
-): Promise<T> {
+export async function withCache<T>(key: string, fetcher: () => Promise<T>, ttl?: number): Promise<T> {
   return defaultQueryCache.getOrSet(key, fetcher, ttl);
 }
 
@@ -383,17 +369,14 @@ export async function withCache<T>(
  */
 export const CacheKeys = {
   looks: (brand: string, season: string, division: string) =>
-    QueryCache.createKey('looks', { brand, season, division }),
-  
-  lookDetails: (lookId: string) =>
-    QueryCache.createKey('lookDetails', { lookId }),
-  
-  options: (lookId: string, filters?: Record<string, any>) =>
-    QueryCache.createKey('options', { lookId, ...filters }),
-  
+    QueryCache.createKey("looks", { brand, season, division }),
+
+  lookDetails: (lookId: string) => QueryCache.createKey("lookDetails", { lookId }),
+
+  options: (lookId: string, filters?: Record<string, any>) => QueryCache.createKey("options", { lookId, ...filters }),
+
   optionsSummary: (brand: string, season: string, division: string) =>
-    QueryCache.createKey('optionsSummary', { brand, season, division }),
-    
-  assignments: (userId: string, status?: string) =>
-    QueryCache.createKey('assignments', { userId, status }),
+    QueryCache.createKey("optionsSummary", { brand, season, division }),
+
+  assignments: (userId: string, status?: string) => QueryCache.createKey("assignments", { userId, status }),
 };

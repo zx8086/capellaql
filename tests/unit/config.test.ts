@@ -25,11 +25,8 @@ describe("Configuration System", () => {
     const defaultConfig = {
       application: {
         LOG_LEVEL: "info",
-        LOG_MAX_SIZE: "20m",
-        LOG_MAX_FILES: "14d",
         YOGA_RESPONSE_CACHE_TTL: 900000,
         PORT: 4000,
-        ENABLE_FILE_LOGGING: false,
         ALLOWED_ORIGINS: ["http://localhost:3000"],
         BASE_URL: "http://localhost",
       },
@@ -85,10 +82,7 @@ describe("Configuration System", () => {
       application: {
         PORT: -1, // Invalid port
         LOG_LEVEL: "info",
-        LOG_MAX_SIZE: "20m",
-        LOG_MAX_FILES: "14d",
         YOGA_RESPONSE_CACHE_TTL: 900000,
-        ENABLE_FILE_LOGGING: false,
         ALLOWED_ORIGINS: ["http://localhost:3000"],
         BASE_URL: "http://localhost",
       },

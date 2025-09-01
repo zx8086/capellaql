@@ -237,8 +237,6 @@ jobs:
           BASE_URL=${{ vars.BASE_URL }}
           PORT=${{ vars.PORT }}
           LOG_LEVEL=${{ vars.LOG_LEVEL }}
-          LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
-          LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
           YOGA_RESPONSE_CACHE_TTL=${{ vars.YOGA_RESPONSE_CACHE_TTL }}
           COUCHBASE_URL=${{ secrets.COUCHBASE_URL }}
           COUCHBASE_USERNAME=${{ secrets.COUCHBASE_USERNAME }}
@@ -413,11 +411,8 @@ jobs:
             NODE_ENV=production
             BASE_URL=${{ vars.BASE_URL }}
             PORT=${{ vars.PORT }}
-            ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
             ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
             LOG_LEVEL=${{ vars.LOG_LEVEL }}
-            LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
-            LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
             YOGA_RESPONSE_CACHE_TTL=${{ vars.YOGA_RESPONSE_CACHE_TTL }}
             COUCHBASE_BUCKET=${{ vars.COUCHBASE_BUCKET }}
             COUCHBASE_SCOPE=${{ vars.COUCHBASE_SCOPE }}
@@ -473,11 +468,8 @@ jobs:
             NODE_ENV=production
             BASE_URL=${{ vars.BASE_URL }}
             PORT=${{ vars.PORT }}
-            ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
             ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
             LOG_LEVEL=${{ vars.LOG_LEVEL }}
-            LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
-            LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
             YOGA_RESPONSE_CACHE_TTL=${{ vars.YOGA_RESPONSE_CACHE_TTL }}
             COUCHBASE_BUCKET=${{ vars.COUCHBASE_BUCKET }}
             COUCHBASE_SCOPE=${{ vars.COUCHBASE_SCOPE }}
@@ -964,11 +956,8 @@ jobs:
             BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
             BASE_URL=${{ vars.BASE_URL }}
             PORT=${{ vars.PORT }}
-            ENABLE_FILE_LOGGING=${{ vars.ENABLE_FILE_LOGGING }}
             ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
             LOG_LEVEL=${{ vars.LOG_LEVEL }}
-            LOG_MAX_SIZE=${{ vars.LOG_MAX_SIZE }}
-            LOG_MAX_FILES=${{ vars.LOG_MAX_FILES }}
             YOGA_RESPONSE_CACHE_TTL=${{ vars.YOGA_RESPONSE_CACHE_TTL }}
             COUCHBASE_BUCKET=${{ vars.COUCHBASE_BUCKET }}
             COUCHBASE_SCOPE=${{ vars.COUCHBASE_SCOPE }}
@@ -1008,9 +997,6 @@ jobs:
             -e COMMIT_HASH=${{ github.sha }} \
             -e BUILD_DATE=${{ env.BUILD_TIMESTAMP }} \
             -e ENABLE_OPENTELEMETRY=false \
-            -e ENABLE_FILE_LOGGING=false \
-            -e LOG_MAX_FILES=7d \
-            -e LOG_MAX_SIZE=10m \
             -e LOG_LEVEL=info \
             zx8086/capellaql:latest
 

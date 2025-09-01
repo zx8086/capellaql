@@ -1,24 +1,18 @@
 /* test/k6/data/test-data-loader.ts */
 
-import { SharedArray } from 'k6/data';
-import { createRandomSelector, generateQueryVariables } from '../utils/graphql-helpers.ts';
+import { SharedArray } from "k6/data";
+import { createRandomSelector, generateQueryVariables } from "../utils/graphql-helpers.ts";
 
 // Load test data using SharedArray for memory efficiency
-export const brands = new SharedArray('brands', function() {
-  return JSON.parse(open('./brands.json'));
-});
+export const brands = new SharedArray("brands", () => JSON.parse(open("./brands.json")));
 
-export const queries = new SharedArray('queries', function() {
-  return JSON.parse(open('./queries.json'));
-});
+export const queries = new SharedArray("queries", () => JSON.parse(open("./queries.json")));
 
-export const scenarios = new SharedArray('test-scenarios', function() {
-  return JSON.parse(open('./test-scenarios.json'));
-});
+export const scenarios = new SharedArray("test-scenarios", () => JSON.parse(open("./test-scenarios.json")));
 
 // Create selectors for randomization
 export const brandSelector = createRandomSelector(brands);
-export const seasonSelector = createRandomSelector(['C51', 'C52']);
+export const seasonSelector = createRandomSelector(["C51", "C52"]);
 
 export const divisionSelector = () => {
   const brand = brandSelector();
@@ -30,9 +24,7 @@ export const primaryDivisionSelector = () => {
   return createRandomSelector(brand.primaryDivisions)();
 };
 
-export const salesOrgCodeSelector = createRandomSelector([
-  'US01', 'US02', 'EU01', 'EU02', 'ASIA01'
-]);
+export const salesOrgCodeSelector = createRandomSelector(["US01", "US02", "EU01", "EU02", "ASIA01"]);
 
 export const multiDivisionSelector = () => {
   const allDivisions = brands.flatMap((brand: any) => brand.divisions);
@@ -45,7 +37,7 @@ export const generateLooksSummaryVariables = () => {
   return {
     brand: brand.name,
     division: createRandomSelector(brand.divisions)(),
-    season: seasonSelector()
+    season: seasonSelector(),
   };
 };
 
@@ -54,17 +46,17 @@ export const generateLooksVariables = () => {
   return {
     brand: brand.name,
     division: createRandomSelector(brand.divisions)(),
-    season: seasonSelector()
+    season: seasonSelector(),
   };
 };
 
 export const generateSeasonalAssignmentsVariables = () => ({
-  styleSeasonCode: seasonSelector()
+  styleSeasonCode: seasonSelector(),
 });
 
 export const generateImageUrlCheckVariables = () => ({
   divisions: multiDivisionSelector(),
-  season: seasonSelector()
+  season: seasonSelector(),
 });
 
 export const generateOptionsSummaryVariables = () => {
@@ -74,7 +66,7 @@ export const generateOptionsSummaryVariables = () => {
     StyleSeasonCode: seasonSelector(),
     DivisionCode: createRandomSelector(brand.divisions)(),
     ActiveOption: true,
-    SalesChannels: ['SELLIN', 'B2B']
+    SalesChannels: ["SELLIN", "B2B"],
   };
 };
 
@@ -86,7 +78,7 @@ export const generateOptionsProductViewVariables = () => {
     StyleSeasonCode: seasonSelector(),
     DivisionCode: createRandomSelector(brand.divisions)(),
     ActiveOption: true,
-    SalesChannels: ['SELLIN', 'B2B']
+    SalesChannels: ["SELLIN", "B2B"],
   };
 };
 
@@ -94,7 +86,7 @@ export const generateImageDetailsVariables = () => {
   const brand = brandSelector();
   return {
     divisionCode: createRandomSelector(brand.divisions)(),
-    styleSeasonCode: seasonSelector()
+    styleSeasonCode: seasonSelector(),
   };
 };
 
@@ -106,7 +98,7 @@ export const variableGenerators: Record<string, () => any> = {
   getImageUrlCheck: generateImageUrlCheckVariables,
   optionsSummary: generateOptionsSummaryVariables,
   optionsProductView: generateOptionsProductViewVariables,
-  imageDetails: generateImageDetailsVariables
+  imageDetails: generateImageDetailsVariables,
 };
 
 export const getQueryWithVariables = (operationName: string) => {
@@ -117,7 +109,7 @@ export const getQueryWithVariables = (operationName: string) => {
 
   const queryData = queryDef[operationName];
   const generator = variableGenerators[operationName];
-  
+
   if (!generator) {
     throw new Error(`Variable generator for '${operationName}' not found`);
   }
@@ -126,7 +118,7 @@ export const getQueryWithVariables = (operationName: string) => {
     query: queryData.query,
     variables: generator(),
     complexity: queryData.complexity,
-    expectedFields: queryData.expectedFields
+    expectedFields: queryData.expectedFields,
   };
 };
 
@@ -140,14 +132,14 @@ export const getScenarioStep = (scenarioName: string) => {
   // Weighted random selection
   const totalWeight = scenario.steps.reduce((sum: number, step: any) => sum + step.weight, 0);
   let randomValue = Math.random() * totalWeight;
-  
+
   for (const step of scenario.steps) {
     randomValue -= step.weight;
     if (randomValue <= 0) {
       return step;
     }
   }
-  
+
   // Fallback to first step
   return scenario.steps[0];
 };

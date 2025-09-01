@@ -1,6 +1,6 @@
 /* tests/integration/graphql.test.ts - GraphQL Resolver Integration Tests */
 
-import { beforeAll, describe, expect, mock, test, afterAll, beforeEach } from "bun:test";
+import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 // Mock Couchbase connection before importing resolvers
 const mockQueryResult = {
@@ -117,13 +117,13 @@ describe("GraphQL Resolvers Integration", () => {
 
       expect(result).toBeDefined();
       expect(mockCluster.query).toHaveBeenCalledTimes(1);
-      
+
       // Verify the query was called with correct parameters
       const queryCall = mockCluster.query.mock.calls[0];
       expect(queryCall[0]).toContain("TestBrand");
       expect(queryCall[0]).toContain("2024S");
       expect(queryCall[0]).toContain("WOMEN");
-      
+
       // Verify query options
       expect(queryCall[1]).toEqual({
         parameters: {
@@ -165,7 +165,7 @@ describe("GraphQL Resolvers Integration", () => {
       const result = await resolvers.Query.lookDetails(null, args);
 
       expect(result).toBeDefined();
-      
+
       // Should use collection.get for document retrieval
       const collectionMock = mockConnection.defaultCollection;
       expect(collectionMock.get).toHaveBeenCalledWith("look_123");
@@ -174,7 +174,7 @@ describe("GraphQL Resolvers Integration", () => {
     test("should handle document not found", async () => {
       const collectionMock = mockConnection.defaultCollection;
       const DocumentNotFoundError = mockConnection.errors.DocumentNotFoundError;
-      
+
       collectionMock.get.mockRejectedValueOnce(new DocumentNotFoundError("Document not found"));
 
       const args = { lookId: "non_existent_look" };
@@ -189,7 +189,7 @@ describe("GraphQL Resolvers Integration", () => {
         rows: [
           {
             brand: "TestBrand",
-            season: "2024S", 
+            season: "2024S",
             division: "WOMEN",
             totalOptions: 150,
             optionsByCategory: {
@@ -212,7 +212,7 @@ describe("GraphQL Resolvers Integration", () => {
       expect(result).toBeDefined();
       expect(result.totalOptions).toBe(150);
       expect(result.optionsByCategory).toBeDefined();
-      
+
       expect(mockCluster.query).toHaveBeenCalledTimes(1);
     });
 
@@ -312,7 +312,7 @@ describe("GraphQL Resolvers Integration", () => {
   describe("Performance", () => {
     test("should complete queries within reasonable time", async () => {
       const start = Date.now();
-      
+
       const args = {
         brand: "TestBrand",
         season: "2024S",
@@ -320,7 +320,7 @@ describe("GraphQL Resolvers Integration", () => {
       };
 
       await resolvers.Query.looks(null, args);
-      
+
       const duration = Date.now() - start;
       expect(duration).toBeLessThan(1000); // Should complete within 1 second
     });
@@ -332,14 +332,14 @@ describe("GraphQL Resolvers Integration", () => {
         division: "WOMEN",
       };
 
-      const requests = Array(10).fill(null).map(() => 
-        resolvers.Query.looks(null, args)
-      );
+      const requests = Array(10)
+        .fill(null)
+        .map(() => resolvers.Query.looks(null, args));
 
       const results = await Promise.all(requests);
-      
+
       expect(results).toHaveLength(10);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toEqual(mockQueryResult.rows[0]);
       });
     });

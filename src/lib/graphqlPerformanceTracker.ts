@@ -1,23 +1,23 @@
 /* src/lib/graphqlPerformanceTracker.ts */
 
-import { metrics } from '@opentelemetry/api';
-import { log } from '../telemetry/logger';
-import { withCardinalityCheck } from './metricsCardinalityManager';
+import { metrics } from "@opentelemetry/api";
+import { log } from "../telemetry/logger";
+import { withCardinalityCheck } from "./metricsCardinalityManager";
 
 // Get the existing meter instance to reuse
 const meter = metrics.getMeter("capellaql-graphql-performance", "1.0.0");
 
 // Create metrics for GraphQL operations
-const resolverDuration = meter.createHistogram('graphql_resolver_duration_ms', {
-  description: 'GraphQL resolver execution time in milliseconds'
+const resolverDuration = meter.createHistogram("graphql_resolver_duration_ms", {
+  description: "GraphQL resolver execution time in milliseconds",
 });
 
-const resolverCallCount = meter.createCounter('graphql_resolver_calls_total', {
-  description: 'Total number of GraphQL resolver calls'
+const resolverCallCount = meter.createCounter("graphql_resolver_calls_total", {
+  description: "Total number of GraphQL resolver calls",
 });
 
-const resolverErrorCount = meter.createCounter('graphql_resolver_errors_total', {
-  description: 'Total number of GraphQL resolver errors'
+const resolverErrorCount = meter.createCounter("graphql_resolver_errors_total", {
+  description: "Total number of GraphQL resolver errors",
 });
 
 export interface GraphQLPerformanceData {
@@ -47,11 +47,11 @@ export function withPerformanceTracking<T extends any[], R>(
     let error: string | undefined;
 
     // Track the resolver call with cardinality check
-    const callLabels = withCardinalityCheck('graphql_resolver_calls_total', {
+    const callLabels = withCardinalityCheck("graphql_resolver_calls_total", {
       operation: operationName,
-      field: fieldName
+      field: fieldName,
     });
-    
+
     if (callLabels.allowed) {
       resolverCallCount.add(1, callLabels.labels);
     }
@@ -62,29 +62,29 @@ export function withPerformanceTracking<T extends any[], R>(
     } catch (err) {
       success = false;
       error = err instanceof Error ? err.message : String(err);
-      
+
       // Track the error with cardinality check
-      const errorLabels = withCardinalityCheck('graphql_resolver_errors_total', {
+      const errorLabels = withCardinalityCheck("graphql_resolver_errors_total", {
         operation: operationName,
         field: fieldName,
-        error: error
+        error: error,
       });
-      
+
       if (errorLabels.allowed) {
         resolverErrorCount.add(1, errorLabels.labels);
       }
-      
+
       throw err;
     } finally {
       const duration = Date.now() - startTime;
-      
+
       // Record duration metric with cardinality check
-      const durationLabels = withCardinalityCheck('graphql_resolver_duration_ms', {
+      const durationLabels = withCardinalityCheck("graphql_resolver_duration_ms", {
         operation: operationName,
         field: fieldName,
-        status: success ? 'success' : 'error'
+        status: success ? "success" : "error",
       });
-      
+
       if (durationLabels.allowed) {
         resolverDuration.record(duration, durationLabels.labels);
       }
@@ -96,23 +96,24 @@ export function withPerformanceTracking<T extends any[], R>(
         duration,
         success,
         error,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       };
 
       recentOperations.push(performanceData);
-      
+
       // Keep only recent operations
       if (recentOperations.length > MAX_STORED_OPERATIONS) {
         recentOperations.shift();
       }
 
       // Log slow operations
-      if (duration > 1000) { // 1 second threshold
+      if (duration > 1000) {
+        // 1 second threshold
         log(`Slow GraphQL operation detected`, {
           operation: operationName,
           field: fieldName,
           duration: `${duration}ms`,
-          success
+          success,
         });
       }
     }
@@ -136,41 +137,44 @@ export function getGraphQLPerformanceStats() {
       averageDuration: 0,
       errorRate: 0,
       slowOperations: 0,
-      operationBreakdown: {}
+      operationBreakdown: {},
     };
   }
 
   const totalOperations = recentOperations.length;
   const totalDuration = recentOperations.reduce((sum, op) => sum + op.duration, 0);
-  const errorCount = recentOperations.filter(op => !op.success).length;
-  const slowOperations = recentOperations.filter(op => op.duration > 1000).length;
+  const errorCount = recentOperations.filter((op) => !op.success).length;
+  const slowOperations = recentOperations.filter((op) => op.duration > 1000).length;
 
   // Break down by operation
-  const operationBreakdown: Record<string, {
-    count: number;
-    averageDuration: number;
-    errorRate: number;
-  }> = {};
+  const operationBreakdown: Record<
+    string,
+    {
+      count: number;
+      averageDuration: number;
+      errorRate: number;
+    }
+  > = {};
 
-  recentOperations.forEach(op => {
+  recentOperations.forEach((op) => {
     const key = `${op.operationName}.${op.fieldName}`;
     if (!operationBreakdown[key]) {
       operationBreakdown[key] = {
         count: 0,
         averageDuration: 0,
-        errorRate: 0
+        errorRate: 0,
       };
     }
-    
+
     operationBreakdown[key].count++;
     operationBreakdown[key].averageDuration += op.duration;
   });
 
   // Calculate averages
-  Object.keys(operationBreakdown).forEach(key => {
-    const ops = recentOperations.filter(op => `${op.operationName}.${op.fieldName}` === key);
+  Object.keys(operationBreakdown).forEach((key) => {
+    const ops = recentOperations.filter((op) => `${op.operationName}.${op.fieldName}` === key);
     operationBreakdown[key].averageDuration = ops.reduce((sum, op) => sum + op.duration, 0) / ops.length;
-    operationBreakdown[key].errorRate = ops.filter(op => !op.success).length / ops.length;
+    operationBreakdown[key].errorRate = ops.filter((op) => !op.success).length / ops.length;
   });
 
   return {
@@ -178,7 +182,7 @@ export function getGraphQLPerformanceStats() {
     averageDuration: totalDuration / totalOperations,
     errorRate: errorCount / totalOperations,
     slowOperations,
-    operationBreakdown
+    operationBreakdown,
   };
 }
 

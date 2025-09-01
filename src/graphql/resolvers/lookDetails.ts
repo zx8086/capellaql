@@ -1,8 +1,8 @@
 /* src/graphql/resolvers/lookDetails.ts */
 
+import { SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
 import { getCluster } from "$lib/clusterProvider";
 import { debug, error as err, log } from "../../telemetry/logger";
-import { withSQLiteCache, SQLiteCacheKeys } from "$lib/bunSQLiteCache";
 
 const lookDetails = {
   Query: {
@@ -18,7 +18,7 @@ const lookDetails = {
               err("Error in getCluster:", error);
               throw error;
             });
-            
+
             const query = `EXECUTE FUNCTION \`default\`.\`media_assets\`.getLookDetails($lookDocKey)`;
             const queryOptions = { parameters: { lookDocKey } };
 

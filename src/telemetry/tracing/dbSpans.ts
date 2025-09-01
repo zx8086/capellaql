@@ -1,8 +1,8 @@
 /* src/telemetry/tracing/dbSpans.ts */
 
 import { type Attributes, type Span, SpanStatusCode, trace } from "@opentelemetry/api";
-import { recordDatabaseOperation } from "../metrics/databaseMetrics";
 import { telemetryLogger } from "../logger";
+import { recordDatabaseOperation } from "../metrics/databaseMetrics";
 
 export interface CouchbaseSpanOptions {
   bucket: string;
@@ -50,14 +50,7 @@ export async function createDatabaseSpan<T>(options: CouchbaseSpanOptions, opera
       });
 
       // Record database metrics with trace correlation
-      recordDatabaseOperation(
-        options.operation,
-        options.bucket,
-        duration,
-        true,
-        options.scope,
-        options.collection
-      );
+      recordDatabaseOperation(options.operation, options.bucket, duration, true, options.scope, options.collection);
 
       // Log successful operation with trace context
       telemetryLogger.debug(`Database operation completed successfully`, {
@@ -73,8 +66,8 @@ export async function createDatabaseSpan<T>(options: CouchbaseSpanOptions, opera
       return result;
     } catch (error) {
       const duration = Date.now() - startTime;
-      const errorType = error instanceof Error ? error.name : 'UnknownError';
-      
+      const errorType = error instanceof Error ? error.name : "UnknownError";
+
       span.setAttributes({
         "db.operation.duration_ms": duration,
         "db.operation.success": false,
