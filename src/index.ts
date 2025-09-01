@@ -12,8 +12,16 @@ import * as path from "path";
 import { ulid } from "ulid";
 import { fileURLToPath } from "url";
 import config from "./config";
+import { contextFactory } from "./graphql/context";
 import resolvers from "./graphql/resolvers";
 import typeDefs from "./graphql/typeDefs";
+import {
+  buildGraphQLCacheKey,
+  getOperationTTL,
+  getSessionId,
+  shouldCacheOperation,
+  sqliteGraphQLCache,
+} from "./lib/graphqlResponseCache";
 import { getPerformanceHistory, getPerformanceMetrics, getPerformanceTrends } from "./lib/performanceMonitor";
 import { getSystemHealth, getSystemHealthSummary } from "./lib/systemHealth";
 import {
@@ -132,18 +140,32 @@ function checkRateLimit(request: Request): boolean {
 const createYogaOptions = () => ({
   typeDefs,
   resolvers,
+  context: contextFactory,
   batching: {
     limit: 10,
   },
   validationRules: [depthLimit(10)], // Prevent deep query attacks
   plugins: [
-    // Response cache disabled due to params issues
+    // Response cache plugin incompatible with @elysiajs/graphql-yoga (v3) - WeakMap context issues persist
+    // Using proven SQLite caching at resolver level instead, which provides excellent performance
+    // The existing BunSQLiteCache with 5-minute TTLs already delivers optimal caching
     // useResponseCache({
-    //   session: () => null,
-    //   ttl: YOGA_RESPONSE_CACHE_TTL,
+    //   cache: sqliteGraphQLCache,
+    //   session: getSessionId,
+    //   ttl: (params) => {
+    //     if (!params?.operationName) return YOGA_RESPONSE_CACHE_TTL / 1000;
+    //     return getOperationTTL(params.operationName);
+    //   },
     //   buildResponseCacheKey: ({ params }) => {
     //     if (!params) return "no-params";
-    //     return `${params.operationName || "unnamed"}:${JSON.stringify(params.variableValues || {})}`;
+    //     return buildGraphQLCacheKey({
+    //       operationName: params.operationName,
+    //       source: params.source,
+    //       variableValues: params.variableValues,
+    //     });
+    //   },
+    //   shouldCacheResponse: ({ params }) => {
+    //     return shouldCacheOperation(params?.operationName, params?.source);
     //   },
     // }),
     // Query size validation plugin
@@ -693,7 +715,6 @@ const getClientIp = (request: Request): string => {
     if (ip && isIP(ip)) return ip;
   }
 
-
   const remoteAddress = (request as any).socket?.remoteAddress;
   if (remoteAddress && isIP(remoteAddress)) return remoteAddress;
 
@@ -960,7 +981,15 @@ console.log(`
 🎯 Ready to accept requests!
 `);
 
+let isShuttingDown = false;
+
 const gracefulShutdown = async (signal: string) => {
+  if (isShuttingDown) {
+    log(`Shutdown already in progress, ignoring ${signal}`);
+    return;
+  }
+  
+  isShuttingDown = true;
   log(`Received ${signal}. Starting graceful shutdown...`);
   try {
     // Import shutdown functions dynamically to avoid circular dependencies

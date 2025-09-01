@@ -664,13 +664,27 @@ export const SQLiteCacheKeys = {
   looks: (brand: string, season: string, division: string) => `looks:${brand}:${season}:${division}`,
 
   lookDetails: (lookId: string) => `lookDetails:${lookId}`,
+  looksSummary: (brand: string, season: string, division: string) => `looksSummary:${brand}:${season}:${division}`,
 
   options: (lookId: string, filters?: Record<string, any>) => {
     const filterStr = filters ? `:${JSON.stringify(filters, Object.keys(filters).sort())}` : "";
     return `options:${lookId}${filterStr}`;
   },
 
-  optionsSummary: (brand: string, season: string, division: string) => `optionsSummary:${brand}:${season}:${division}`,
+  optionsSummary: (salesOrg: string, styleSeasonCode: string, divisionCode: string, activeOption: boolean, salesChannels: string[]) => 
+    `optionsSummary:${salesOrg}:${styleSeasonCode}:${divisionCode}:${activeOption}:${salesChannels.sort().join(",")}`,
+  imageDetails: (divisionCode: string, styleSeasonCode: string, styleCode: string) => 
+    `imageDetails:${divisionCode}:${styleSeasonCode}:${styleCode}`,
+  optionsProductView: (brandCode: string, salesOrg: string, styleSeasonCode: string, divisionCode: string, activeOption: boolean, salesChannels: string[]) => 
+    `optionsProductView:${brandCode}:${salesOrg}:${styleSeasonCode}:${divisionCode}:${activeOption}:${salesChannels.sort().join(",")}`,
+  imageUrlCheck: (divisions: string[], season: string) => 
+    `imageUrlCheck:${divisions.sort().join(",")}:${season}`,
+  looksUrlCheck: (divisions: string[], season: string) => 
+    `looksUrlCheck:${divisions.sort().join(",")}:${season}`,
+  getAllSeasonalAssignments: (styleSeasonCode: string, companyCode?: string, isActive?: boolean) => 
+    `getAllSeasonalAssignments:${styleSeasonCode}:${companyCode || 'null'}:${isActive ?? 'undefined'}`,
+  getDivisionAssignment: (styleSeasonCode: string, companyCode: string, divisionCode: string) => 
+    `getDivisionAssignment:${styleSeasonCode}:${companyCode}:${divisionCode}`,
 
   assignments: (userId: string, status?: string) => `assignments:${userId}${status ? `:${status}` : ""}`,
 
