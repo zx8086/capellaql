@@ -160,17 +160,17 @@ function generateBusinessMetrics(telemetryHealth: TelemetryHealthData, memoryUsa
 
   // Calculate retention optimization savings
   const baseRetentionDays = 30; // Industry baseline
-  const smartRetention = 
-    (config.telemetry.LOG_RETENTION_DEBUG_DAYS * 0.2) + // 20% debug logs
-    (config.telemetry.LOG_RETENTION_INFO_DAYS * 0.5) +   // 50% info logs
-    (config.telemetry.LOG_RETENTION_WARN_DAYS * 0.2) +   // 20% warn logs
-    (config.telemetry.LOG_RETENTION_ERROR_DAYS * 0.1);   // 10% error logs
+  const smartRetention =
+    config.telemetry.LOG_RETENTION_DEBUG_DAYS * 0.2 + // 20% debug logs
+    config.telemetry.LOG_RETENTION_INFO_DAYS * 0.5 + // 50% info logs
+    config.telemetry.LOG_RETENTION_WARN_DAYS * 0.2 + // 20% warn logs
+    config.telemetry.LOG_RETENTION_ERROR_DAYS * 0.1; // 10% error logs
 
   const storageSavingsPercent = ((baseRetentionDays - smartRetention) / baseRetentionDays) * 100;
 
   // Estimate monthly cost based on log volume and retention
   const estimatedDailyLogs = 10000; // Baseline estimation
-  const costPerLogMB = 0.50; // USD per MB-month
+  const costPerLogMB = 0.5; // USD per MB-month
   const avgLogSize = 0.001; // MB per log
   const monthlyLogVolume = estimatedDailyLogs * 30 * avgLogSize;
   const baseCost = monthlyLogVolume * baseRetentionDays * costPerLogMB;
@@ -180,7 +180,7 @@ function generateBusinessMetrics(telemetryHealth: TelemetryHealthData, memoryUsa
   // Cost tier distribution based on log levels and their storage costs
   const costTierDistribution = {
     standard: 70, // Debug + Info logs
-    priority: 20, // Warn logs  
+    priority: 20, // Warn logs
     critical: 10, // Error logs
   };
 
@@ -190,8 +190,7 @@ function generateBusinessMetrics(telemetryHealth: TelemetryHealthData, memoryUsa
   const telemetryCostEfficiency = exportSuccessRate * circuitBreakerEfficiency * (1 - memoryUsagePercent / 100);
 
   // Operation impact score based on system health
-  const healthScore = telemetryHealth.status === "healthy" ? 1.0 :
-                     telemetryHealth.status === "degraded" ? 0.8 : 0.5;
+  const healthScore = telemetryHealth.status === "healthy" ? 1.0 : telemetryHealth.status === "degraded" ? 0.8 : 0.5;
   const operationImpactScore = healthScore * telemetryCostEfficiency;
 
   return {

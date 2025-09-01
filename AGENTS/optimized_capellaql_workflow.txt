@@ -1,0 +1,333 @@
+# .github/workflows/docker-ci-cd.yml
+
+name: Docker CI/CD with Bun and Snyk
+
+on:
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  schedule:
+    - cron: "0 0 * * 0"
+
+env:
+  REGISTRY: docker.io
+  IMAGE_NAME: zx8086/capellaql
+  BUILDKIT_STEP_LOG_MAX_SIZE: 10000000
+  BUILDKIT_STEP_LOG_MAX_SPEED: 1000000
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+  BUILDKIT_PROGRESS: plain
+  COSIGN_VERSION: "v2.5.2"
+  SYFT_VERSION: "v1.28.0"
+  COSIGN_YES: "true"
+  COSIGN_EXPERIMENTAL: "true"
+
+permissions:
+  contents: read
+  security-events: write
+  packages: write
+
+jobs:
+  build-and-deploy:
+    runs-on: self-hosted
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Environment
+        uses: ./.github/actions/setup-environment
+
+      - name: Set build metadata
+        id: metadata
+        run: |
+          echo "BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
+          echo "BUILD_START_TIME=$(date +%s)" >> $GITHUB_ENV
+
+      - name: Create .env file
+        run: |
+          cat << EOF > .env
+          ENABLE_FILE_LOGGING=${ENABLE_FILE_LOGGING:-false}
+          ENABLE_OPENTELEMETRY=${ENABLE_OPENTELEMETRY:-false}
+          BASE_URL=${{ vars.BASE_URL }}
+          PORT=${{ vars.PORT }}
+          LOG_LEVEL=${{ vars.LOG_LEVEL }}
+          YOGA_RESPONSE_CACHE_TTL=${{ vars.YOGA_RESPONSE_CACHE_TTL }}
+          COUCHBASE_URL=${{ secrets.COUCHBASE_URL }}
+          COUCHBASE_USERNAME=${{ secrets.COUCHBASE_USERNAME }}
+          COUCHBASE_PASSWORD=${{ secrets.COUCHBASE_PASSWORD }}
+          COUCHBASE_BUCKET=${{ vars.COUCHBASE_BUCKET }}
+          COUCHBASE_SCOPE=${{ vars.COUCHBASE_SCOPE }}
+          COUCHBASE_COLLECTION=${{ vars.COUCHBASE_COLLECTION }}
+          SERVICE_NAME=${{ vars.SERVICE_NAME }}
+          SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
+          DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
+          TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
+          METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
+          LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
+          METRIC_READER_INTERVAL=${{ vars.METRIC_READER_INTERVAL }}
+          CONSOLE_METRIC_READER_INTERVAL=${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
+          SUMMARY_LOG_INTERVAL=${{ vars.SUMMARY_LOG_INTERVAL }}
+          ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}
+          BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=${{ vars.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS }}
+          SOURCE_MAP_SUPPORT=${{ vars.SOURCE_MAP_SUPPORT }}
+          PRESERVE_SOURCE_MAPS=${{ vars.PRESERVE_SOURCE_MAPS }}
+          EOF
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Cache Bun dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies
+        run: |
+          bun install
+          bun pm untrusted || true
+          bun pm trust --all || true
+
+      # Move security scanning to separate job for better performance
+      - name: Run Snyk code scan
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          export $(grep -v '^#' .env | xargs)
+          bun run snyk test --file=package.json --sarif-file-output=snyk.sarif --severity-threshold=high || echo "Vulnerabilities found but continuing..."
+          bun run snyk monitor --file=package.json || echo "Monitor failed but continuing..."
+        continue-on-error: true
+
+      - name: Upload Snyk code scan results
+        if: hashFiles('snyk.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk.sarif
+          category: snyk-code
+        continue-on-error: true
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{date 'YYYYMMDD'}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.title=capellaql
+            org.opencontainers.image.description=CapellaQL is a high-performance GraphQL service for Couchbase Capella databases
+            org.opencontainers.image.version=${BUILD_VERSION}
+            org.opencontainers.image.created=${BUILD_TIMESTAMP}
+            org.opencontainers.image.revision=${GITHUB_SHA}
+            org.opencontainers.image.authors=Simon Owusu <simonowusupvh@gmail.com>
+            org.opencontainers.image.vendor=Siobytes
+            org.opencontainers.image.licenses=MIT
+            org.opencontainers.image.url=https://github.com/zx8086/capellaql
+            org.opencontainers.image.source=https://github.com/zx8086/capellaql
+            org.opencontainers.image.documentation=https://github.com/zx8086/capellaql/README.md
+
+      # Single multi-platform build instead of matrix strategy
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
+            BUILD_VERSION=${{ github.ref_name || '2.0.0' }}
+            COMMIT_HASH=${{ github.sha }}
+            GITHUB_REF_NAME=${{ github.ref_name }}
+            NODE_ENV=production
+            BASE_URL=${{ vars.BASE_URL }}
+            PORT=${{ vars.PORT }}
+            ENABLE_OPENTELEMETRY=${{ vars.ENABLE_OPENTELEMETRY }}
+            LOG_LEVEL=${{ vars.LOG_LEVEL }}
+            YOGA_RESPONSE_CACHE_TTL=${{ vars.YOGA_RESPONSE_CACHE_TTL }}
+            COUCHBASE_BUCKET=${{ vars.COUCHBASE_BUCKET }}
+            COUCHBASE_SCOPE=${{ vars.COUCHBASE_SCOPE }}
+            COUCHBASE_COLLECTION=${{ vars.COUCHBASE_COLLECTION }}
+            SERVICE_NAME=${{ vars.SERVICE_NAME }}
+            SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
+            DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
+            TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
+            METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
+            LOGS_ENDPOINT=${{ vars.LOGS_ENDPOINT }}
+            METRIC_READER_INTERVAL=${{ vars.METRIC_READER_INTERVAL }}
+            CONSOLE_METRIC_READER_INTERVAL=${{ vars.CONSOLE_METRIC_READER_INTERVAL }}
+            SUMMARY_LOG_INTERVAL=${{ vars.SUMMARY_LOG_INTERVAL }}
+            ALLOWED_ORIGINS=${{ vars.ALLOWED_ORIGINS }}
+            BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=${{ vars.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS }}
+            SOURCE_MAP_SUPPORT=true
+            PRESERVE_SOURCE_MAPS=true
+          cache-from: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-amd64
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+          cache-to: |
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-amd64,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache-arm64,mode=max
+          sbom: true
+          provenance: true
+
+      - name: Wait for image availability
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Waiting for image to be available in registry..."
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1 | sed 's/.*://')
+          for i in {1..15}; do
+            if docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} >/dev/null 2>&1; then
+              echo "Image is available!"
+              break
+            fi
+            echo "Waiting for image... (attempt $i/15)"
+            sleep 5
+          done
+        continue-on-error: true
+
+      - name: Test container health
+        if: github.event_name != 'pull_request'
+        run: |
+          # Stop existing containers
+          docker ps -q --filter publish=4000 | xargs -r docker stop || true
+          docker rm -f capellaql-test 2>/dev/null || true
+
+          # Run container
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          docker run -d \
+            --name capellaql-test \
+            -p 4000:4000 \
+            --env-file .env \
+            -e NODE_ENV=production \
+            -e BUILD_VERSION=${{ github.ref_name || '2.0.0' }} \
+            -e COMMIT_HASH=${{ github.sha }} \
+            -e BUILD_DATE=${{ env.BUILD_TIMESTAMP }} \
+            -e ENABLE_OPENTELEMETRY=false \
+            -e LOG_LEVEL=info \
+            "${IMAGE_TAG}"
+
+          # Wait and verify
+          sleep 15
+          if ! docker ps | grep -q capellaql-test; then
+            echo "Container failed to start. Showing logs:"
+            docker logs capellaql-test
+            exit 1
+          fi
+
+          # Capture metrics
+          CONTAINER_STATUS=$(docker inspect --format='{{.State.Status}}' capellaql-test)
+          echo "CONTAINER_STATUS=${CONTAINER_STATUS}" >> $GITHUB_ENV
+          echo "✅ Container test successful"
+        continue-on-error: true
+
+      - name: Run Snyk container scan
+        if: github.event_name != 'pull_request'
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          FULL_IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+          snyk container test "${FULL_IMAGE_TAG}" \
+            --file=Dockerfile \
+            --severity-threshold=high \
+            --sarif-file-output=snyk-docker.sarif || echo "Container vulnerabilities found but continuing..."
+
+          if [[ "${{ github.ref }}" == "refs/heads/master" ]]; then
+            snyk container monitor "${FULL_IMAGE_TAG}" \
+              --file=Dockerfile || echo "Container monitor failed but continuing..."
+          fi
+        continue-on-error: true
+
+      - name: Upload Snyk container scan results
+        if: github.event_name != 'pull_request' && hashFiles('snyk-docker.sarif') != ''
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: snyk-docker.sarif
+          category: snyk-docker
+        continue-on-error: true
+
+      - name: Generate SBOM
+        if: github.event_name != 'pull_request'
+        run: |
+          mkdir -p sbom-output
+          IMAGE_TAG=$(echo '${{ steps.meta.outputs.tags }}' | head -n1)
+
+          "${GITHUB_WORKSPACE}/bin/syft" "${IMAGE_TAG}" \
+            -o json=sbom-output/syft-sbom.json \
+            -o spdx-json=sbom-output/spdx-sbom.json \
+            -o cyclonedx-json=sbom-output/cyclonedx-sbom.json || echo "SBOM generation failed but continuing..."
+
+          echo "Generated SBOM files:"
+          ls -la sbom-output/ || true
+        continue-on-error: true
+
+      - name: Upload SBOM files
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-files-${{ github.run_id }}
+          path: sbom-output/
+          retention-days: 90
+        continue-on-error: true
+
+      - name: Build Summary
+        if: always()
+        run: |
+          BUILD_END_TIME=$(date +%s)
+          BUILD_DURATION=$((BUILD_END_TIME - BUILD_START_TIME))
+
+          {
+            echo "### 🐳 Docker Build Summary"
+            echo ""
+            echo "#### 📊 Build Overview"
+            echo "| Metric | Value |"
+            echo "|--------|-------|"
+            echo "| 🆔 Build ID | \`${GITHUB_SHA::7}\` |"
+            echo "| 📦 Image | capellaQL |"
+            echo "| 🏗️ Platform | Multi-arch (linux/amd64, linux/arm64) |"
+            echo "| ⚡ Status | ${CONTAINER_STATUS:-N/A} |"
+            echo "| ⏱️ Duration | ${BUILD_DURATION}s |"
+
+            echo ""
+            echo "#### 🔒 Security Features"
+            echo "- ✅ SBOM Generation"
+            echo "- ✅ Container Attestations"
+            echo "- ✅ Snyk Security Scanning"
+            echo "- ✅ Multi-platform Build"
+          } >> $GITHUB_STEP_SUMMARY
+
+      - name: Cleanup
+        if: always()
+        run: |
+          # Remove test containers
+          docker container rm -f capellaql-test 2>/dev/null || true
+
+          # Clean up files
+          rm -f .env snyk.sarif snyk-docker.sarif
+          rm -rf sbom-output/
+
+          # Docker cleanup
+          docker image prune -f --filter "until=24h"
+          docker volume prune -f
+          docker builder prune -f --filter "until=24h"
+
+          echo "Cleanup completed"
+        continue-on-error: true

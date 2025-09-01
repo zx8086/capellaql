@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     // Latest TypeScript features optimized for Bun
-    "lib": ["ES2024", "DOM", "WebWorker"],
+    "lib": ["ES2024", "DOM"],
     "target": "ES2024",
     "module": "ESNext",
     "moduleDetection": "force",
@@ -79,7 +79,6 @@
     "preserveWatchOutput": true,
 
     // Import/Export optimizations
-    "importsNotUsedAsValues": "error",
     "preserveValueImports": false
   },
   "include": ["src/**/*", "src/global.d.ts", "tests/**/*.test.ts", "tools/**/*.ts"],

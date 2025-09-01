@@ -362,21 +362,20 @@ class PerformanceMonitor {
     const telemetryCostEfficiency = (actualLogsPerMinute * 60 * 24) / costPerMillionLogs;
 
     // Calculate operation impact score based on latency and error rates
-    const latencyImpact = Math.max(0, 1 - (dbMetrics.latency / 1000)); // Normalized 0-1
+    const latencyImpact = Math.max(0, 1 - dbMetrics.latency / 1000); // Normalized 0-1
     const errorImpact = Math.max(0, 1 - (dbMetrics.errorRate || 0));
-    const performanceImpact = Math.max(0, 1 - (graphqlMetrics.errorRate / 100));
+    const performanceImpact = Math.max(0, 1 - graphqlMetrics.errorRate / 100);
     const operationImpactScore = (latencyImpact + errorImpact + performanceImpact) / 3;
 
     // Calculate SLI compliance
-    const availability = dbMetrics.connectionStatus === "connected" ? 99.9 : 
-                        dbMetrics.connectionStatus === "degraded" ? 99.0 : 95.0;
+    const availability =
+      dbMetrics.connectionStatus === "connected" ? 99.9 : dbMetrics.connectionStatus === "degraded" ? 99.0 : 95.0;
     const errorRate = ((dbMetrics.errorRate || 0) + graphqlMetrics.errorRate) / 2;
-    const latencyCompliance = dbMetrics.latency < 500 ? 100 : 
-                             dbMetrics.latency < 1000 ? 90 : 70;
+    const latencyCompliance = dbMetrics.latency < 500 ? 100 : dbMetrics.latency < 1000 ? 90 : 70;
 
     // Calculate retention optimization savings
     const baseRetention = 30; // Base retention of 30 days for all logs
-    const smartRetention = (1 * 0.1) + (7 * 0.3) + (30 * 0.4) + (90 * 0.2); // Weighted average
+    const smartRetention = 1 * 0.1 + 7 * 0.3 + 30 * 0.4 + 90 * 0.2; // Weighted average
     const retentionSavings = ((baseRetention - smartRetention) / baseRetention) * 100;
 
     // Cost tier distribution

@@ -2,8 +2,8 @@
 
 import { context, type SpanContext, trace } from "@opentelemetry/api";
 import * as api from "@opentelemetry/api-logs";
-import { telemetryHealthMonitor } from "./health/telemetryHealth";
 import config from "$config";
+import { telemetryHealthMonitor } from "./health/telemetryHealth";
 
 export enum LogLevel {
   DEBUG = "debug",
@@ -19,7 +19,6 @@ export interface LogContext {
   userId?: string;
   sessionId?: string;
   operationType?: string;
-  businessContext?: string;
 }
 
 export interface StructuredLogData {
@@ -32,11 +31,6 @@ export interface StructuredLogData {
     name: string;
     message: string;
     stack?: string;
-  };
-  businessImpact?: {
-    severity: "low" | "medium" | "high" | "critical";
-    operationCategory: "query" | "mutation" | "subscription" | "system" | "health";
-    costTier: "standard" | "priority" | "critical";
   };
 }
 
@@ -153,7 +147,7 @@ class TelemetryLogger {
 
     if (this.isInitialized && this.logger) {
       try {
-        // Enhanced log record with 2025 compliance and business context
+        // Streamlined log record with essential metadata only
         this.logger.emit({
           timestamp: logData.timestamp,
           severityText: logData.level.toUpperCase(),
@@ -164,21 +158,11 @@ class TelemetryLogger {
             ...logData.context,
             // User metadata
             ...logData.meta,
-            // Service identification (2025 standard)
+            // Service identification
             "service.name": "capellaql",
             "service.version": "2.0.0",
             // Runtime information
             "runtime.name": typeof Bun !== "undefined" ? "bun" : "node",
-            // Log retention metadata for cloud management
-            "log.retention.days": this.getRetentionDays(logData.level),
-            "log.priority": this.getLogPriority(logData.level),
-            "log.cost.tier": this.getCostTier(logData.level),
-            // Business impact metadata
-            ...(logData.businessImpact && {
-              "business.impact.severity": logData.businessImpact.severity,
-              "business.operation.category": logData.businessImpact.operationCategory,
-              "business.cost.tier": logData.businessImpact.costTier,
-            }),
           },
         });
 
@@ -268,12 +252,12 @@ class TelemetryLogger {
    */
   private shouldSampleLog(logData: StructuredLogData): boolean {
     const samplingRate = this.getSamplingRate(logData.level);
-    
+
     // Always sample errors to maintain 100% error visibility
     if (logData.level === LogLevel.ERROR) {
       return true;
     }
-    
+
     // Use trace ID for deterministic sampling if available
     const traceId = logData.context?.traceId;
     if (traceId) {
@@ -282,7 +266,7 @@ class TelemetryLogger {
       const normalizedHash = (hash % 1000000) / 1000000; // Normalize to 0-1
       return normalizedHash < samplingRate;
     }
-    
+
     // Fallback to random sampling
     return Math.random() < samplingRate;
   }
@@ -299,51 +283,6 @@ class TelemetryLogger {
         return config.telemetry.LOG_SAMPLING_ERROR;
       default:
         return 0.5;
-    }
-  }
-
-  private getRetentionDays(level: LogLevel): number {
-    switch (level) {
-      case LogLevel.DEBUG:
-        return config.telemetry.LOG_RETENTION_DEBUG_DAYS;
-      case LogLevel.INFO:
-        return config.telemetry.LOG_RETENTION_INFO_DAYS;
-      case LogLevel.WARN:
-        return config.telemetry.LOG_RETENTION_WARN_DAYS;
-      case LogLevel.ERROR:
-        return config.telemetry.LOG_RETENTION_ERROR_DAYS;
-      default:
-        return 7;
-    }
-  }
-
-  private getLogPriority(level: LogLevel): number {
-    switch (level) {
-      case LogLevel.DEBUG:
-        return 1; // Lowest priority
-      case LogLevel.INFO:
-        return 2; // Standard priority
-      case LogLevel.WARN:
-        return 3; // High priority
-      case LogLevel.ERROR:
-        return 4; // Critical priority
-      default:
-        return 2;
-    }
-  }
-
-  private getCostTier(level: LogLevel): string {
-    switch (level) {
-      case LogLevel.DEBUG:
-        return "standard"; // Cost-optimized storage
-      case LogLevel.INFO:
-        return "standard"; // Standard storage
-      case LogLevel.WARN:
-        return "priority"; // Priority storage for faster access
-      case LogLevel.ERROR:
-        return "critical"; // Critical storage with highest availability
-      default:
-        return "standard";
     }
   }
 }

@@ -22,7 +22,7 @@ export const telemetryEnvMapping = {
   CIRCUIT_BREAKER_TIMEOUT_MS: "CIRCUIT_BREAKER_TIMEOUT_MS",
   // Log-level specific sampling rates
   LOG_SAMPLING_DEBUG: "LOG_SAMPLING_DEBUG",
-  LOG_SAMPLING_INFO: "LOG_SAMPLING_INFO", 
+  LOG_SAMPLING_INFO: "LOG_SAMPLING_INFO",
   LOG_SAMPLING_WARN: "LOG_SAMPLING_WARN",
   LOG_SAMPLING_ERROR: "LOG_SAMPLING_ERROR",
   // Log retention policy
@@ -51,15 +51,15 @@ export const telemetryDefaults: TelemetryConfig = {
   CIRCUIT_BREAKER_THRESHOLD: 5,
   CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
   // Log-level specific sampling rates (optimize cost while maintaining visibility)
-  LOG_SAMPLING_DEBUG: 0.1,  // 10% - reduce debug noise
-  LOG_SAMPLING_INFO: 0.5,   // 50% - balanced info logging
-  LOG_SAMPLING_WARN: 0.9,   // 90% - high warn visibility
-  LOG_SAMPLING_ERROR: 1.0,  // 100% - never drop errors
+  LOG_SAMPLING_DEBUG: 0.1, // 10% - reduce debug noise
+  LOG_SAMPLING_INFO: 0.5, // 50% - balanced info logging
+  LOG_SAMPLING_WARN: 0.9, // 90% - high warn visibility
+  LOG_SAMPLING_ERROR: 1.0, // 100% - never drop errors
   // Log retention policy (days) - balance compliance and cost
-  LOG_RETENTION_DEBUG_DAYS: 1,   // Debug logs: 1 day
-  LOG_RETENTION_INFO_DAYS: 7,    // Info logs: 7 days
-  LOG_RETENTION_WARN_DAYS: 30,   // Warning logs: 30 days
-  LOG_RETENTION_ERROR_DAYS: 90,  // Error logs: 90 days
+  LOG_RETENTION_DEBUG_DAYS: 1, // Debug logs: 1 day
+  LOG_RETENTION_INFO_DAYS: 7, // Info logs: 7 days
+  LOG_RETENTION_WARN_DAYS: 30, // Warning logs: 30 days
+  LOG_RETENTION_ERROR_DAYS: 90, // Error logs: 90 days
 };
 
 // Zod schema for telemetry configuration (2025 compliance)
@@ -256,20 +256,32 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
 
     // Log retention policy
     LOG_RETENTION_DEBUG_DAYS:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_RETENTION_DEBUG_DAYS), "number", "LOG_RETENTION_DEBUG_DAYS") as number) ||
-      telemetryDefaults.LOG_RETENTION_DEBUG_DAYS,
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.LOG_RETENTION_DEBUG_DAYS),
+        "number",
+        "LOG_RETENTION_DEBUG_DAYS"
+      ) as number) || telemetryDefaults.LOG_RETENTION_DEBUG_DAYS,
 
     LOG_RETENTION_INFO_DAYS:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_RETENTION_INFO_DAYS), "number", "LOG_RETENTION_INFO_DAYS") as number) ||
-      telemetryDefaults.LOG_RETENTION_INFO_DAYS,
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.LOG_RETENTION_INFO_DAYS),
+        "number",
+        "LOG_RETENTION_INFO_DAYS"
+      ) as number) || telemetryDefaults.LOG_RETENTION_INFO_DAYS,
 
     LOG_RETENTION_WARN_DAYS:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_RETENTION_WARN_DAYS), "number", "LOG_RETENTION_WARN_DAYS") as number) ||
-      telemetryDefaults.LOG_RETENTION_WARN_DAYS,
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.LOG_RETENTION_WARN_DAYS),
+        "number",
+        "LOG_RETENTION_WARN_DAYS"
+      ) as number) || telemetryDefaults.LOG_RETENTION_WARN_DAYS,
 
     LOG_RETENTION_ERROR_DAYS:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_RETENTION_ERROR_DAYS), "number", "LOG_RETENTION_ERROR_DAYS") as number) ||
-      telemetryDefaults.LOG_RETENTION_ERROR_DAYS,
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.LOG_RETENTION_ERROR_DAYS),
+        "number",
+        "LOG_RETENTION_ERROR_DAYS"
+      ) as number) || telemetryDefaults.LOG_RETENTION_ERROR_DAYS,
   };
 }
 

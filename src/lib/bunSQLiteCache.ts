@@ -155,6 +155,7 @@ export class BunSQLiteCache {
         key: key.substring(0, 50) + (key.length > 50 ? "..." : ""),
         hitCount: result.hit_count + 1,
         age: now - (result.created_at || now),
+        cacheEfficiency: "hit",
       });
 
       return data;
@@ -191,6 +192,7 @@ export class BunSQLiteCache {
         size,
         ttl: ttlMs || this.config.defaultTtlMs,
         expiresIn: expiresAt - now,
+        cacheOperation: "store",
       });
     } catch (error) {
       err("SQLite cache set error:", error);
@@ -245,7 +247,10 @@ export class BunSQLiteCache {
 
       if (deleted) {
         this.updateStats();
-        log("SQLite cache delete", { key });
+        log("SQLite cache delete", {
+          key: key.substring(0, 50) + (key.length > 50 ? "..." : ""),
+          cacheOperation: "delete",
+        });
       }
 
       return deleted;
@@ -271,7 +276,10 @@ export class BunSQLiteCache {
         memoryUsage: 0,
       };
 
-      log("SQLite cache cleared");
+      log("SQLite cache cleared", {
+        cacheOperation: "clear",
+        previousSize: this.stats.size,
+      });
     } catch (error) {
       err("SQLite cache clear error:", error);
     }
@@ -301,6 +309,7 @@ export class BunSQLiteCache {
         log("SQLite cache pattern invalidation", {
           pattern: pattern.toString(),
           deleted: deletedCount,
+          cacheOperation: "pattern-invalidate",
         });
       }
 
@@ -491,7 +500,10 @@ export class BunSQLiteCache {
 
       if (expiredCount > 0) {
         this.stats.evictions += expiredCount;
-        log("SQLite cache expired eviction", { expired: expiredCount });
+        log("SQLite cache expired eviction", {
+          expired: expiredCount,
+          cacheOperation: "expired-eviction",
+        });
       }
 
       // Check if we still need space
@@ -526,7 +538,13 @@ export class BunSQLiteCache {
       }
 
       this.stats.evictions += evicted;
-      log("SQLite cache memory eviction", { evicted, freedSpace, requiredSpace });
+      warn("SQLite cache memory pressure eviction", {
+        evicted,
+        freedSpace,
+        requiredSpace,
+        cacheOperation: "memory-eviction",
+        performanceImpact: "memory-pressure",
+      });
     } catch (error) {
       err("SQLite cache evictByMemory error:", error);
     }
@@ -556,7 +574,10 @@ export class BunSQLiteCache {
       }
 
       this.stats.evictions += evicted;
-      log("SQLite cache LRU eviction", { evicted });
+      log("SQLite cache LRU eviction", {
+        evicted,
+        cacheOperation: "lru-eviction",
+      });
     } catch (error) {
       err("SQLite cache evictLRU error:", error);
     }
@@ -619,7 +640,11 @@ export class BunSQLiteCache {
 
       if (cleaned > 0) {
         this.updateStats();
-        log("SQLite cache cleanup", { cleaned, remaining: this.stats.size });
+        log("SQLite cache cleanup completed", {
+          cleaned,
+          remaining: this.stats.size,
+          cacheOperation: "cleanup",
+        });
       }
     } catch (error) {
       err("SQLite cache cleanup error:", error);

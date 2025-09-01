@@ -15,12 +15,12 @@ const looksResolver = withValidation(
       const { brand, season, division } = args;
       const cacheKey = SQLiteCacheKeys.looks(brand, season, division);
 
-      log("Looks query initiated", {
+      log("GraphQL looks query initiated", {
         requestId: context.requestId,
-        brand,
-        season,
-        division,
+        operationName: "looks",
+        parameters: { brand, season, division },
         user: context.user?.id,
+        clientIp: context.clientIp,
       });
 
       // Use SQLite cache with 5-minute TTL for looks data
@@ -37,18 +37,31 @@ const looksResolver = withValidation(
             parameters: { brand, season, division },
           };
 
-          log("Executing looks query (cache miss)", {
-            query,
+          log("Database query execution (cache miss)", {
+            operationName: "looks",
+            query: "get_looks",
             queryOptions,
             requestId: context.requestId,
+            cacheStatus: "miss",
           });
 
           const result = await cluster.cluster.query(query, queryOptions);
 
-          debug("Looks query result", {
+          const queryEndTime = Date.now();
+          const queryDuration = queryEndTime - (context.startTime || queryEndTime);
+          
+          log("GraphQL looks query completed", {
             requestId: context.requestId,
+            operationName: "looks",
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2),
+            queryDurationMs: queryDuration,
+            performanceCategory: queryDuration > 1000 ? "slow" : queryDuration > 500 ? "moderate" : "fast",
+            cacheStatus: "populated",
+          });
+          
+          debug("Looks query result details", {
+            requestId: context.requestId,
+            resultSample: JSON.stringify(result.rows[0], null, 2),
           });
 
           return result.rows[0];
@@ -56,10 +69,13 @@ const looksResolver = withValidation(
         5 * 60 * 1000 // 5-minute TTL
       );
     } catch (error) {
-      err("Error in looks resolver:", {
-        error,
+      err("GraphQL looks query failed", {
+        error: error instanceof Error ? error.message : String(error),
+        errorType: error instanceof Error ? error.constructor.name : "unknown",
         requestId: context.requestId,
-        args,
+        operationName: "looks",
+        parameters: args,
+        clientIp: context.clientIp,
       });
       throw error;
     }

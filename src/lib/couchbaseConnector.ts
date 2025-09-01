@@ -15,7 +15,7 @@ import {
 } from "couchbase";
 import config from "$config";
 import { CircuitBreaker, retryWithBackoff } from "$utils/bunUtils";
-import { log } from "../telemetry/logger";
+import { log, warn, err } from "../telemetry/logger";
 
 interface QueryableCluster extends Cluster {
   query<TRow = any>(
@@ -46,7 +46,7 @@ const dbCircuitBreaker = new CircuitBreaker(
 );
 
 export async function clusterConn(): Promise<capellaConn> {
-  log("Attempting to connect to Couchbase...");
+  const connectionStartTime = Date.now();
 
   const clusterConnStr: string = config.capella.COUCHBASE_URL;
   const username: string = config.capella.COUCHBASE_USERNAME;
@@ -54,13 +54,6 @@ export async function clusterConn(): Promise<capellaConn> {
   const bucketName: string = config.capella.COUCHBASE_BUCKET;
   const scopeName: string = config.capella.COUCHBASE_SCOPE;
   const collectionName: string = config.capella.COUCHBASE_COLLECTION;
-
-  log(`Configuring connection with the following default connection details:
-                  URL: ${clusterConnStr},
-                  Username: ${username},
-                  Bucket: ${bucketName},
-                  Scope: ${scopeName},
-                  Collection: ${collectionName}`);
 
   // Enhanced connection with retry and circuit breaker
   return await dbCircuitBreaker.execute(async () => {
@@ -79,14 +72,22 @@ export async function clusterConn(): Promise<capellaConn> {
             bootstrapTimeout: config.capella.COUCHBASE_BOOTSTRAP_TIMEOUT,
           },
         });
-        log("Cluster connection established.");
 
         const bucket: Bucket = cluster.bucket(bucketName);
-        log(`Bucket ${bucketName} accessed.`);
-
         const scope: Scope = bucket.scope(scopeName);
         const collection: Collection = scope.collection(collectionName);
-        log(`Collection ${collectionName} accessed under scope ${scopeName}.`);
+        
+        const totalConnectionTime = Date.now() - connectionStartTime;
+        
+        // Only log slow connections or errors
+        if (totalConnectionTime > 5000) {
+          warn("Slow Couchbase connection", {
+            connectionTimeMs: totalConnectionTime,
+            bucketName,
+            scopeName,
+            collectionName,
+          });
+        }
 
         return {
           cluster,
@@ -151,6 +152,7 @@ export async function getCouchbaseHealth(): Promise<{
       },
     };
   } catch (error) {
+    err("Couchbase health check failed", error);
     return {
       status: "unhealthy",
       details: {
@@ -180,6 +182,7 @@ export async function pingCouchbase(): Promise<{
       services: pingResult.services || [],
     };
   } catch (error) {
+    err("Couchbase ping failed", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
