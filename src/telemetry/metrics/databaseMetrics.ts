@@ -1,6 +1,7 @@
 /* src/telemetry/metrics/databaseMetrics.ts - 2025-compliant database observability */
 
 import { type Counter, context, type Histogram, metrics, trace, type UpDownCounter } from "@opentelemetry/api";
+import { getUnifiedSamplingCoordinator } from "../instrumentation";
 import { telemetryHealthMonitor } from "../health/telemetryHealth";
 
 let dbOperationCounter: Counter | undefined;
@@ -69,6 +70,26 @@ export function recordDatabaseOperation(
   const circuitBreaker = telemetryHealthMonitor.getCircuitBreaker();
   if (!circuitBreaker.canExecute()) {
     return; // Skip metrics recording if circuit breaker is open
+  }
+
+  // Apply unified sampling decision - database operations are technical metrics
+  const samplingCoordinator = getUnifiedSamplingCoordinator();
+  if (samplingCoordinator) {
+    const metricName = "db_operations_total";
+    const attributes = { 
+      metric_category: "technical",
+      operation: operation.toLowerCase(),
+      bucket,
+      status: success ? "success" : "error",
+      ...(scope && { scope }),
+      ...(collection && { collection }),
+      ...(errorType && !success && { error_type: errorType }),
+    };
+    
+    const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
+    if (!decision.shouldSample) {
+      return; // Skip this metric based on sampling decision
+    }
   }
 
   try {
@@ -160,6 +181,23 @@ export function recordSLIMetric(
 
   const circuitBreaker = telemetryHealthMonitor.getCircuitBreaker();
   if (!circuitBreaker.canExecute()) return;
+
+  // Apply unified sampling decision - SLI metrics are business critical
+  const samplingCoordinator = getUnifiedSamplingCoordinator();
+  if (samplingCoordinator) {
+    const metricName = `sli_${sliName}_total`;
+    const attributes = { 
+      metric_category: "business", // SLIs are business metrics
+      sli_name: sliName,
+      status: success ? "success" : "failure",
+      ...additionalLabels,
+    };
+    
+    const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
+    if (!decision.shouldSample) {
+      return; // Skip this metric based on sampling decision
+    }
+  }
 
   try {
     const meter = metrics.getMeter("capellaql-sli-metrics", "1.0.0");

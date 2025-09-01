@@ -25,6 +25,11 @@ export const telemetryEnvMapping = {
   LOG_SAMPLING_INFO: "LOG_SAMPLING_INFO",
   LOG_SAMPLING_WARN: "LOG_SAMPLING_WARN",
   LOG_SAMPLING_ERROR: "LOG_SAMPLING_ERROR",
+  // Metric sampling rates by category (2025 standard)
+  METRIC_SAMPLING_BUSINESS: "METRIC_SAMPLING_BUSINESS",
+  METRIC_SAMPLING_TECHNICAL: "METRIC_SAMPLING_TECHNICAL",
+  METRIC_SAMPLING_INFRASTRUCTURE: "METRIC_SAMPLING_INFRASTRUCTURE",
+  METRIC_SAMPLING_DEBUG: "METRIC_SAMPLING_DEBUG",
   // Log retention policy
   LOG_RETENTION_DEBUG_DAYS: "LOG_RETENTION_DEBUG_DAYS",
   LOG_RETENTION_INFO_DAYS: "LOG_RETENTION_INFO_DAYS",
@@ -55,6 +60,11 @@ export const telemetryDefaults: TelemetryConfig = {
   LOG_SAMPLING_INFO: 0.5, // 50% - balanced info logging
   LOG_SAMPLING_WARN: 0.9, // 90% - high warn visibility
   LOG_SAMPLING_ERROR: 1.0, // 100% - never drop errors
+  // Metric sampling rates by category (2025 standard)
+  METRIC_SAMPLING_BUSINESS: 1.0, // 100% - never drop business metrics
+  METRIC_SAMPLING_TECHNICAL: 0.75, // 75% - most technical metrics
+  METRIC_SAMPLING_INFRASTRUCTURE: 0.5, // 50% - infrastructure monitoring
+  METRIC_SAMPLING_DEBUG: 0.25, // 25% - development metrics
   // Log retention policy (days) - balance compliance and cost
   LOG_RETENTION_DEBUG_DAYS: 1, // Debug logs: 1 day
   LOG_RETENTION_INFO_DAYS: 7, // Info logs: 7 days
@@ -135,6 +145,27 @@ export const TelemetryConfigSchema = z.object({
     .min(0.01, "LOG_SAMPLING_ERROR must be at least 1%")
     .max(1.0, "LOG_SAMPLING_ERROR cannot exceed 100%")
     .default(1.0),
+  // Metric sampling rate validation (2025 standards)
+  METRIC_SAMPLING_BUSINESS: z.coerce
+    .number()
+    .min(0.01, "METRIC_SAMPLING_BUSINESS must be at least 1%")
+    .max(1.0, "METRIC_SAMPLING_BUSINESS cannot exceed 100%")
+    .default(1.0), // 100% for business metrics
+  METRIC_SAMPLING_TECHNICAL: z.coerce
+    .number()
+    .min(0.01, "METRIC_SAMPLING_TECHNICAL must be at least 1%")
+    .max(1.0, "METRIC_SAMPLING_TECHNICAL cannot exceed 100%")
+    .default(0.75), // 75% for technical metrics
+  METRIC_SAMPLING_INFRASTRUCTURE: z.coerce
+    .number()
+    .min(0.01, "METRIC_SAMPLING_INFRASTRUCTURE must be at least 1%")
+    .max(1.0, "METRIC_SAMPLING_INFRASTRUCTURE cannot exceed 100%")
+    .default(0.5), // 50% for infrastructure metrics
+  METRIC_SAMPLING_DEBUG: z.coerce
+    .number()
+    .min(0.01, "METRIC_SAMPLING_DEBUG must be at least 1%")
+    .max(1.0, "METRIC_SAMPLING_DEBUG cannot exceed 100%")
+    .default(0.25), // 25% for debug metrics
   // Log retention policy validation
   LOG_RETENTION_DEBUG_DAYS: z.coerce
     .number()
@@ -253,6 +284,23 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
     LOG_SAMPLING_ERROR:
       (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_SAMPLING_ERROR), "number", "LOG_SAMPLING_ERROR") as number) ||
       telemetryDefaults.LOG_SAMPLING_ERROR,
+
+    // Metric sampling rates by category
+    METRIC_SAMPLING_BUSINESS:
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_BUSINESS), "number", "METRIC_SAMPLING_BUSINESS") as number) ||
+      telemetryDefaults.METRIC_SAMPLING_BUSINESS,
+
+    METRIC_SAMPLING_TECHNICAL:
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_TECHNICAL), "number", "METRIC_SAMPLING_TECHNICAL") as number) ||
+      telemetryDefaults.METRIC_SAMPLING_TECHNICAL,
+
+    METRIC_SAMPLING_INFRASTRUCTURE:
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_INFRASTRUCTURE), "number", "METRIC_SAMPLING_INFRASTRUCTURE") as number) ||
+      telemetryDefaults.METRIC_SAMPLING_INFRASTRUCTURE,
+
+    METRIC_SAMPLING_DEBUG:
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_DEBUG), "number", "METRIC_SAMPLING_DEBUG") as number) ||
+      telemetryDefaults.METRIC_SAMPLING_DEBUG,
 
     // Log retention policy
     LOG_RETENTION_DEBUG_DAYS:

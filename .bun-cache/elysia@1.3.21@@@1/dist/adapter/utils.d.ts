@@ -1,0 +1,19 @@
+import { StatusMap } from '../utils';
+import type { Context } from '../context';
+export declare const handleFile: (response: File | Blob, set?: Context["set"]) => Response;
+export declare const parseSetCookies: (headers: Headers, setCookie: string[]) => Headers;
+export declare const responseToSetHeaders: (response: Response, set?: Context["set"]) => {
+    headers: import("..").HTTPHeaders;
+    status?: number | keyof StatusMap;
+    redirect?: string;
+    cookie?: Record<string, import("../cookies").ElysiaCookie>;
+};
+type CreateHandlerParameter = {
+    mapResponse(response: unknown, set: Context['set'], request?: Request): Response;
+    mapCompactResponse(response: unknown, request?: Request): Response;
+};
+export declare const createStreamHandler: ({ mapResponse, mapCompactResponse }: CreateHandlerParameter) => (generator: Generator | AsyncGenerator | ReadableStream, set?: Context["set"], request?: Request) => Promise<Response>;
+export declare function streamResponse(response: Response): AsyncGenerator<string, void, unknown>;
+export declare const handleSet: (set: Context["set"]) => void;
+export declare const createResponseHandler: (handler: CreateHandlerParameter) => (response: Response, set: Context["set"], request?: Request) => any;
+export {};

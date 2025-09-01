@@ -66,6 +66,11 @@ export interface TelemetryConfig {
   LOG_SAMPLING_INFO: number;
   LOG_SAMPLING_WARN: number;
   LOG_SAMPLING_ERROR: number;
+  // Metric sampling rates by category (2025 standard)
+  METRIC_SAMPLING_BUSINESS: number;
+  METRIC_SAMPLING_TECHNICAL: number;
+  METRIC_SAMPLING_INFRASTRUCTURE: number;
+  METRIC_SAMPLING_DEBUG: number;
   // Log retention policy (days)
   LOG_RETENTION_DEBUG_DAYS: number;
   LOG_RETENTION_INFO_DAYS: number;

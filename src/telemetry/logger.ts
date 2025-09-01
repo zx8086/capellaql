@@ -3,6 +3,7 @@
 import { context, type SpanContext, trace } from "@opentelemetry/api";
 import * as api from "@opentelemetry/api-logs";
 import config from "$config";
+import { getUnifiedSamplingCoordinator } from "./instrumentation";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 
 export enum LogLevel {
@@ -248,9 +249,23 @@ class TelemetryLogger {
   }
 
   /**
-   * Deterministic sampling based on trace ID for consistency across distributed systems
+   * Unified sampling decision using UnifiedSamplingCoordinator for consistency
    */
   private shouldSampleLog(logData: StructuredLogData): boolean {
+    const samplingCoordinator = getUnifiedSamplingCoordinator();
+    
+    if (samplingCoordinator) {
+      // Use unified sampling coordinator for consistent decisions
+      const decision = samplingCoordinator.shouldSampleLog(
+        logData.level,
+        logData.message,
+        logData.context?.traceId
+      );
+      
+      return decision.shouldSample;
+    }
+
+    // Fallback to legacy sampling if coordinator not available
     const samplingRate = this.getSamplingRate(logData.level);
 
     // Always sample errors to maintain 100% error visibility

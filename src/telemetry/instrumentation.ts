@@ -33,11 +33,12 @@ import { BunSpanProcessor } from "./exporters/BunSpanProcessor";
 import { BunTraceExporter } from "./exporters/BunTraceExporter";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 import { log, telemetryLogger, warn } from "./logger";
-import { SmartSampler } from "./sampling/SmartSampler";
+import { DEFAULT_UNIFIED_SAMPLING_CONFIG, UnifiedSamplingCoordinator } from "./sampling/UnifiedSamplingCoordinator";
 
 let sdk: NodeSDK | undefined;
 let isInitialized = false;
 let config: TelemetryConfig;
+let unifiedSamplingCoordinator: UnifiedSamplingCoordinator | undefined;
 
 export async function initializeTelemetry(): Promise<void> {
   if (isInitialized) {
@@ -144,12 +145,30 @@ export async function initializeTelemetry(): Promise<void> {
       });
     }
 
-    // Create smart sampler with 2025 standards
-    const sampler = new SmartSampler({
-      defaultSamplingRate: config.SAMPLING_RATE, // 15% (2025 standard)
-      errorSamplingRate: 1.0, // 100% error retention (2025 standard)
-      enabledEndpoints: ["/graphql", "/health"], // Always sample these
-    });
+    // Create unified sampling coordinator with 2025 standards
+    const unifiedSamplingConfig = {
+      ...DEFAULT_UNIFIED_SAMPLING_CONFIG,
+      trace: {
+        defaultSamplingRate: config.SAMPLING_RATE, // 15% (2025 standard)
+        errorSamplingRate: 1.0, // 100% error retention (2025 standard)
+        enabledEndpoints: ["/graphql", "/health"], // Always sample these
+      },
+      metrics: {
+        businessMetrics: config.METRIC_SAMPLING_BUSINESS,
+        technicalMetrics: config.METRIC_SAMPLING_TECHNICAL,
+        infrastructureMetrics: config.METRIC_SAMPLING_INFRASTRUCTURE,
+        debugMetrics: config.METRIC_SAMPLING_DEBUG,
+      },
+      logs: {
+        debug: config.LOG_SAMPLING_DEBUG,
+        info: config.LOG_SAMPLING_INFO,
+        warn: config.LOG_SAMPLING_WARN,
+        error: config.LOG_SAMPLING_ERROR,
+      },
+    };
+
+    const sampler = new UnifiedSamplingCoordinator(unifiedSamplingConfig);
+    unifiedSamplingCoordinator = sampler;
 
     // Create propagator with W3C standards
     const propagator = new CompositePropagator({
@@ -401,6 +420,10 @@ export function getTelemetrySDK(): NodeSDK | undefined {
 
 export function isTelemetryInitialized(): boolean {
   return isInitialized;
+}
+
+export function getUnifiedSamplingCoordinator(): UnifiedSamplingCoordinator | undefined {
+  return unifiedSamplingCoordinator;
 }
 
 // Performance monitoring utilities with Bun integration

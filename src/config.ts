@@ -62,6 +62,10 @@ const envVarMapping = {
     LOG_SAMPLING_INFO: "LOG_SAMPLING_INFO",
     LOG_SAMPLING_WARN: "LOG_SAMPLING_WARN",
     LOG_SAMPLING_ERROR: "LOG_SAMPLING_ERROR",
+    METRIC_SAMPLING_BUSINESS: "METRIC_SAMPLING_BUSINESS",
+    METRIC_SAMPLING_TECHNICAL: "METRIC_SAMPLING_TECHNICAL",
+    METRIC_SAMPLING_INFRASTRUCTURE: "METRIC_SAMPLING_INFRASTRUCTURE",
+    METRIC_SAMPLING_DEBUG: "METRIC_SAMPLING_DEBUG",
     LOG_RETENTION_DEBUG_DAYS: "LOG_RETENTION_DEBUG_DAYS",
     LOG_RETENTION_INFO_DAYS: "LOG_RETENTION_INFO_DAYS",
     LOG_RETENTION_WARN_DAYS: "LOG_RETENTION_WARN_DAYS",
@@ -145,6 +149,10 @@ class ConfigurationError extends Error {
       "telemetry.LOG_SAMPLING_INFO": "LOG_SAMPLING_INFO",
       "telemetry.LOG_SAMPLING_WARN": "LOG_SAMPLING_WARN",
       "telemetry.LOG_SAMPLING_ERROR": "LOG_SAMPLING_ERROR",
+      "telemetry.METRIC_SAMPLING_BUSINESS": "METRIC_SAMPLING_BUSINESS",
+      "telemetry.METRIC_SAMPLING_TECHNICAL": "METRIC_SAMPLING_TECHNICAL",
+      "telemetry.METRIC_SAMPLING_INFRASTRUCTURE": "METRIC_SAMPLING_INFRASTRUCTURE",
+      "telemetry.METRIC_SAMPLING_DEBUG": "METRIC_SAMPLING_DEBUG",
       "telemetry.LOG_RETENTION_DEBUG_DAYS": "LOG_RETENTION_DEBUG_DAYS",
       "telemetry.LOG_RETENTION_INFO_DAYS": "LOG_RETENTION_INFO_DAYS",
       "telemetry.LOG_RETENTION_WARN_DAYS": "LOG_RETENTION_WARN_DAYS",
@@ -216,16 +224,21 @@ const defaultConfig: Config = {
     SAMPLING_RATE: 0.15,
     CIRCUIT_BREAKER_THRESHOLD: 5,
     CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
-    // Log sampling configuration - 100% sampling to ensure important events are captured
-    LOG_SAMPLING_DEBUG: 1.0,
-    LOG_SAMPLING_INFO: 1.0,
-    LOG_SAMPLING_WARN: 1.0,
-    LOG_SAMPLING_ERROR: 1.0,
-    // Log retention configuration
-    LOG_RETENTION_DEBUG_DAYS: 7,   // 7 days for debug logs
-    LOG_RETENTION_INFO_DAYS: 30,   // 30 days for info logs  
-    LOG_RETENTION_WARN_DAYS: 90,   // 90 days for warning logs
-    LOG_RETENTION_ERROR_DAYS: 365, // 365 days (1 year) for error logs
+    // Log sampling configuration - optimized for cost while maintaining visibility
+    LOG_SAMPLING_DEBUG: 0.1,  // 10% - reduce debug noise
+    LOG_SAMPLING_INFO: 0.5,   // 50% - balanced info logging
+    LOG_SAMPLING_WARN: 0.9,   // 90% - high warn visibility
+    LOG_SAMPLING_ERROR: 1.0,  // 100% - never drop errors
+    // Metric sampling rates by category (2025 standards)
+    METRIC_SAMPLING_BUSINESS: 1.0,       // 100% - never drop business metrics
+    METRIC_SAMPLING_TECHNICAL: 0.75,     // 75% - most technical metrics
+    METRIC_SAMPLING_INFRASTRUCTURE: 0.5, // 50% - infrastructure monitoring
+    METRIC_SAMPLING_DEBUG: 0.25,         // 25% - development metrics
+    // Log retention configuration - balance compliance needs with storage costs
+    LOG_RETENTION_DEBUG_DAYS: 1,   // Debug logs: 1 day (minimize storage)
+    LOG_RETENTION_INFO_DAYS: 7,    // Info logs: 7 days (standard retention)
+    LOG_RETENTION_WARN_DAYS: 30,   // Warning logs: 30 days (compliance)
+    LOG_RETENTION_ERROR_DAYS: 90,  // Error logs: 90 days (audit requirements)
   },
 };
 
@@ -599,6 +612,35 @@ function loadConfigFromEnv(): Partial<Config> {
         "number",
         "LOG_SAMPLING_ERROR"
       ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_ERROR,
+
+    // Metric sampling configuration (2025 unified sampling standards)
+    METRIC_SAMPLING_BUSINESS:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.METRIC_SAMPLING_BUSINESS),
+        "number",
+        "METRIC_SAMPLING_BUSINESS"
+      ) as number) ?? defaultConfig.telemetry.METRIC_SAMPLING_BUSINESS,
+
+    METRIC_SAMPLING_TECHNICAL:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.METRIC_SAMPLING_TECHNICAL),
+        "number",
+        "METRIC_SAMPLING_TECHNICAL"
+      ) as number) ?? defaultConfig.telemetry.METRIC_SAMPLING_TECHNICAL,
+
+    METRIC_SAMPLING_INFRASTRUCTURE:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.METRIC_SAMPLING_INFRASTRUCTURE),
+        "number",
+        "METRIC_SAMPLING_INFRASTRUCTURE"
+      ) as number) ?? defaultConfig.telemetry.METRIC_SAMPLING_INFRASTRUCTURE,
+
+    METRIC_SAMPLING_DEBUG:
+      (parseEnvVar(
+        getEnvVar(envVarMapping.telemetry.METRIC_SAMPLING_DEBUG),
+        "number",
+        "METRIC_SAMPLING_DEBUG"
+      ) as number) ?? defaultConfig.telemetry.METRIC_SAMPLING_DEBUG,
 
     // Log retention configuration
     LOG_RETENTION_DEBUG_DAYS:
