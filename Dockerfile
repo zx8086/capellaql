@@ -28,7 +28,7 @@ COPY --chown=bun:bun package.json bun.lock* bunfig.toml tsconfig.json ./
 # Install dependencies with optimized Bun caching
 RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
     --mount=type=cache,target=/root/.bun,sharing=locked \
-    bun install --frozen-lockfile --production --verbose && \
+    bun install --frozen-lockfile --production && \
     mkdir -p node_modules && \
     chown -R bun:bun node_modules
 
@@ -38,7 +38,7 @@ ENV NODE_ENV=development
 
 # Install all dependencies including dev dependencies
 RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
-    bun install --frozen-lockfile --verbose
+    bun install --frozen-lockfile
 
 # Copy source files
 COPY --chown=bun:bun . .
@@ -78,7 +78,7 @@ FROM base AS release
 COPY --chown=bun:bun package.json bun.lock* bunfig.toml ./
 RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
     --mount=type=cache,target=/root/.bun,sharing=locked \
-    bun install --frozen-lockfile --production --verbose
+    bun install --frozen-lockfile --production
 
 # Copy built application from builder stage
 COPY --from=builder --chown=bun:bun /usr/src/app/dist ./dist

@@ -59,6 +59,20 @@ Dockerfile
 **/*.tar.gz
 **/*.tgz
 
+# Bun cache (large and not needed in build)
+.bun-cache/
+.bun-cache/*
+
+# CI/CD artifacts
+.github/workflows/
+.github/actions/
+AGENTS/
+
+# Large development files
+*.backup
+*.trace
+*.prof
+
 # Misc
 .vercel
 .vscode/
