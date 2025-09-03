@@ -33,12 +33,12 @@ import { BunSpanProcessor } from "./exporters/BunSpanProcessor";
 import { BunTraceExporter } from "./exporters/BunTraceExporter";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 import { log, telemetryLogger, warn } from "./logger";
-import { DEFAULT_UNIFIED_SAMPLING_CONFIG, UnifiedSamplingCoordinator } from "./sampling/UnifiedSamplingCoordinator";
+import { DEFAULT_SIMPLE_SAMPLING_CONFIG, SimpleSmartSampler, type SimpleSmartSamplingConfig } from "./sampling/SimpleSmartSampler";
 
 let sdk: NodeSDK | undefined;
 let isInitialized = false;
 let config: TelemetryConfig;
-let unifiedSamplingCoordinator: UnifiedSamplingCoordinator | undefined;
+let simpleSmartSampler: SimpleSmartSampler | undefined;
 
 export async function initializeTelemetry(): Promise<void> {
   if (isInitialized) {
@@ -145,30 +145,24 @@ export async function initializeTelemetry(): Promise<void> {
       });
     }
 
-    // Create unified sampling coordinator with 2025 standards
-    const unifiedSamplingConfig = {
-      ...DEFAULT_UNIFIED_SAMPLING_CONFIG,
-      trace: {
-        defaultSamplingRate: config.SAMPLING_RATE, // 15% (2025 standard)
-        errorSamplingRate: 1.0, // 100% error retention (2025 standard)
-        enabledEndpoints: ["/graphql", "/health"], // Always sample these
-      },
-      metrics: {
-        businessMetrics: config.METRIC_SAMPLING_BUSINESS,
-        technicalMetrics: config.METRIC_SAMPLING_TECHNICAL,
-        infrastructureMetrics: config.METRIC_SAMPLING_INFRASTRUCTURE,
-        debugMetrics: config.METRIC_SAMPLING_DEBUG,
-      },
-      logs: {
-        debug: config.LOG_SAMPLING_DEBUG,
-        info: config.LOG_SAMPLING_INFO,
-        warn: config.LOG_SAMPLING_WARN,
-        error: config.LOG_SAMPLING_ERROR,
-      },
+    // Create simple 3-tier sampling strategy (streamlined approach)
+    const simpleSamplingConfig: SimpleSmartSamplingConfig = {
+      // Use new simplified rates or fall back to derived values for backward compatibility
+      traces: config.TRACES_SAMPLING_RATE || config.SAMPLING_RATE,
+      metrics: config.METRICS_SAMPLING_RATE || 
+               ((config.METRIC_SAMPLING_BUSINESS + config.METRIC_SAMPLING_TECHNICAL + 
+                 config.METRIC_SAMPLING_INFRASTRUCTURE + config.METRIC_SAMPLING_DEBUG) / 4),
+      logs: config.LOGS_SAMPLING_RATE || 
+            ((config.LOG_SAMPLING_DEBUG + config.LOG_SAMPLING_INFO + 
+              config.LOG_SAMPLING_WARN + config.LOG_SAMPLING_ERROR) / 4),
+      
+      preserveErrors: true,        // Always preserve errors
+      costOptimizationMode: config.COST_OPTIMIZATION_MODE !== undefined ? config.COST_OPTIMIZATION_MODE : config.DEPLOYMENT_ENVIRONMENT === 'production',
+      healthCheckSampling: config.HEALTH_CHECK_SAMPLING_RATE || 0.05,
     };
 
-    const sampler = new UnifiedSamplingCoordinator(unifiedSamplingConfig);
-    unifiedSamplingCoordinator = sampler;
+    const sampler = new SimpleSmartSampler(simpleSamplingConfig);
+    simpleSmartSampler = sampler;
 
     // Create propagator with W3C standards
     const propagator = new CompositePropagator({
@@ -422,8 +416,14 @@ export function isTelemetryInitialized(): boolean {
   return isInitialized;
 }
 
-export function getUnifiedSamplingCoordinator(): UnifiedSamplingCoordinator | undefined {
-  return unifiedSamplingCoordinator;
+export function getSimpleSmartSampler(): SimpleSmartSampler | undefined {
+  return simpleSmartSampler;
+}
+
+// Backward compatibility
+export function getUnifiedSamplingCoordinator(): SimpleSmartSampler | undefined {
+  console.warn('getUnifiedSamplingCoordinator() is deprecated - use getSimpleSmartSampler() instead');
+  return simpleSmartSampler;
 }
 
 // Performance monitoring utilities with Bun integration

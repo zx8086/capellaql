@@ -58,18 +58,12 @@ const envVarMapping = {
     SAMPLING_RATE: "SAMPLING_RATE",
     CIRCUIT_BREAKER_THRESHOLD: "CIRCUIT_BREAKER_THRESHOLD",
     CIRCUIT_BREAKER_TIMEOUT_MS: "CIRCUIT_BREAKER_TIMEOUT_MS",
-    LOG_SAMPLING_DEBUG: "LOG_SAMPLING_DEBUG",
-    LOG_SAMPLING_INFO: "LOG_SAMPLING_INFO",
-    LOG_SAMPLING_WARN: "LOG_SAMPLING_WARN",
-    LOG_SAMPLING_ERROR: "LOG_SAMPLING_ERROR",
-    METRIC_SAMPLING_BUSINESS: "METRIC_SAMPLING_BUSINESS",
-    METRIC_SAMPLING_TECHNICAL: "METRIC_SAMPLING_TECHNICAL",
-    METRIC_SAMPLING_INFRASTRUCTURE: "METRIC_SAMPLING_INFRASTRUCTURE",
-    METRIC_SAMPLING_DEBUG: "METRIC_SAMPLING_DEBUG",
-    LOG_RETENTION_DEBUG_DAYS: "LOG_RETENTION_DEBUG_DAYS",
-    LOG_RETENTION_INFO_DAYS: "LOG_RETENTION_INFO_DAYS",
-    LOG_RETENTION_WARN_DAYS: "LOG_RETENTION_WARN_DAYS",
-    LOG_RETENTION_ERROR_DAYS: "LOG_RETENTION_ERROR_DAYS",
+    // 3-tier sampling strategy
+    TRACES_SAMPLING_RATE: "TRACES_SAMPLING_RATE",
+    METRICS_SAMPLING_RATE: "METRICS_SAMPLING_RATE",
+    LOGS_SAMPLING_RATE: "LOGS_SAMPLING_RATE",
+    COST_OPTIMIZATION_MODE: "COST_OPTIMIZATION_MODE",
+    HEALTH_CHECK_SAMPLING_RATE: "HEALTH_CHECK_SAMPLING_RATE",
   },
 } as const;
 
@@ -145,18 +139,12 @@ class ConfigurationError extends Error {
       "telemetry.SAMPLING_RATE": "SAMPLING_RATE",
       "telemetry.CIRCUIT_BREAKER_THRESHOLD": "CIRCUIT_BREAKER_THRESHOLD",
       "telemetry.CIRCUIT_BREAKER_TIMEOUT_MS": "CIRCUIT_BREAKER_TIMEOUT_MS",
-      "telemetry.LOG_SAMPLING_DEBUG": "LOG_SAMPLING_DEBUG",
-      "telemetry.LOG_SAMPLING_INFO": "LOG_SAMPLING_INFO",
-      "telemetry.LOG_SAMPLING_WARN": "LOG_SAMPLING_WARN",
-      "telemetry.LOG_SAMPLING_ERROR": "LOG_SAMPLING_ERROR",
-      "telemetry.METRIC_SAMPLING_BUSINESS": "METRIC_SAMPLING_BUSINESS",
-      "telemetry.METRIC_SAMPLING_TECHNICAL": "METRIC_SAMPLING_TECHNICAL",
-      "telemetry.METRIC_SAMPLING_INFRASTRUCTURE": "METRIC_SAMPLING_INFRASTRUCTURE",
-      "telemetry.METRIC_SAMPLING_DEBUG": "METRIC_SAMPLING_DEBUG",
-      "telemetry.LOG_RETENTION_DEBUG_DAYS": "LOG_RETENTION_DEBUG_DAYS",
-      "telemetry.LOG_RETENTION_INFO_DAYS": "LOG_RETENTION_INFO_DAYS",
-      "telemetry.LOG_RETENTION_WARN_DAYS": "LOG_RETENTION_WARN_DAYS",
-      "telemetry.LOG_RETENTION_ERROR_DAYS": "LOG_RETENTION_ERROR_DAYS",
+      // Simplified 3-tier sampling environment variable mappings
+      "telemetry.TRACES_SAMPLING_RATE": "TRACES_SAMPLING_RATE",
+      "telemetry.METRICS_SAMPLING_RATE": "METRICS_SAMPLING_RATE",
+      "telemetry.LOGS_SAMPLING_RATE": "LOGS_SAMPLING_RATE",
+      "telemetry.COST_OPTIMIZATION_MODE": "COST_OPTIMIZATION_MODE",
+      "telemetry.HEALTH_CHECK_SAMPLING_RATE": "HEALTH_CHECK_SAMPLING_RATE",
     };
     return mapping[path];
   }
@@ -224,21 +212,12 @@ const defaultConfig: Config = {
     SAMPLING_RATE: 0.15,
     CIRCUIT_BREAKER_THRESHOLD: 5,
     CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
-    // Log sampling configuration - optimized for cost while maintaining visibility
-    LOG_SAMPLING_DEBUG: 0.1,  // 10% - reduce debug noise
-    LOG_SAMPLING_INFO: 0.5,   // 50% - balanced info logging
-    LOG_SAMPLING_WARN: 0.9,   // 90% - high warn visibility
-    LOG_SAMPLING_ERROR: 1.0,  // 100% - never drop errors
-    // Metric sampling rates by category (2025 standards)
-    METRIC_SAMPLING_BUSINESS: 1.0,       // 100% - never drop business metrics
-    METRIC_SAMPLING_TECHNICAL: 0.75,     // 75% - most technical metrics
-    METRIC_SAMPLING_INFRASTRUCTURE: 0.5, // 50% - infrastructure monitoring
-    METRIC_SAMPLING_DEBUG: 0.25,         // 25% - development metrics
-    // Log retention configuration - balance compliance needs with storage costs
-    LOG_RETENTION_DEBUG_DAYS: 1,   // Debug logs: 1 day (minimize storage)
-    LOG_RETENTION_INFO_DAYS: 7,    // Info logs: 7 days (standard retention)
-    LOG_RETENTION_WARN_DAYS: 30,   // Warning logs: 30 days (compliance)
-    LOG_RETENTION_ERROR_DAYS: 90,  // Error logs: 90 days (audit requirements)
+    // Simplified 3-tier sampling configuration (NEW) - 2025 unified sampling approach
+    TRACES_SAMPLING_RATE: 0.15,   // 15% traces - cost-effective distributed tracing
+    METRICS_SAMPLING_RATE: 0.25,  // 25% metrics - higher for performance monitoring
+    LOGS_SAMPLING_RATE: 0.30,     // 30% logs - balance visibility and storage costs
+    COST_OPTIMIZATION_MODE: true,        // Enable smart cost optimization features
+    HEALTH_CHECK_SAMPLING_RATE: 0.05,    // 5% health checks - reduce noise
   },
 };
 
@@ -584,92 +563,42 @@ function loadConfigFromEnv(): Partial<Config> {
         "CIRCUIT_BREAKER_TIMEOUT_MS"
       ) as number) || defaultConfig.telemetry.CIRCUIT_BREAKER_TIMEOUT_MS,
 
-    // Log sampling configuration
-    LOG_SAMPLING_DEBUG:
+    // Simplified 3-tier sampling configuration (NEW)
+    TRACES_SAMPLING_RATE:
       (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOG_SAMPLING_DEBUG),
+        getEnvVar(envVarMapping.telemetry.TRACES_SAMPLING_RATE),
         "number",
-        "LOG_SAMPLING_DEBUG"
-      ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_DEBUG,
+        "TRACES_SAMPLING_RATE"
+      ) as number) ?? defaultConfig.telemetry.TRACES_SAMPLING_RATE,
 
-    LOG_SAMPLING_INFO:
+    METRICS_SAMPLING_RATE:
       (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOG_SAMPLING_INFO),
+        getEnvVar(envVarMapping.telemetry.METRICS_SAMPLING_RATE),
         "number",
-        "LOG_SAMPLING_INFO"
-      ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_INFO,
+        "METRICS_SAMPLING_RATE"
+      ) as number) ?? defaultConfig.telemetry.METRICS_SAMPLING_RATE,
 
-    LOG_SAMPLING_WARN:
+    LOGS_SAMPLING_RATE:
       (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOG_SAMPLING_WARN),
+        getEnvVar(envVarMapping.telemetry.LOGS_SAMPLING_RATE),
         "number",
-        "LOG_SAMPLING_WARN"
-      ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_WARN,
+        "LOGS_SAMPLING_RATE"
+      ) as number) ?? defaultConfig.telemetry.LOGS_SAMPLING_RATE,
 
-    LOG_SAMPLING_ERROR:
+    COST_OPTIMIZATION_MODE:
       (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOG_SAMPLING_ERROR),
-        "number",
-        "LOG_SAMPLING_ERROR"
-      ) as number) ?? defaultConfig.telemetry.LOG_SAMPLING_ERROR,
+        getEnvVar(envVarMapping.telemetry.COST_OPTIMIZATION_MODE),
+        "boolean",
+        "COST_OPTIMIZATION_MODE"
+      ) as boolean) ?? defaultConfig.telemetry.COST_OPTIMIZATION_MODE,
 
-    // Metric sampling configuration (2025 unified sampling standards)
-    METRIC_SAMPLING_BUSINESS:
+    HEALTH_CHECK_SAMPLING_RATE:
       (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.METRIC_SAMPLING_BUSINESS),
+        getEnvVar(envVarMapping.telemetry.HEALTH_CHECK_SAMPLING_RATE),
         "number",
-        "METRIC_SAMPLING_BUSINESS"
-      ) as number) ?? defaultConfig.telemetry.METRIC_SAMPLING_BUSINESS,
+        "HEALTH_CHECK_SAMPLING_RATE"
+      ) as number) ?? defaultConfig.telemetry.HEALTH_CHECK_SAMPLING_RATE,
 
-    METRIC_SAMPLING_TECHNICAL:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.METRIC_SAMPLING_TECHNICAL),
-        "number",
-        "METRIC_SAMPLING_TECHNICAL"
-      ) as number) ?? defaultConfig.telemetry.METRIC_SAMPLING_TECHNICAL,
-
-    METRIC_SAMPLING_INFRASTRUCTURE:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.METRIC_SAMPLING_INFRASTRUCTURE),
-        "number",
-        "METRIC_SAMPLING_INFRASTRUCTURE"
-      ) as number) ?? defaultConfig.telemetry.METRIC_SAMPLING_INFRASTRUCTURE,
-
-    METRIC_SAMPLING_DEBUG:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.METRIC_SAMPLING_DEBUG),
-        "number",
-        "METRIC_SAMPLING_DEBUG"
-      ) as number) ?? defaultConfig.telemetry.METRIC_SAMPLING_DEBUG,
-
-    // Log retention configuration
-    LOG_RETENTION_DEBUG_DAYS:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOG_RETENTION_DEBUG_DAYS),
-        "number",
-        "LOG_RETENTION_DEBUG_DAYS"
-      ) as number) || defaultConfig.telemetry.LOG_RETENTION_DEBUG_DAYS,
-
-    LOG_RETENTION_INFO_DAYS:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOG_RETENTION_INFO_DAYS),
-        "number",
-        "LOG_RETENTION_INFO_DAYS"
-      ) as number) || defaultConfig.telemetry.LOG_RETENTION_INFO_DAYS,
-
-    LOG_RETENTION_WARN_DAYS:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOG_RETENTION_WARN_DAYS),
-        "number",
-        "LOG_RETENTION_WARN_DAYS"
-      ) as number) || defaultConfig.telemetry.LOG_RETENTION_WARN_DAYS,
-
-    LOG_RETENTION_ERROR_DAYS:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOG_RETENTION_ERROR_DAYS),
-        "number",
-        "LOG_RETENTION_ERROR_DAYS"
-      ) as number) || defaultConfig.telemetry.LOG_RETENTION_ERROR_DAYS,
   };
 
   return config;
@@ -820,6 +749,14 @@ try {
   process.stderr.write(
     `🚀 Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`
   );
+  
+  // Log simplified sampling configuration status
+  if (config.telemetry.COST_OPTIMIZATION_MODE) {
+    process.stderr.write(`💰 Cost optimization mode: ENABLED (3-tier sampling)\n`);
+    process.stderr.write(`📉 Simplified sampling rates: Traces=${config.telemetry.TRACES_SAMPLING_RATE}, Metrics=${config.telemetry.METRICS_SAMPLING_RATE}, Logs=${config.telemetry.LOGS_SAMPLING_RATE}\n`);
+  } else {
+    process.stderr.write(`🔧 Legacy sampling mode: ACTIVE (detailed category-based sampling)\n`);
+  }
 
   // Log runtime detection
   process.stderr.write(`⚡ Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);

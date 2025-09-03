@@ -1,7 +1,7 @@
 /* src/telemetry/metrics/httpMetrics.ts */
 
 import { type Counter, context, type Histogram, metrics, trace } from "@opentelemetry/api";
-import { getUnifiedSamplingCoordinator } from "../instrumentation";
+import { getSimpleSmartSampler } from "../instrumentation";
 
 let httpRequestCounter: Counter | undefined;
 let httpResponseTimeHistogram: Histogram | undefined;
@@ -42,7 +42,7 @@ export function recordHttpRequest(method: string, route: string, statusCode?: nu
   }
 
   // Apply unified sampling decision
-  const samplingCoordinator = getUnifiedSamplingCoordinator();
+  const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const metricName = "http_requests_total";
     const attributes = { 
@@ -59,7 +59,7 @@ export function recordHttpRequest(method: string, route: string, statusCode?: nu
 
     // Add sampling metadata to attributes
     attributes.sampling_reason = decision.reason;
-    attributes.sampling_rate = decision.samplingRate.toString();
+    attributes.sampling_rate = (decision.samplingRate ?? 0).toString();
     if (decision.correlationId) {
       attributes.correlation_id = decision.correlationId;
     }
@@ -85,7 +85,7 @@ export function recordHttpResponseTime(durationMs: number, method?: string, rout
   }
 
   // Apply unified sampling decision
-  const samplingCoordinator = getUnifiedSamplingCoordinator();
+  const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const metricName = "http_response_time_seconds";
     const attributes = { 
@@ -133,7 +133,7 @@ export function recordGraphQLRequest(operationName: string, operationType: strin
   }
 
   // Apply unified sampling decision - GraphQL operations might be business metrics
-  const samplingCoordinator = getUnifiedSamplingCoordinator();
+  const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const isBusinessOperation = operationType === "query" && (
       operationName.toLowerCase().includes("revenue") ||
@@ -179,7 +179,7 @@ export function recordGraphQLResponseTime(
   }
 
   // Apply unified sampling decision - GraphQL operations might be business metrics
-  const samplingCoordinator = getUnifiedSamplingCoordinator();
+  const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const isBusinessOperation = operationType === "query" && (
       operationName.toLowerCase().includes("revenue") ||

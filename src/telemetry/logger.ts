@@ -3,7 +3,7 @@
 import { context, type SpanContext, trace } from "@opentelemetry/api";
 import * as api from "@opentelemetry/api-logs";
 import config from "$config";
-import { getUnifiedSamplingCoordinator } from "./instrumentation";
+import { getSimpleSmartSampler } from "./instrumentation";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 
 export enum LogLevel {
@@ -252,7 +252,7 @@ class TelemetryLogger {
    * Unified sampling decision using UnifiedSamplingCoordinator for consistency
    */
   private shouldSampleLog(logData: StructuredLogData): boolean {
-    const samplingCoordinator = getUnifiedSamplingCoordinator();
+    const samplingCoordinator = getSimpleSmartSampler();
     
     if (samplingCoordinator) {
       // Use unified sampling coordinator for consistent decisions

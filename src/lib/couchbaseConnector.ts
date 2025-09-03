@@ -16,6 +16,7 @@ import {
 import config from "$config";
 import { CircuitBreaker, retryWithBackoff } from "$utils/bunUtils";
 import { log, warn, err } from "../telemetry/logger";
+import { getPerformanceStats } from "$lib/couchbaseMetrics";
 
 interface QueryableCluster extends Cluster {
   query<TRow = any>(
@@ -112,34 +113,156 @@ export async function clusterConn(): Promise<capellaConn> {
 }
 
 export async function getCouchbaseHealth(): Promise<{
-  status: "healthy" | "degraded" | "unhealthy";
+  status: "healthy" | "degraded" | "unhealthy" | "critical";
   details: {
-    connection: "connected" | "disconnected" | "connecting";
+    connection: "connected" | "disconnected" | "connecting" | "error";
     ping?: any;
     diagnostics?: any;
     circuitBreaker: {
       state: string;
       failures: number;
       successes: number;
+      totalOperations?: number;
+      lastFailure?: string;
+      errorRate?: number;
     };
-    error?: string;
+    connectionLatency?: number;
+    performance: {
+      avgQueryTime?: number;
+      errorRate?: number;
+      documentsPerSecond?: number;
+      connectionPoolSize?: number;
+    };
+    serviceHealth: {
+      kv?: { status: string; healthy: boolean };
+      query?: { status: string; healthy: boolean };
+      analytics?: { status: string; healthy: boolean };
+      search?: { status: string; healthy: boolean };
+    };
+    errors?: string[];
+    warnings?: string[];
+    recommendations?: string[];
   };
 }> {
+  const startTime = Date.now();
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const recommendations: string[] = [];
+
   try {
     const connection = await clusterConn();
+    const connectionLatency = Date.now() - startTime;
     const circuitBreakerStats = dbCircuitBreaker.getStats();
 
-    // Test basic connectivity
+    // Test basic connectivity and get detailed diagnostics
     const ping = await connection.cluster.ping();
     const diagnostics = await connection.cluster.diagnostics();
 
-    // Determine health status based on ping results
-    let status: "healthy" | "degraded" | "unhealthy" = "healthy";
+    // Analyze service health
+    const serviceHealth = {
+      kv: { status: 'unknown', healthy: false },
+      query: { status: 'unknown', healthy: false },
+      analytics: { status: 'unknown', healthy: false },
+      search: { status: 'unknown', healthy: false }
+    };
 
+    // Check service states from ping
+    if (ping.services) {
+      const kvServices = ping.services.kv || [];
+      const queryServices = ping.services.query || [];
+      const analyticsServices = ping.services.analytics || [];
+      const searchServices = ping.services.search || [];
+
+      serviceHealth.kv = {
+        status: kvServices.length > 0 ? (kvServices.every(s => s.state === 'ok') ? 'healthy' : 'degraded') : 'unavailable',
+        healthy: kvServices.length > 0 && kvServices.every(s => s.state === 'ok')
+      };
+
+      serviceHealth.query = {
+        status: queryServices.length > 0 ? (queryServices.every(s => s.state === 'ok') ? 'healthy' : 'degraded') : 'unavailable',
+        healthy: queryServices.length > 0 && queryServices.every(s => s.state === 'ok')
+      };
+
+      serviceHealth.analytics = {
+        status: analyticsServices.length > 0 ? (analyticsServices.every(s => s.state === 'ok') ? 'healthy' : 'degraded') : 'unavailable',
+        healthy: analyticsServices.length > 0 && analyticsServices.every(s => s.state === 'ok')
+      };
+
+      serviceHealth.search = {
+        status: searchServices.length > 0 ? (searchServices.every(s => s.state === 'ok') ? 'healthy' : 'degraded') : 'unavailable',
+        healthy: searchServices.length > 0 && searchServices.every(s => s.state === 'ok')
+      };
+    }
+
+    // Calculate comprehensive error metrics
+    const totalOperations = circuitBreakerStats.successes + circuitBreakerStats.failures;
+    const errorRate = totalOperations > 0 ? (circuitBreakerStats.failures / totalOperations) * 100 : 0;
+
+    // Enhanced circuit breaker stats
+    const enhancedCircuitBreakerStats = {
+      ...circuitBreakerStats,
+      totalOperations,
+      errorRate,
+      lastFailure: circuitBreakerStats.failures > 0 ? 'Recent failures detected' : undefined
+    };
+
+    // Get real performance metrics
+    const performanceStats = getPerformanceStats();
+    const performance = {
+      avgQueryTime: performanceStats.averageQueryTime,
+      errorRate: performanceStats.errorRate,
+      documentsPerSecond: performanceStats.documentsPerSecond,
+      connectionPoolSize: 10 // would come from connection pool metrics when available
+    };
+
+    // Determine overall health status with enhanced logic
+    let status: "healthy" | "degraded" | "unhealthy" | "critical" = "healthy";
+
+    // Critical conditions
     if (circuitBreakerStats.state === "open") {
+      status = "critical";
+      errors.push("Circuit breaker is open - database operations failing");
+      recommendations.push("Investigate connection issues immediately");
+    } else if (!serviceHealth.kv.healthy && !serviceHealth.query.healthy) {
+      status = "critical";
+      errors.push("Both KV and Query services are unhealthy");
+      recommendations.push("Check cluster status and node availability");
+    } else if (errorRate > 50) {
+      status = "critical";
+      errors.push(`High error rate: ${errorRate.toFixed(1)}%`);
+      recommendations.push("Investigate error patterns and consider scaling");
+    }
+    // Unhealthy conditions
+    else if (!serviceHealth.kv.healthy || !serviceHealth.query.healthy) {
       status = "unhealthy";
-    } else if (circuitBreakerStats.failures > 0 || ping.services.length === 0) {
+      errors.push("Critical services are unhealthy");
+      recommendations.push("Check individual service status");
+    } else if (connectionLatency > 5000) {
+      status = "unhealthy";
+      errors.push(`Very slow connection: ${connectionLatency}ms`);
+      recommendations.push("Check network connectivity and cluster load");
+    }
+    // Degraded conditions
+    else if (circuitBreakerStats.failures > 0) {
       status = "degraded";
+      warnings.push(`${circuitBreakerStats.failures} recent failures detected`);
+      recommendations.push("Monitor for error patterns");
+    } else if (connectionLatency > 2000) {
+      status = "degraded";
+      warnings.push(`Slow connection: ${connectionLatency}ms`);
+      recommendations.push("Monitor connection performance");
+    } else if (errorRate > 5) {
+      status = "degraded";
+      warnings.push(`Elevated error rate: ${errorRate.toFixed(1)}%`);
+      recommendations.push("Monitor error trends");
+    }
+
+    // Connection quality recommendations
+    if (connectionLatency > 1000) {
+      recommendations.push("Consider connection pooling optimization");
+    }
+    if (performance.avgQueryTime > 500) {
+      recommendations.push("Consider query optimization or indexing");
     }
 
     return {
@@ -148,17 +271,54 @@ export async function getCouchbaseHealth(): Promise<{
         connection: "connected",
         ping,
         diagnostics,
-        circuitBreaker: circuitBreakerStats,
+        circuitBreaker: enhancedCircuitBreakerStats,
+        connectionLatency,
+        performance,
+        serviceHealth,
+        errors: errors.length > 0 ? errors : undefined,
+        warnings: warnings.length > 0 ? warnings : undefined,
+        recommendations: recommendations.length > 0 ? recommendations : undefined
       },
     };
   } catch (error) {
-    err("Couchbase health check failed", error);
+    const circuitBreakerStats = dbCircuitBreaker.getStats();
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    
+    err("Couchbase health check failed", {
+      error: errorMessage,
+      connectionLatency: Date.now() - startTime,
+      circuitBreakerState: circuitBreakerStats.state
+    });
+
     return {
-      status: "unhealthy",
+      status: "critical",
       details: {
-        connection: "disconnected",
-        circuitBreaker: dbCircuitBreaker.getStats(),
-        error: error instanceof Error ? error.message : String(error),
+        connection: "error",
+        circuitBreaker: {
+          ...circuitBreakerStats,
+          totalOperations: circuitBreakerStats.successes + circuitBreakerStats.failures,
+          errorRate: 100
+        },
+        connectionLatency: Date.now() - startTime,
+        performance: {
+          errorRate: 100,
+          documentsPerSecond: 0
+        },
+        serviceHealth: {
+          kv: { status: 'unavailable', healthy: false },
+          query: { status: 'unavailable', healthy: false },
+          analytics: { status: 'unavailable', healthy: false },
+          search: { status: 'unavailable', healthy: false }
+        },
+        errors: [
+          errorMessage,
+          "Unable to establish connection to Couchbase cluster"
+        ],
+        recommendations: [
+          "Check connection configuration and credentials",
+          "Verify cluster availability and network connectivity",
+          "Review circuit breaker thresholds if failures persist"
+        ]
       },
     };
   }

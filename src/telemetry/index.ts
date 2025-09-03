@@ -35,6 +35,15 @@ export {
 } from "./metrics/httpMetrics";
 // Sampling exports
 export { SmartSampler, type SmartSamplingConfig } from "./sampling/SmartSampler";
+export { 
+  SimpleSmartSampler, 
+  type SimpleSmartSamplingConfig, 
+  type SimpleSamplingDecision,
+  createCostOptimizedSampler,
+  createHighFidelitySampler,
+  estimateCostImpact
+} from "./sampling/SimpleSmartSampler";
+export { getSimpleSmartSampler } from "./instrumentation";
 // Tracing exports
 export {
   createCouchbaseGetSpan,

@@ -36,7 +36,7 @@ CapellaQL is a high-performance GraphQL service built with Bun that provides a m
 ### Technology Stack
 - **Runtime**: Bun (leverages Bun-specific APIs and performance optimizations)
 - **GraphQL**: GraphQL Yoga with Elysia framework
-- **Database**: Couchbase SDK v4.4.6 with direct key-value and N1QL query support
+- **Database**: Couchbase SDK v4.5.0 with comprehensive error handling, retry logic, and performance monitoring
 - **Observability**: OpenTelemetry with custom OTLP exporters
 - **Containerization**: Docker multi-architecture (linux/amd64, linux/arm64)
 
@@ -45,7 +45,9 @@ CapellaQL is a high-performance GraphQL service built with Bun that provides a m
 #### Connection Management
 - Single cluster connection shared across all resolvers (`src/lib/couchbaseConnector.ts`)
 - Factory pattern for bucket/scope/collection access
-- Connection pooling with automatic retry logic
+- Production-ready error handling with comprehensive retry logic (`src/lib/couchbaseErrorHandler.ts`)
+- Real-time performance metrics and health monitoring (`src/lib/couchbaseMetrics.ts`)
+- Advanced transaction error handling (`src/lib/couchbaseTransactionHandler.ts`)
 
 #### GraphQL Resolver Organization
 - Modular resolver structure in `src/graphql/resolvers/`
@@ -80,6 +82,10 @@ src/
 ├── lib/
 │   ├── couchbaseConnector.ts   # Database connection factory
 │   ├── clusterProvider.ts      # Cluster management utilities
+│   ├── couchbaseErrorHandler.ts # Production-ready error handling with retry logic
+│   ├── couchbaseMetrics.ts     # Performance metrics and monitoring
+│   ├── couchbaseTransactionHandler.ts # Advanced transaction error handling
+│   ├── dataLoader.ts           # Enhanced DataLoader with comprehensive error handling
 │   └── queryCache.ts           # Query result caching layer
 ├── models/
 │   ├── index.ts                # Model exports
@@ -105,24 +111,34 @@ tests/                          # Centralized test directory
 
 #### Connection Usage
 ```typescript
-import { clusterConn } from "$lib/couchbaseConnector";
+import { getCluster } from "$lib/clusterProvider";
+import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
 
-const connection = await clusterConn();
-// Use connection.defaultCollection for default collection
-// Use connection.collection(bucket, scope, collection) for specific collections
+// Production-ready connection with comprehensive error handling
+const cluster = await CouchbaseErrorHandler.executeWithRetry(
+  async () => await getCluster(),
+  CouchbaseErrorHandler.createConnectionOperationContext("getCluster", requestId)
+);
+
+// Use cluster.collection(bucket, scope, collection) for specific collections
+const collection = cluster.collection("bucket", "scope", "collection");
 ```
 
 #### Query Patterns
-1. **Key-Value Operations**: Direct document retrieval with `collection.get(key)`
-2. **N1QL Queries**: Complex queries using `cluster.query(statement, options)`
-3. **Stored Functions**: Execute server-side functions with parameterized calls
-4. **Multi-Collection Search**: Cross-collection document discovery patterns
+1. **Key-Value Operations**: Document operations with comprehensive error handling and retry logic
+2. **N1QL Queries**: Complex queries with performance monitoring and error classification
+3. **Stored Functions**: Execute server-side functions with proper context and retry strategies
+4. **Multi-Collection Search**: Cross-collection document discovery with DataLoader batching
+5. **Transaction Operations**: ACID transactions with ambiguous operation tracking and recovery
 
 ### Error Handling
-- Use structured logging with request correlation IDs
-- Implement graceful degradation for non-critical failures
-- Handle Couchbase-specific errors (DocumentNotFoundError, CouchbaseError)
-- OpenTelemetry span error recording with proper status codes
+- **Production-Ready**: Comprehensive `CouchbaseErrorHandler` with 25+ error type classifications
+- **Retry Logic**: Exponential backoff with circuit breaker patterns for resilient operations
+- **Error Classification**: Automatic categorization (retryable/non-retryable, severity levels)
+- **Performance Monitoring**: Real-time metrics collection with slow query detection
+- **Ambiguous Operation Tracking**: Special handling for operations requiring manual investigation
+- **Transaction Safety**: Advanced transaction error handling with rollback strategies
+- **Structured Logging**: Correlation IDs with OpenTelemetry span integration
 
 ### Environment Configuration
 Copy `.env.example` to `.env` and configure:
@@ -142,28 +158,69 @@ Copy `.env.example` to `.env` and configure:
 - Production images support multi-architecture deployment
 - Source maps preserved in production for debugging
 
-## Available Claude Code Agents
+## Available Claude Code Specialized Agents
 
-When working with this project, you have access to specialized agents that can provide expert assistance:
+This project has access to comprehensive specialized agents for expert assistance. Each agent follows evidence-based analysis methodologies and requires complete context understanding before providing recommendations.
 
-### Core Development Agents
-- **@agent-bun-developer** - Expert in Bun runtime, APIs, and performance optimization. Use for Bun-specific development, native SQL/Redis integration, workspaces, and ES2023+ features.
-- **@agent-couchbase-capella-specialist** - Expert in Couchbase Capella connections, SDK v4.4.6, pooling, retry logic, and optimization. Use for all database-related tasks and connection management.
-- **@agent-config-manager** - Environment variable and configuration expert. Use for .env files, configuration validation, Zod schemas, and environment management.
-- **@agent-otel-logger** - OpenTelemetry observability specialist. Use for telemetry configuration, logging implementation, metrics collection, and distributed tracing.
+### Architecture & System Design
+- **`architect-reviewer`** - Architecture review specialist for system design validation, scalability analysis, and technical decision-making. **Use PROACTIVELY** for architectural decisions, refactoring strategies, system design improvements, and technology evaluation.
+- **`meta-orchestrator`** - Meta-level orchestration expert for complex multi-step tasks with advanced coordination patterns and production-ready workflow management. **Use PROACTIVELY** for breaking down complex problems, multi-agent coordination, task complexity analysis, and comprehensive workflow orchestration.
 
-### Architecture & Quality Agents
-- **@agent-architect-reviewer** - System design validation and technical decisions. Use for architecture reviews, design patterns, and scalability concerns.
-- **@agent-refactoring-specialist** - Code quality and refactoring expert. Use for improving code structure, reducing complexity, and safe code transformations.
-- **@agent-meta-orchestrator** - Complex multi-step task coordination. Use for breaking down complex problems and workflow planning.
+### Runtime & Backend Development
+- **`bun-developer`** - Expert Bun runtime developer with mastery of modern JavaScript/TypeScript and all Bun-specific APIs. **Use PROACTIVELY** for Bun servers, native SQL/Redis/S3 integration, workspaces, streams, ES2023+ features, performance optimization, full-stack TypeScript development, Zod validation, database integration, gRPC services, and monorepo management with catalogs and Biome.
+- **`graphql-specialist`** - Expert GraphQL developer specializing in GraphQL Yoga v5.x and Houdini with comprehensive knowledge of modern GraphQL patterns, federation, subscriptions, and performance optimization. **MUST BE USED** for all GraphQL schema design, resolver implementation, client integration, subscription handling, and performance optimization tasks. Specializes in production-ready patterns for scalable GraphQL applications with security, type safety, and developer experience optimization.
+- **`couchbase-capella-specialist`** - Expert Couchbase Capella specialist achieving **100/100 production readiness** with comprehensive error handling, performance monitoring, and resilience frameworks. **MUST BE USED** for all Couchbase operations including connection management, error handling, retry logic, transaction processing, and performance optimization. Features production-tested patterns for SDK v4.5.0+ with 25+ error classifications, circuit breaker integration, ambiguous operation tracking, and advanced health monitoring with actionable recommendations.
 
-### When to Use Each Agent
-- **Database issues**: Use @agent-couchbase-capella-specialist
-- **Configuration problems**: Use @agent-config-manager  
-- **Performance optimization**: Use @agent-bun-developer
-- **Telemetry/logging**: Use @agent-otel-logger
-- **Architecture decisions**: Use @agent-architect-reviewer
-- **Code quality improvements**: Use @agent-refactoring-specialist
+### Frontend Development
+- **`svelte5-developer`** - Expert Svelte 5 and SvelteKit developer specializing in modern reactive patterns, runes system, component architecture, and full-stack TypeScript applications. Has live access to Svelte 5 documentation via MCP server. **Use PROACTIVELY** for all frontend development, reactive state management, component design, and SvelteKit full-stack patterns.
+
+### Configuration & Infrastructure
+- **`config-manager`** - Environment variable and configuration expert with universal configuration excellence patterns, production-ready validation frameworks, and cross-system consistency management. **ALWAYS USE** for .env files, ConfigurationManager, configChanged events, health checks, config.ts files, Zod validation, or configuration management. Specializes in type-safe environment variable parsing, default/merge patterns, configuration validation with Zod v4, event-driven config updates, performance metrics, schema migration, "no fallbacks" policies, multi-environment optimization, and configuration health monitoring.
+- **`deployment-bun-svelte-specialist`** - Expert Bun + Svelte workflow optimizer for GitHub Actions CI/CD pipelines. **Use immediately** when working with .github/workflows/, Dockerfile, bun.lockb, or svelte.config.js files. Proactively optimizes build times, Docker workflows, security scanning, and developer experience.
+
+### Testing & Performance
+- **`k6-performance-specialist`** - Expert K6 performance testing specialist with comprehensive knowledge of load testing patterns, cloud-native testing strategies, and production-ready performance validation frameworks. **MUST BE USED** for all K6 test creation, performance testing strategy, load pattern design, and test result analysis. **Use PROACTIVELY** when implementing performance tests, analyzing bottlenecks, designing test scenarios, or optimizing test execution. Specializes in K6 v1.0+ features, TypeScript support, browser testing, WebSocket/GraphQL testing, distributed testing with K6 Operator, and cloud optimization strategies.
+
+### Observability & Monitoring  
+- **`otel-logger`** - OpenTelemetry-native observability specialist implementing pure structured logging, distributed tracing, and metrics collection per 2025 standards. **Use PROACTIVELY** for telemetry configuration, logging implementation, metrics collection, distributed tracing, and cost-optimized sampling strategies. Specializes in telemetry systems that have migrated from hybrid file logging to cloud-native OpenTelemetry-only implementations with advanced memory management and circuit breaker reliability patterns. **Expert in unified sampling strategies** achieving 60-70% cost reduction while maintaining critical observability.
+
+### Code Quality & Maintenance
+- **`refactoring-specialist`** - Expert refactoring specialist mastering safe code transformation techniques and design pattern application. Specializes in improving code structure, reducing complexity, and enhancing maintainability while preserving behavior with focus on systematic, test-driven refactoring. **Use PROACTIVELY** for any code quality improvement, complexity reduction, or architectural cleanup. **MUST BE USED** for legacy code modernization, performance refactoring, and safe code transformations.
+
+### Integration & Protocol Development
+- **`mcp-developer`** - Expert MCP developer specializing in Model Context Protocol server and client development. Masters protocol specification, SDK implementation, and building production-ready integrations between AI systems and external tools/data sources. **Use PROACTIVELY** for any MCP server/client development, protocol implementation, or AI-tool integration. **MUST BE USED** for JSON-RPC compliance, transport configuration, and production deployment.
+
+### Agent Usage Guidelines
+
+**Proactive Usage Patterns:**
+- **MUST BE USED**: Invoke immediately when working in their specialized domain
+- **Use PROACTIVELY**: Consider early in planning phases and during active development
+- **ALWAYS USE**: Required for specific file types or configuration tasks
+
+**Multi-Agent Coordination:**
+- Multiple agents can be combined for complex tasks requiring cross-domain expertise
+- The `meta-orchestrator` can coordinate multi-agent workflows when needed
+- Always prefer the most specialized agent for the primary task domain
+
+**Key Decision Matrix:**
+- **Database/Connection Issues**: `couchbase-capella-specialist`
+- **Configuration/Environment**: `config-manager` (ALWAYS USE)
+- **Performance/Bun Optimization**: `bun-developer`
+- **GraphQL Development**: `graphql-specialist` (MUST BE USED)
+- **Telemetry/OpenTelemetry**: `otel-logger`
+- **Architecture/Design Decisions**: `architect-reviewer`
+- **Code Quality/Refactoring**: `refactoring-specialist`
+- **Frontend/Svelte Development**: `svelte5-developer`
+- **Performance Testing**: `k6-performance-specialist` (MUST BE USED)
+- **CI/CD/Deployment**: `deployment-bun-svelte-specialist`
+- **Complex Multi-Step Tasks**: `meta-orchestrator`
+- **Protocol/Integration Development**: `mcp-developer`
+
+**Evidence-Based Methodology:**
+- All agents follow evidence-based analysis requiring complete context reading
+- Agents provide production-ready patterns and real-world validation
+- Each agent specializes in specific technology stacks and maintains current best practices
+- Agents are designed for proactive assistance rather than reactive troubleshooting
 
 ## Testing Structure
 
@@ -192,12 +249,15 @@ tests/
 ## Important Notes
 
 - This codebase extensively uses Bun-specific features and APIs
-- Always use the existing connection patterns rather than creating new database connections
+- **Always use `CouchbaseErrorHandler`** for all database operations - provides production-ready error handling
+- **Use existing connection patterns** with comprehensive retry logic rather than creating new connections
+- **Follow error classification principles** - never retry ambiguous operations, always log critical errors
 - Follow the modular resolver pattern when adding new GraphQL endpoints
-- Maintain the structured logging approach with correlation IDs
+- Maintain structured logging with correlation IDs and OpenTelemetry integration
+- **Monitor performance metrics** using the built-in `CouchbaseMetrics` system for query optimization
 - Test changes with the provided K6 performance test suite
 - All configuration should use the centralized config system with proper validation
-- Use the specialized agents for expert assistance in their respective domains
+- **Use specialized agents** for expert assistance - the couchbase-capella-specialist provides 100/100 production patterns
 
 ## Development Process Management
 

@@ -1,7 +1,7 @@
 /* src/telemetry/metrics/databaseMetrics.ts - 2025-compliant database observability */
 
 import { type Counter, context, type Histogram, metrics, trace, type UpDownCounter } from "@opentelemetry/api";
-import { getUnifiedSamplingCoordinator } from "../instrumentation";
+import { getSimpleSmartSampler } from "../instrumentation";
 import { telemetryHealthMonitor } from "../health/telemetryHealth";
 
 let dbOperationCounter: Counter | undefined;
@@ -73,7 +73,7 @@ export function recordDatabaseOperation(
   }
 
   // Apply unified sampling decision - database operations are technical metrics
-  const samplingCoordinator = getUnifiedSamplingCoordinator();
+  const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const metricName = "db_operations_total";
     const attributes = { 
@@ -183,7 +183,7 @@ export function recordSLIMetric(
   if (!circuitBreaker.canExecute()) return;
 
   // Apply unified sampling decision - SLI metrics are business critical
-  const samplingCoordinator = getUnifiedSamplingCoordinator();
+  const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const metricName = `sli_${sliName}_total`;
     const attributes = { 

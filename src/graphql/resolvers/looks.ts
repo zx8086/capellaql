@@ -2,6 +2,7 @@
 
 import { SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
 import { getCluster } from "$lib/clusterProvider";
+import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { debug, error as err, log } from "../../telemetry/logger";
 import type { GraphQLContext } from "../context";
@@ -27,10 +28,10 @@ const looksResolver = withValidation(
       return await withSQLiteCache(
         cacheKey,
         async () => {
-          const cluster = await getCluster().catch((error) => {
-            err("Error in getCluster:", { error, requestId: context.requestId });
-            throw error;
-          });
+          const cluster = await CouchbaseErrorHandler.executeWithRetry(
+            async () => await getCluster(),
+            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
+          );
 
           const query = `EXECUTE FUNCTION \`default\`.\`media_assets\`.get_looks($brand, $season, $division)`;
           const queryOptions = {
@@ -45,7 +46,10 @@ const looksResolver = withValidation(
             cacheStatus: "miss",
           });
 
-          const result = await cluster.cluster.query(query, queryOptions);
+          const result = await CouchbaseErrorHandler.executeWithRetry(
+            async () => await cluster.cluster.query(query, queryOptions),
+            CouchbaseErrorHandler.createQueryOperationContext("get_looks", query, context.requestId, "default")
+          );
 
           const queryEndTime = Date.now();
           const queryDuration = queryEndTime - (context.startTime || queryEndTime);

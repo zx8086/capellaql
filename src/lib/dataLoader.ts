@@ -2,6 +2,18 @@
 
 import DataLoader from "dataloader";
 import { getCluster } from "$lib/clusterProvider";
+import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import {
+  DocumentNotFoundError,
+  CouchbaseError,
+  TimeoutError,
+  TemporaryFailureError,
+  ServiceNotAvailableError,
+  AuthenticationFailureError,
+  RateLimitedError,
+  AmbiguousTimeoutError,
+  DocumentLockedError
+} from 'couchbase';
 import { debug, error as err, log } from "../telemetry/logger";
 
 // Key type for identifying documents
@@ -29,7 +41,10 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
   const startTime = Date.now();
 
   try {
-    const connection = await getCluster();
+    const connection = await CouchbaseErrorHandler.executeWithRetry(
+      async () => await getCluster(),
+      CouchbaseErrorHandler.createConnectionOperationContext("getCluster")
+    );
     const results: DocumentResult[] = [];
 
     // Group keys by collection for efficient batching
@@ -74,7 +89,17 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
               };
             }
 
-            const result = await collectionRef.get(keyInfo.key);
+            const result = await CouchbaseErrorHandler.executeWithRetry(
+              async () => await collectionRef.get(keyInfo.key),
+              CouchbaseErrorHandler.createDocumentOperationContext(
+                "get",
+                keyInfo.bucket,
+                keyInfo.scope,
+                keyInfo.collection,
+                keyInfo.key
+              ),
+              2 // Limit retries for individual document gets
+            );
             const timeTaken = Date.now() - keyStartTime;
 
             return {
@@ -86,8 +111,10 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
             };
           } catch (error) {
             const timeTaken = Date.now() - keyStartTime;
+            const classification = CouchbaseErrorHandler.classifyError(error);
 
-            if (error instanceof connection.errors.DocumentNotFoundError) {
+            // Handle specific error types with proper classification
+            if (error instanceof DocumentNotFoundError) {
               return {
                 bucket: keyInfo.bucket,
                 scope: keyInfo.scope,
@@ -95,16 +122,78 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
                 data: null,
                 timeTaken,
               };
-            } else if (error instanceof connection.errors.CouchbaseError) {
+            } else if (error instanceof AuthenticationFailureError) {
+              // Critical authentication errors - don't retry, but return error info
+              err("Authentication/Permission error in DataLoader", {
+                errorType: error.constructor.name,
+                keyInfo,
+                classification
+              });
               return {
                 bucket: keyInfo.bucket,
                 scope: keyInfo.scope,
                 collection: keyInfo.collection,
                 data: null,
                 timeTaken,
-                error: error.message,
+                error: `Access denied: ${error.message}`,
+              };
+            } else if (error instanceof AmbiguousTimeoutError) {
+              // Ambiguous operations need special logging
+              err("Ambiguous timeout in DataLoader - manual investigation required", {
+                keyInfo,
+                errorMessage: error.message,
+                requiresInvestigation: true
+              });
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Ambiguous timeout: ${error.message}`,
+              };
+            } else if (error instanceof TemporaryFailureError || 
+                       error instanceof ServiceNotAvailableError ||
+                       error instanceof RateLimitedError) {
+              // These errors are retryable but may have failed after retries
+              debug("Retryable error occurred in DataLoader", {
+                errorType: error.constructor.name,
+                keyInfo,
+                classification
+              });
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Service error: ${error.message}`,
+              };
+            } else if (error instanceof DocumentLockedError) {
+              // Document locked - could retry but limit attempts
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Document locked: ${error.message}`,
+              };
+            } else if (error instanceof CouchbaseError) {
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Couchbase error: ${error.message}`,
               };
             } else {
+              err("Unexpected error in DataLoader", {
+                error: error.message,
+                keyInfo,
+                errorType: error.constructor.name
+              });
               return {
                 bucket: keyInfo.bucket,
                 scope: keyInfo.scope,
