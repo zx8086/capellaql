@@ -5,6 +5,7 @@
     "": {
       "name": "capellaql",
       "dependencies": {
+        "@elastic/ecs-winston-format": "1.5.3",
         "@graphql-tools/schema": "10.0.31",
         "@graphql-yoga/plugin-response-cache": "3.20.0",
         "@opentelemetry/api": "1.9.0",
@@ -101,6 +102,10 @@
     "@couchbase/couchbase-win32-x64-napi": ["@couchbase/couchbase-win32-x64-napi@4.6.1", "", { "os": "win32", "cpu": "x64" }, "sha512-ANg6PK5suwi2O+ljbob1BrOocQx2tEYjrhULS70WQ4h7ZOGsPNTGKKNBgo5rtfaxQkJqVU68F5C1tK5HPd+osA=="],
 
     "@dabh/diagnostics": ["@dabh/diagnostics@2.0.8", "", { "dependencies": { "@so-ric/colorspace": "^1.1.6", "enabled": "2.0.x", "kuler": "^2.0.0" } }, "sha512-R4MSXTVnuMzGD7bzHdW2ZhhdPC/igELENcq5IjEverBvq5hn1SXCWcsi6eSsdWP0/Ur+SItRRjAktmdoX/8R/Q=="],
+
+    "@elastic/ecs-helpers": ["@elastic/ecs-helpers@2.1.1", "", {}, "sha512-ItoNazMnYdlUCmkBYTXc3SG6PF7UlVTbvMdHPvXkfTMPdwGv2G1Xtp5CjDHaGHGOZSwaDrW4RSCXvA/lMSU+rg=="],
+
+    "@elastic/ecs-winston-format": ["@elastic/ecs-winston-format@1.5.3", "", { "dependencies": { "@elastic/ecs-helpers": "^2.1.1", "safe-stable-stringify": "^2.4.3", "triple-beam": ">=1.1.0" } }, "sha512-JfHLK+KpxnRRtwWmsQxcYy/zimS/06xz9oQG+OTsFX6fvofpxVWEiep3BXLMrSIrdYkgqQBJHMOQdZm9voVHbg=="],
 
     "@envelop/core": ["@envelop/core@5.3.0", "", { "dependencies": { "@envelop/instrumentation": "^1.0.0", "@envelop/types": "^5.2.1", "@whatwg-node/promise-helpers": "^1.2.4", "tslib": "^2.5.0" } }, "sha512-xvUkOWXI8JsG2OOnqiI2tOkEc52wbmIqWORr7yGc8B8E53Oh1MMGGGck4mbR80s25LnHVzfNIiIlNkuDgZRuuA=="],
 

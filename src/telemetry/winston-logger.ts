@@ -1,9 +1,11 @@
 /* src/telemetry/winston-logger.ts */
 /* Structured logging with OTLP transport and ECS field mapping */
+/* Per monitoring-updated.md: Uses @elastic/ecs-winston-format with colorize + simple console */
 
 import { context, trace, type SpanContext } from "@opentelemetry/api";
 import * as apiLogs from "@opentelemetry/api-logs";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
+import ecsFormat from "@elastic/ecs-winston-format";
 import winston from "winston";
 import { applicationConfig, telemetryConfig } from "$config";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
@@ -87,9 +89,6 @@ function getCurrentTraceContext(): LogContext {
         }
       : {};
 
-    // Note: Span attributes are not directly accessible via public API
-    // Correlation IDs should be set via span context or propagated headers
-
     return baseContext;
   } catch {
     return {};
@@ -97,69 +96,25 @@ function getCurrentTraceContext(): LogContext {
 }
 
 // ============================================================================
-// ECS Field Transformation
+// ECS Field Transformation (Custom Transform for Field Mapping)
+// Per monitoring-updated.md: Step 3 in format pipeline
 // ============================================================================
 
 /**
- * Apply ECS field mapping to metadata.
- * Transforms custom fields to ECS-standard fields.
- *
- * Per monitoring-updated.md lines 108-135:
- * - Fields with ECS mapping appear at root level in Elasticsearch
- * - Non-mapped fields go under labels.* namespace
- * - No duplication between top-level and labels
- *
- * @param meta - Original metadata object
- * @returns Transformed metadata with ECS fields
+ * Custom Winston transform to rename fields per ECS mapping.
+ * Applied BEFORE ecsFormat() to ensure correct field names in ECS output.
  */
-function applyECSMapping(meta: Record<string, unknown>): Record<string, unknown> {
-  const mapped: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(meta)) {
-    // Check if field has ECS mapping - these become top-level fields
-    if (key in ECS_FIELD_MAPPING) {
-      const ecsField = ECS_FIELD_MAPPING[key];
-      mapped[ecsField] = value;
-    }
-    // Fields already namespaced (contain dots or start with labels.) pass through
-    else if (key.startsWith("labels.") || key.includes(".")) {
-      mapped[key] = value;
-    }
-    // Non-mapped fields go under labels.* namespace
-    else {
-      mapped[`labels.${key}`] = value;
+const fieldMappingTransform = winston.format((info) => {
+  // Apply ECS field mapping to info object
+  for (const [customField, ecsField] of Object.entries(ECS_FIELD_MAPPING)) {
+    if (customField in info) {
+      info[ecsField] = info[customField];
+      delete info[customField];
     }
   }
 
-  return mapped;
-}
-
-// ============================================================================
-// Custom Winston Format for ECS Compliance
-// ============================================================================
-
-const ecsFormat = winston.format((info) => {
-  const { level, message, timestamp, ...meta } = info;
-
-  // Apply ECS field mapping to metadata
-  const mappedMeta = applyECSMapping(meta as Record<string, unknown>);
-
-  // Get current trace context
+  // Inject trace context for distributed tracing correlation
   const traceContext = getCurrentTraceContext();
-
-  // Mutate info object to preserve Winston's internal symbols
-  // This is required for proper Winston transport handling
-  info["@timestamp"] = timestamp || new Date().toISOString();
-  info["log.level"] = level;
-  info["ecs.version"] = "8.10.0";
-  info["service.name"] = telemetryConfig.SERVICE_NAME || "capellaql";
-  info["service.version"] = telemetryConfig.SERVICE_VERSION || "2.0.0";
-  info["service.environment"] = process.env.NODE_ENV || process.env.BUN_ENV || "development";
-  info["event.dataset"] = telemetryConfig.SERVICE_NAME || "capellaql";
-  info["runtime.name"] = typeof Bun !== "undefined" ? "bun" : "node";
-  info.timestamp = new Date().toISOString();
-
-  // Add trace context for distributed tracing correlation
   if (traceContext.traceId) {
     info["trace.id"] = traceContext.traceId;
   }
@@ -167,48 +122,28 @@ const ecsFormat = winston.format((info) => {
     info["span.id"] = traceContext.spanId;
   }
 
-  // Add service object for nested access
-  info.service = {
-    name: telemetryConfig.SERVICE_NAME || "capellaql",
-    environment: process.env.NODE_ENV || process.env.BUN_ENV || "development",
-  };
-
-  // Add mapped metadata
-  for (const [key, value] of Object.entries(mappedMeta)) {
-    info[key] = value;
-  }
-
   return info;
 });
 
 // ============================================================================
-// Console Format for Development (opt-in via LOG_FORMAT=console)
+// Winston Logger Configuration
+// Per monitoring-updated.md format pipeline:
+// 1. winston.format.timestamp()      -> Adds timestamp
+// 2. winston.format.errors()         -> Stack trace handling
+// 3. Custom transform                -> Renames fields (consumerId -> consumer.id)
+// 4. ecsFormat()                     -> ECS JSON structure
+//
+// Console transport format:
+// 1. winston.format.colorize()       -> Adds ANSI colors
+// 2. winston.format.simple()         -> "level: message {json}"
 // ============================================================================
 
-const developmentFormat = winston.format.combine(
-  winston.format.timestamp({
-    format: () => {
-      const date = new Date();
-      return `${date.toLocaleDateString()} ${date.toLocaleTimeString()} (${Intl.DateTimeFormat().resolvedOptions().timeZone})`;
-    },
-  }),
-  winston.format.colorize(),
-  winston.format.printf(({ level, message, timestamp, ...meta }) => {
-    const traceContext = getCurrentTraceContext();
-    const contextStr = traceContext.traceId
-      ? `[${traceContext.traceId.slice(0, 8)}:${traceContext.spanId?.slice(0, 8) || "--------"}]`
-      : "";
-
-    const metaStr = Object.keys(meta).length > 0 ? ` ${JSON.stringify(meta)}` : "";
-    return `${timestamp} ${level} ${contextStr} ${message}${metaStr}`;
-  }),
-);
-
-// ============================================================================
-// JSON ECS Format (default format for all environments)
-// ============================================================================
-
-const jsonEcsFormat = winston.format.combine(winston.format.timestamp(), ecsFormat(), winston.format.json());
+// Service configuration for ECS format
+const localConfig = {
+  serviceName: telemetryConfig.SERVICE_NAME || "capellaql",
+  serviceVersion: telemetryConfig.SERVICE_VERSION || "2.0.0",
+  environment: process.env.NODE_ENV || process.env.BUN_ENV || "development",
+};
 
 // ============================================================================
 // Winston Telemetry Logger Class
@@ -221,20 +156,35 @@ class WinstonTelemetryLogger {
   private otelTransport: OpenTelemetryTransportV3 | undefined;
 
   constructor() {
-    // LOG_FORMAT: "json-ecs" (default) | "console" (opt-in colorized format)
-    const logFormat = process.env.LOG_FORMAT?.toLowerCase() || "json-ecs";
-    const useConsoleFormat = logFormat === "console";
-
     // Use LOG_LEVEL from config (defaults to "info")
     const configuredLevel = applicationConfig.LOG_LEVEL || "info";
 
-    // Create base Winston logger with console transport
-    // Default: JSON ECS format for all environments (production observability)
-    // Optional: Set LOG_FORMAT=console for colorized development output
+    // Create Winston logger per monitoring-updated.md specification:
+    // Logger format: timestamp -> errors -> custom field transform -> ecsFormat
+    // Console transport: colorize + simple -> produces "info: message {json}"
     this.logger = winston.createLogger({
       level: configuredLevel,
-      format: useConsoleFormat ? developmentFormat : jsonEcsFormat,
-      transports: [new winston.transports.Console()],
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.errors({ stack: true }),
+        fieldMappingTransform(),
+        ecsFormat({
+          convertErr: true,
+          convertReqRes: true,
+          apmIntegration: true,
+          serviceName: localConfig.serviceName,
+          serviceVersion: localConfig.serviceVersion,
+          serviceEnvironment: localConfig.environment,
+        }),
+      ),
+      transports: [
+        new winston.transports.Console({
+          format: winston.format.combine(
+            winston.format.colorize({ all: true }),
+            winston.format.simple(),
+          ),
+        }),
+      ],
     });
   }
 
@@ -331,106 +281,78 @@ class WinstonTelemetryLogger {
   }
 
   private emit(logData: StructuredLogData): void {
-    // Before OTLP is initialized, output all logs to console
+    // Before OTLP is initialized, still use Winston (console output works)
     if (!this.isInitialized) {
       // Store for replay after initialization
       this.fallbackLogs.push(logData);
       if (this.fallbackLogs.length > 100) {
         this.fallbackLogs.shift();
       }
-      // Output to console in JSON ECS format
-      this.logToConsoleOnly(logData);
-      return;
     }
 
-    // Check circuit breaker for OTLP resilience
-    const circuitBreaker = telemetryHealthMonitor.getCircuitBreaker();
-
-    if (!circuitBreaker.canExecute()) {
-      // Circuit breaker is open, fall back to console only
-      this.logToConsoleOnly(logData);
-      return;
-    }
-
-    try {
-      // Log through Winston with OTLP transport
-      this.logger.log({
-        level: logData.level,
-        message: logData.message,
-        ...logData.context,
-        ...logData.meta,
-      });
-
-      // Record successful log emission
-      telemetryHealthMonitor.recordExporterSuccess("logs");
-      circuitBreaker.recordSuccess();
-    } catch (error) {
-      // Record failure and fall back to console
-      telemetryHealthMonitor.recordExporterFailure("logs", error as Error);
-      circuitBreaker.recordFailure();
-      this.logToConsoleOnly(logData, error);
-    }
-  }
-
-  private logToConsoleOnly(logData: StructuredLogData, error?: unknown): void {
-    // Direct console logging in JSON ECS format when OTLP is unavailable
-    const timestamp = new Date(logData.timestamp).toISOString();
-
-    // Build ECS-compliant fallback log record
-    const ecsRecord: Record<string, unknown> = {
-      "@timestamp": timestamp,
-      message: logData.message,
-      "log.level": logData.level,
-      "ecs.version": "8.10.0",
-      "service.name": telemetryConfig.SERVICE_NAME || "capellaql",
-      "service.version": telemetryConfig.SERVICE_VERSION || "2.0.0",
-      "service.environment": process.env.NODE_ENV || process.env.BUN_ENV || "development",
-      "event.dataset": telemetryConfig.SERVICE_NAME || "capellaql",
-      timestamp,
-    };
-
-    // Add trace context if available
-    if (logData.context?.traceId) {
-      ecsRecord["trace.id"] = logData.context.traceId;
-    }
-    if (logData.context?.spanId) {
-      ecsRecord["span.id"] = logData.context.spanId;
-    }
-
-    // Add service object
-    ecsRecord.service = {
-      name: telemetryConfig.SERVICE_NAME || "capellaql",
-      environment: process.env.NODE_ENV || process.env.BUN_ENV || "development",
-    };
-
-    // Add metadata
-    if (logData.meta) {
-      for (const [key, value] of Object.entries(logData.meta)) {
-        ecsRecord[key] = value;
+    // Check circuit breaker for OTLP resilience (only when OTLP is enabled)
+    if (this.isInitialized) {
+      const circuitBreaker = telemetryHealthMonitor.getCircuitBreaker();
+      if (!circuitBreaker.canExecute()) {
+        // Circuit breaker is open, skip OTLP transport
+        // Winston console transport still works
+        this.logToWinston(logData);
+        return;
       }
     }
 
-    // Add error info if present
-    if (error) {
-      ecsRecord.error =
-        error instanceof Error ? { message: error.message, stack: error.stack, type: error.name } : { message: String(error) };
-    }
+    try {
+      // Log through Winston (works for both console-only and OTLP modes)
+      this.logToWinston(logData);
 
-    // Output as single JSON string in ECS format (matches expected: "info: Message {...}")
-    const jsonLog = JSON.stringify(ecsRecord);
+      // Record successful log emission (only when OTLP is enabled)
+      if (this.isInitialized) {
+        telemetryHealthMonitor.recordExporterSuccess("logs");
+        telemetryHealthMonitor.getCircuitBreaker().recordSuccess();
+      }
+    } catch (error) {
+      // Record failure (only when OTLP is enabled)
+      if (this.isInitialized) {
+        telemetryHealthMonitor.recordExporterFailure("logs", error as Error);
+        telemetryHealthMonitor.getCircuitBreaker().recordFailure();
+      }
+      // Fallback to direct console for critical errors
+      this.directConsoleLog(logData, error);
+    }
+  }
+
+  private logToWinston(logData: StructuredLogData): void {
+    // Log through Winston with all metadata
+    this.logger.log({
+      level: logData.level,
+      message: logData.message,
+      ...logData.context,
+      ...logData.meta,
+    });
+  }
+
+  private directConsoleLog(logData: StructuredLogData, error?: unknown): void {
+    // Direct console fallback when Winston fails
+    const output = {
+      "@timestamp": new Date(logData.timestamp).toISOString(),
+      message: logData.message,
+      level: logData.level,
+      ...logData.meta,
+      _fallbackError: error instanceof Error ? error.message : String(error),
+    };
 
     switch (logData.level) {
       case LogLevel.DEBUG:
-        console.debug(`${logData.level}: ${logData.message} ${jsonLog}`);
+        console.debug(`${logData.level}: ${logData.message}`, JSON.stringify(output));
         break;
       case LogLevel.INFO:
-        console.info(`${logData.level}: ${logData.message} ${jsonLog}`);
+        console.info(`${logData.level}: ${logData.message}`, JSON.stringify(output));
         break;
       case LogLevel.WARN:
-        console.warn(`${logData.level}: ${logData.message} ${jsonLog}`);
+        console.warn(`${logData.level}: ${logData.message}`, JSON.stringify(output));
         break;
       case LogLevel.ERROR:
-        console.error(`${logData.level}: ${logData.message} ${jsonLog}`);
+        console.error(`${logData.level}: ${logData.message}`, JSON.stringify(output));
         break;
     }
   }
