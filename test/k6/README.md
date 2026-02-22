@@ -2,7 +2,7 @@
 
 Modern, TypeScript-based performance testing suite for CapellaQL GraphQL API with comprehensive coverage, realistic user scenarios, and production-ready validation.
 
-## 📁 Test Structure
+## Test Structure
 
 ```
 test/k6/
@@ -34,7 +34,7 @@ test/k6/
     └── graphql-endpoints.js   # Legacy GraphQL test
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 - **K6 installed** (`brew install k6` or [download](https://k6.io/docs/getting-started/installation/))
@@ -75,7 +75,7 @@ export TIMEOUT=30s               # Request timeout (default: 30s)
 HOST=staging.example.com PORT=443 k6 run test/k6/smoke/health-smoke.ts
 ```
 
-## 📊 Test Categories
+## Test Categories
 
 ### 1. Smoke Tests 🚬
 **Purpose**: Quick validation of core functionality
@@ -84,7 +84,7 @@ HOST=staging.example.com PORT=443 k6 run test/k6/smoke/health-smoke.ts
 - **Frequency**: Every commit/deployment
 - **Thresholds**: P95 < 50ms (health), P95 < 200ms (GraphQL)
 
-### 2. Load Tests ⚡
+### 2. Load Tests
 **Purpose**: Validate performance under expected load
 - **Duration**: 15-20 minutes
 - **VUs**: 10-40
@@ -105,7 +105,7 @@ HOST=staging.example.com PORT=443 k6 run test/k6/smoke/health-smoke.ts
 - **Frequency**: Pre-release/regression testing
 - **Focus**: Business workflow validation
 
-## 🎯 GraphQL Operations Coverage
+## GraphQL Operations Coverage
 
 The test suite covers all available GraphQL operations:
 
@@ -119,7 +119,7 @@ The test suite covers all available GraphQL operations:
 | `optionsProductView` | Complex | Product details | P95 < 800ms |
 | `imageDetails` | Simple | Image metadata | P95 < 200ms |
 
-## 📈 Custom Metrics & Business KPIs
+## Custom Metrics & Business KPIs
 
 The suite tracks custom metrics beyond standard HTTP metrics:
 
@@ -176,7 +176,7 @@ const config = getConfig();
 // Automatic environment variable support for HOST, PORT, TIMEOUT
 ```
 
-## 🧪 Test Data Management
+## Test Data Management
 
 ### SharedArray for Memory Efficiency
 ```typescript
@@ -199,7 +199,7 @@ export const generateLooksSummaryVariables = () => {
 };
 ```
 
-## 🔍 Advanced Features
+## Advanced Features
 
 ### 1. TypeScript Support
 - Full TypeScript implementation
@@ -227,7 +227,7 @@ export const generateLooksSummaryVariables = () => {
 - Operation-specific thresholds
 - Business metric correlation
 
-## 📊 Interpreting Results
+## Interpreting Results
 
 ### Key Metrics to Monitor
 
@@ -261,7 +261,7 @@ k6 run --out json=results.json test/k6/load/complete-graphql-coverage.ts
 k6 --summary-time-unit=ms results.json
 ```
 
-## 🔧 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
@@ -350,7 +350,7 @@ Legacy JavaScript tests remain available in the `legacy/` directory for gradual 
 - Stress tests: Lenient thresholds focusing on stability
 - Scenario tests: Business-appropriate thresholds
 
-## 📋 Test Execution Checklist
+## Test Execution Checklist
 
 Before running performance tests:
 - [ ] CapellaQL server is running
@@ -380,4 +380,4 @@ For questions about the performance test suite:
 3. Check K6 documentation for advanced features
 4. Consult CapellaQL architecture documentation for business context
 
-**Happy Performance Testing!** 🚀
+**Happy Performance Testing!**

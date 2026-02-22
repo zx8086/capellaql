@@ -1,21 +1,21 @@
 #!/bin/bash
 # K6 Performance Test Suite - Setup Verification Script
 
-echo "🔍 K6 Performance Test Suite - Setup Verification"
+echo " K6 Performance Test Suite - Setup Verification"
 echo "=================================================="
 
 # Check if K6 is installed
 if ! command -v k6 &> /dev/null; then
-    echo "❌ K6 is not installed. Please install K6 first."
+    echo " K6 is not installed. Please install K6 first."
     echo "   Install: brew install k6 (macOS) or visit https://k6.io/docs/getting-started/installation/"
     exit 1
 fi
 
-echo "✅ K6 is installed: $(k6 version)"
+echo " K6 is installed: $(k6 version)"
 echo ""
 
 # Test TypeScript module resolution for each test
-echo "🧪 Testing TypeScript Module Resolution:"
+echo " Testing TypeScript Module Resolution:"
 echo "----------------------------------------"
 
 tests=(
@@ -40,24 +40,24 @@ for test in "${tests[@]}"; do
     
     # Check if there are module resolution errors
     if echo "$result" | grep -q "opening file via launcher's bridge\|no such file or directory\|cannot resolve"; then
-        echo "❌ Module resolution failed"
+        echo " Module resolution failed"
         failed_tests=$((failed_tests + 1))
     else
-        echo "✅ Module resolution successful"
+        echo " Module resolution successful"
         passed_tests=$((passed_tests + 1))
     fi
 done
 
 echo ""
-echo "📊 Test Results Summary:"
+echo " Test Results Summary:"
 echo "------------------------"
-echo "✅ Passed: $passed_tests tests"
-echo "❌ Failed: $failed_tests tests"
+echo " Passed: $passed_tests tests"
+echo " Failed: $failed_tests tests"
 echo "Total: $((passed_tests + failed_tests)) tests"
 
 if [ $failed_tests -eq 0 ]; then
     echo ""
-    echo "🎉 All TypeScript tests are properly configured!"
+    echo " All TypeScript tests are properly configured!"
     echo "   Ready to run performance tests with:"
     echo "   • bun run k6:smoke:health"
     echo "   • bun run k6:load:coverage"  
@@ -65,12 +65,12 @@ if [ $failed_tests -eq 0 ]; then
     echo "   • bun run k6:all:modern"
 else
     echo ""
-    echo "⚠️  Some tests have module resolution issues."
+    echo "  Some tests have module resolution issues."
     echo "   Check import paths in failed tests."
 fi
 
 echo ""
-echo "🚀 Available Bun Scripts:"
+echo " Available Bun Scripts:"
 echo "-------------------------"
 echo "Modern TypeScript Tests:"
 echo "  bun run k6:smoke:health     - Health endpoint smoke test"

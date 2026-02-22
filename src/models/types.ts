@@ -497,12 +497,12 @@ export function generateConfigHealthReport(config: Config): string {
   let report = `\n=== CONFIGURATION HEALTH REPORT ===\n`;
   report += `Environment: ${config.runtime.NODE_ENV} / ${config.telemetry.DEPLOYMENT_ENVIRONMENT}\n`;
   report += `Production Mode: ${isProduction ? "YES" : "NO"}\n`;
-  report += `Overall Health: ${result.healthy ? "✅ HEALTHY" : "❌ UNHEALTHY"}\n\n`;
+  report += `Overall Health: ${result.healthy ? "HEALTHY" : "UNHEALTHY"}\n\n`;
 
   if (result.issues.length > 0) {
     report += `CRITICAL ISSUES (${result.issues.length}):\n`;
     for (const issue of result.issues) {
-      report += `  ❌ ${issue}\n`;
+      report += `  ${issue}\n`;
     }
     report += `\n`;
   }
@@ -510,13 +510,13 @@ export function generateConfigHealthReport(config: Config): string {
   if (result.warnings.length > 0) {
     report += `WARNINGS (${result.warnings.length}):\n`;
     for (const warning of result.warnings) {
-      report += `  ⚠️  ${warning}\n`;
+      report += `   ${warning}\n`;
     }
     report += `\n`;
   }
 
   if (result.healthy && result.warnings.length === 0) {
-    report += `🎉 Configuration is fully optimized and ready for ${isProduction ? "production" : "development"}!\n`;
+    report += `Configuration is fully optimized and ready for ${isProduction ? "production" : "development"}!\n`;
   }
 
   report += `=== END HEALTH REPORT ===\n`;

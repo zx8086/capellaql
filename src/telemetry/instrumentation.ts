@@ -212,7 +212,7 @@ export async function initializeTelemetry(): Promise<void> {
     isInitialized = true;
 
     if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      console.debug("✅ OpenTelemetry SDK initialized successfully", {
+      console.debug("OpenTelemetry SDK initialized successfully", {
         tracesEndpoint: config.TRACES_ENDPOINT,
         metricsEndpoint: config.METRICS_ENDPOINT,
         logsEndpoint: config.LOGS_ENDPOINT,
@@ -225,7 +225,7 @@ export async function initializeTelemetry(): Promise<void> {
     // Set up graceful shutdown
     setupGracefulShutdown();
   } catch (err) {
-    console.error("❌ Failed to initialize OpenTelemetry SDK:", err);
+    console.error("Failed to initialize OpenTelemetry SDK:", err);
     throw err; // Re-throw to fail fast
   }
 }
@@ -378,10 +378,10 @@ function setupGracefulShutdown(): void {
     try {
       await shutdownTelemetry();
       if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        console.debug("✅ OpenTelemetry SDK shut down successfully");
+        console.debug("OpenTelemetry SDK shut down successfully");
       }
     } catch (err) {
-      console.error("❌ Error during OpenTelemetry SDK shutdown:", err);
+      console.error("Error during OpenTelemetry SDK shutdown:", err);
     }
   };
 

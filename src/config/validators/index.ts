@@ -161,20 +161,20 @@ export function generateConfigHealthReport(config: Config): string {
 
   // Overall status
   if (health.healthy) {
-    report += "✅ Overall Status: HEALTHY\n";
+    report += "Overall Status: HEALTHY\n";
   } else {
-    report += "❌ Overall Status: UNHEALTHY\n";
+    report += "Overall Status: UNHEALTHY\n";
   }
 
   report += `🌍 Environment: ${isProduction ? "PRODUCTION" : "DEVELOPMENT"}\n`;
-  report += `📊 Total Issues: ${health.issues.length}\n`;
-  report += `⚠️  Total Warnings: ${health.warnings.length}\n\n`;
+  report += `Total Issues: ${health.issues.length}\n`;
+  report += ` Total Warnings: ${health.warnings.length}\n\n`;
 
   // Critical issues
   if (health.issues.length > 0) {
     report += "=== CRITICAL ISSUES ===\n";
     health.issues.forEach((issue, index) => {
-      report += `${index + 1}. ❌ ${issue}\n`;
+      report += `${index + 1}. ${issue}\n`;
     });
     report += "\n";
   }
@@ -183,13 +183,13 @@ export function generateConfigHealthReport(config: Config): string {
   if (health.warnings.length > 0) {
     report += "=== WARNINGS ===\n";
     health.warnings.forEach((warning, index) => {
-      report += `${index + 1}. ⚠️  ${warning}\n`;
+      report += `${index + 1}.  ${warning}\n`;
     });
     report += "\n";
   }
 
   if (health.healthy && health.warnings.length === 0) {
-    report += "🎉 All configuration checks passed!\n";
+    report += "All configuration checks passed!\n";
   }
 
   report += "=== END HEALTH REPORT ===\n\n";

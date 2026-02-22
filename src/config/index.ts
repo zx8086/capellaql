@@ -174,7 +174,7 @@ try {
     if (criticalIssues.length > 0) {
       process.stderr.write("\n=== CRITICAL SECURITY ISSUES DETECTED ===\n");
       criticalIssues.forEach((issue) => {
-        process.stderr.write(`❌ ${issue.message}\n`);
+        process.stderr.write(`${issue.message}\n`);
       });
       process.stderr.write("=== DEPLOYMENT BLOCKED - FIX THESE ISSUES ===\n\n");
     }
@@ -220,20 +220,20 @@ try {
 
   // Environment-specific logging
   if (isProduction) {
-    process.stderr.write("🔒 Production mode: All security validations passed\n");
+    process.stderr.write("Production mode: All security validations passed\n");
   } else {
-    process.stderr.write("🔧 Development mode: Using development defaults where applicable\n");
+    process.stderr.write("Development mode: Using development defaults where applicable\n");
   }
 
   // Log modular configuration success
-  process.stderr.write("📋 Modular configuration system active - Domain-separated validation\n");
-  process.stderr.write(`📊 Configuration domains loaded: application, capella, runtime, deployment, telemetry\n`);
+  process.stderr.write("Modular configuration system active - Domain-separated validation\n");
+  process.stderr.write(`Configuration domains loaded: application, capella, runtime, deployment, telemetry\n`);
   process.stderr.write(
-    `🚀 Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`
+    `Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`
   );
 
   // Log runtime detection
-  process.stderr.write(`⚡ Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);
+  process.stderr.write(`Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);
   process.stderr.write("=== MODULAR CONFIGURATION INITIALIZATION COMPLETE ===\n\n");
 } catch (error) {
   if (error instanceof ModularConfigurationError) {
@@ -241,7 +241,7 @@ try {
     process.exit(1);
   } else {
     process.stderr.write(
-      `❌ Unexpected modular configuration error: ${error instanceof Error ? error.message : String(error)}\n`
+      `Unexpected modular configuration error: ${error instanceof Error ? error.message : String(error)}\n`
     );
     process.stderr.write("\n=== MODULAR CONFIGURATION SYSTEM FAILURE ===\n");
     process.stderr.write("The modular configuration system encountered a critical error.\n");

@@ -16,18 +16,18 @@ async function main() {
       });
 
       if (response.ok) {
-        console.log("✅ Health check passed");
+        console.log("Health check passed");
         process.exit(0);
       } else {
-        console.error(`❌ Health check failed: HTTP ${response.status}`);
+        console.error(`Health check failed: HTTP ${response.status}`);
         process.exit(1);
       }
     } catch (error) {
-      console.error("❌ Health check failed:", error instanceof Error ? error.message : error);
+      console.error("Health check failed:", error instanceof Error ? error.message : error);
       process.exit(1);
     }
   } catch (error) {
-    console.error("❌ Healthcheck script error:", error);
+    console.error("Healthcheck script error:", error);
     process.exit(1);
   }
 }

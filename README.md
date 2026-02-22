@@ -1,10 +1,10 @@
-# CapellaQL 🚀
+# CapellaQL 
 
 [![Docker CI/CD with Bun and Snyk](https://github.com/zx8086/capellaql/actions/workflows/docker-ci-cd.yml/badge.svg)](https://github.com/zx8086/capellaql/actions/workflows/docker-ci-cd.yml)
 
 CapellaQL is a high-performance GraphQL service built with Bun that provides a modern API interface for Couchbase Capella databases. It features advanced monitoring, caching, and observability capabilities.
 
-## ✨ Features
+## Features
 
 - **High Performance**: Built with Bun runtime for exceptional speed
 - **GraphQL API**: Modern, flexible query interface
@@ -15,13 +15,13 @@ CapellaQL is a high-performance GraphQL service built with Bun that provides a m
 - **Security**: CORS, security headers, and input validation
 - **Caching**: Response caching for improved performance
 
-## 📋 Prerequisites
+## Prerequisites
 
 - **Bun** >= 1.0.0
 - **Docker** (optional, for containerized deployment)
 - **Couchbase Capella** database access
 
-## 🚀 Installation
+## Installation
 
 ### Local Development
 
@@ -153,7 +153,7 @@ query {
 }
 ```
 
-## 🧪 Performance Testing and Benchmarks
+## Performance Testing and Benchmarks
 
 CapellaQL includes a comprehensive K6 testing suite to ensure optimal performance under various load conditions.
 
@@ -164,7 +164,7 @@ CapellaQL includes a comprehensive K6 testing suite to ensure optimal performanc
 
 ### Test Types
 
-#### 🔥 Smoke Test
+#### Smoke Test
 **Purpose**: Quick validation of basic functionality
 ```bash
 k6 run test/k6/smoke-test-health.js
@@ -184,7 +184,7 @@ k6 run test/k6/soak-test-health.js
 - **Threshold**: 95% of requests < 200ms, < 1% failure rate
 - **Use Case**: Memory leak and stability validation
 
-#### 🔥 Stress Test
+#### Stress Test
 **Purpose**: Identify system breaking point
 ```bash
 k6 run test/k6/stress-test-health.js
@@ -194,7 +194,7 @@ k6 run test/k6/stress-test-health.js
 - **Threshold**: 95% of requests < 500ms, < 10% failure rate
 - **Use Case**: Capacity planning
 
-#### ⚡ Spike Test
+#### Spike Test
 **Purpose**: Sudden traffic surge simulation
 ```bash
 k6 run test/k6/spike-test-health.js
@@ -275,7 +275,7 @@ const requestId = crypto.randomUUID()
 - **Structured Logging**: Correlation IDs for debugging
 - **Health Checks**: Proactive monitoring endpoints
 
-## 📊 GraphQL Schema Details
+## GraphQL Schema Details
 
 CapellaQL implements a comprehensive GraphQL schema designed for fashion retail data management with optimized resolver patterns.
 
@@ -704,7 +704,7 @@ try {
 }
 ```
 
-## 🔧 Troubleshooting Guide
+## Troubleshooting Guide
 
 Common deployment issues, performance optimization tips, and configuration validation guidance for CapellaQL.
 
@@ -828,10 +828,10 @@ required_vars=(
 
 for var in "${required_vars[@]}"; do
   if [ -z "${!var}" ]; then
-    echo "❌ Missing required variable: $var"
+    echo "Missing required variable: $var"
     exit 1
   else
-    echo "✅ $var is set"
+    echo "$var is set"
   fi
 done
 ```
@@ -935,7 +935,7 @@ docker logs capellaql | grep "duration" | awk '{print $NF}' | sort -n
 - **CPU Usage**: < 70% average utilization
 - **DNS Cache Hit Rate**: > 90%
 
-## 📊 Observability
+## Observability
 
 ### OpenTelemetry Integration
 - **Traces**: Request tracing across all components
@@ -947,7 +947,7 @@ docker logs capellaql | grep "duration" | awk '{print $NF}' | sort -n
 - Metrics endpoint: `/metrics` (when enabled)
 - Ready check: `/ready`
 
-## 🔒 Security
+## Security
 
 - **CORS**: Configurable cross-origin resource sharing
 - **Rate Limiting**: 500 requests per minute per client
@@ -955,7 +955,7 @@ docker logs capellaql | grep "duration" | awk '{print $NF}' | sort -n
 - **Input Validation**: GraphQL schema validation
 - **Authentication**: Ready for auth middleware integration
 
-## 🔄 CI/CD Pipeline
+## CI/CD Pipeline
 
 ### GitHub Actions Workflow
 - **Multi-architecture builds**: ARM64 and AMD64 support
@@ -987,7 +987,7 @@ docker logs capellaql | grep "duration" | awk '{print $NF}' | sort -n
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👨‍💻 Author
+## 👨‍Author
 
 **Simon Owusu**
 - Email: simonowusupvh@gmail.com

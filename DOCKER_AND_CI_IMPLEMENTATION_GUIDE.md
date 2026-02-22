@@ -449,7 +449,7 @@ docker inspect capellaql-container | jq '.State.Health'
 ### Security Best Practices
 
 **Container Security**:
-- Run as non-root user (✅ implemented)
+- Run as non-root user (implemented)
 - Use minimal base images (Alpine Linux)
 - Regular security scanning with Snyk
 - SBOM generation for supply chain security

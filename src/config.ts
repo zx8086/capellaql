@@ -703,7 +703,7 @@ try {
     if (criticalIssues.length > 0) {
       process.stderr.write("\n=== CRITICAL SECURITY ISSUES DETECTED ===\n");
       criticalIssues.forEach((issue) => {
-        process.stderr.write(`❌ ${issue.message}\n`);
+        process.stderr.write(`${issue.message}\n`);
       });
       process.stderr.write("=== DEPLOYMENT BLOCKED - FIX THESE ISSUES ===\n\n");
     }
@@ -738,16 +738,16 @@ try {
   const isProduction =
     config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
   if (isProduction) {
-    process.stderr.write("🔒 Production mode: All security validations passed\n");
+    process.stderr.write("Production mode: All security validations passed\n");
   } else {
-    process.stderr.write("🔧 Development mode: Using development defaults where applicable\n");
+    process.stderr.write("Development mode: Using development defaults where applicable\n");
   }
 
   // Log configuration consolidation success
-  process.stderr.write("📋 Unified configuration system active - ALL environment variables consolidated\n");
-  process.stderr.write(`📊 Configuration sections loaded: application, capella, runtime, deployment, telemetry\n`);
+  process.stderr.write("Unified configuration system active - ALL environment variables consolidated\n");
+  process.stderr.write(`Configuration sections loaded: application, capella, runtime, deployment, telemetry\n`);
   process.stderr.write(
-    `🚀 Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`
+    `Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`
   );
   
   // Log simplified sampling configuration status
@@ -755,11 +755,11 @@ try {
     process.stderr.write(`💰 Cost optimization mode: ENABLED (3-tier sampling)\n`);
     process.stderr.write(`📉 Simplified sampling rates: Traces=${config.telemetry.TRACES_SAMPLING_RATE}, Metrics=${config.telemetry.METRICS_SAMPLING_RATE}, Logs=${config.telemetry.LOGS_SAMPLING_RATE}\n`);
   } else {
-    process.stderr.write(`🔧 Legacy sampling mode: ACTIVE (detailed category-based sampling)\n`);
+    process.stderr.write(`Legacy sampling mode: ACTIVE (detailed category-based sampling)\n`);
   }
 
   // Log runtime detection
-  process.stderr.write(`⚡ Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);
+  process.stderr.write(`Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);
   process.stderr.write("=== CONFIGURATION INITIALIZATION COMPLETE ===\n\n");
 } catch (error) {
   if (error instanceof ConfigurationError) {
@@ -767,7 +767,7 @@ try {
     process.exit(1);
   } else {
     process.stderr.write(
-      `❌ Unexpected configuration error: ${error instanceof Error ? error.message : String(error)}\n`
+      `Unexpected configuration error: ${error instanceof Error ? error.message : String(error)}\n`
     );
     process.stderr.write("\n=== CONFIGURATION SYSTEM FAILURE ===\n");
     process.stderr.write("The unified configuration system encountered a critical error.\n");

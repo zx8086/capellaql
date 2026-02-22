@@ -296,9 +296,9 @@ export async function buildWithMetrics(config: BuildConfig = bunBuildConfig): Pr
   const startTime = Date.now();
 
   console.log("🔨 Starting optimized build with Bun...");
-  console.log(`📦 Target: ${config.target}`);
-  console.log(`🎯 Environment: ${process.env.NODE_ENV || "development"}`);
-  console.log(`📁 Output: ${config.outdir}`);
+  console.log(`Target: ${config.target}`);
+  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log(`Output: ${config.outdir}`);
 
   try {
     // Perform the build
@@ -331,14 +331,14 @@ export async function buildWithMetrics(config: BuildConfig = bunBuildConfig): Pr
     };
 
     // Log build results
-    console.log("✅ Build completed successfully!");
-    console.log(`⏱️  Duration: ${duration}ms`);
-    console.log(`📊 Bundle size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
-    console.log(`🧩 Chunks: ${chunkCount}`);
+    console.log("Build completed successfully!");
+    console.log(` Duration: ${duration}ms`);
+    console.log(`Bundle size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
+    console.log(`Chunks: ${chunkCount}`);
     console.log(`🎨 Assets: ${assetCount}`);
 
     if (result.logs.length > 0) {
-      console.log("📋 Build logs:");
+      console.log("Build logs:");
       result.logs.forEach((log) => console.log(`  ${log.message}`));
     }
 
@@ -347,7 +347,7 @@ export async function buildWithMetrics(config: BuildConfig = bunBuildConfig): Pr
     const endTime = Date.now();
     const duration = endTime - startTime;
 
-    console.error("❌ Build failed:");
+    console.error("Build failed:");
     console.error(error);
 
     throw error;
@@ -370,7 +370,7 @@ export default bunBuildConfig;
 
 // Main execution when run directly
 if (import.meta.main) {
-  console.log("🚀 CapellaQL Build System");
+  console.log("CapellaQL Build System");
 
   try {
     const metrics = await autoBuild();
@@ -378,7 +378,7 @@ if (import.meta.main) {
     // Exit with success
     process.exit(0);
   } catch (error) {
-    console.error("💥 Build failed:", error);
+    console.error("Build failed:", error);
     process.exit(1);
   }
 }

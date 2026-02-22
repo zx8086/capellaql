@@ -457,7 +457,7 @@ export namespace BunPerf {
     }
 
     // Log results
-    console.log("\n📊 Benchmark Results:");
+    console.log("\nBenchmark Results:");
     for (const [name, stat] of Object.entries(stats)) {
       console.log(`${name}: avg=${stat.avg.toFixed(2)}ms, min=${stat.min.toFixed(2)}ms, max=${stat.max.toFixed(2)}ms`);
     }

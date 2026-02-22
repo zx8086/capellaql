@@ -272,9 +272,9 @@ export async function createServer(): Promise<Server> {
   });
 
   console.log(`
-🚀 CapellaQL Server started successfully!
+CapellaQL Server started successfully!
 
-📍 Server Information:
+Server Information:
    • Port: ${config.application.PORT}
    • Environment: ${config.telemetry.DEPLOYMENT_ENVIRONMENT}
    • GraphQL Playground: ${graphqlUrl}
@@ -282,16 +282,16 @@ export async function createServer(): Promise<Server> {
    • Telemetry Health: ${telemetryHealthUrl}
    • Dashboard: ${dashboardUrl}
 
-📊 OpenTelemetry Configuration:
-   • Status: ${config.telemetry.ENABLE_OPENTELEMETRY ? "✅ Enabled" : "❌ Disabled"}
+OpenTelemetry Configuration:
+   • Status: ${config.telemetry.ENABLE_OPENTELEMETRY ? "Enabled" : "Disabled"}
    • Traces Endpoint: ${config.telemetry.TRACES_ENDPOINT}
    • Metrics Endpoint: ${config.telemetry.METRICS_ENDPOINT}
    • Logs Endpoint: ${config.telemetry.LOGS_ENDPOINT}
    • Sampling Rate: ${config.telemetry.SAMPLING_RATE} (${(config.telemetry.SAMPLING_RATE * 100).toFixed(0)}%)
 
-⚡ Powered by Bun.serve() native HTTP server (v${Bun.version})
+Powered by Bun.serve() native HTTP server (v${Bun.version})
 
-🎯 Ready to accept requests!
+Ready to accept requests!
 `);
 
   // Setup graceful shutdown

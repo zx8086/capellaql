@@ -73,7 +73,7 @@ export const logServerEvent = (event: string, details?: Record<string, any>): vo
   const timestamp = formatDevTimestamp();
   const detailsStr = details ? ` ${JSON.stringify(details)}` : "";
 
-  console.log(`${timestamp} 🚀 ${event}${detailsStr}`);
+  console.log(`${timestamp} ${event}${detailsStr}`);
 };
 
 /**

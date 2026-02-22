@@ -1550,11 +1550,11 @@ export async function initializeTelemetry(): Promise<void> {
 
     await sdk.start();
     isInitialized = true;
-    console.log("✅ OpenTelemetry initialized successfully");
+    console.log("OpenTelemetry initialized successfully");
 
     setupGracefulShutdown();
   } catch (err) {
-    console.error("❌ Failed to initialize OpenTelemetry SDK:", err);
+    console.error("Failed to initialize OpenTelemetry SDK:", err);
     throw err;
   }
 }
@@ -1662,9 +1662,9 @@ function setupGracefulShutdown(): void {
     console.debug(`Received ${signal}, shutting down OpenTelemetry SDK gracefully...`);
     try {
       await shutdownTelemetry();
-      console.debug("✅ OpenTelemetry SDK shut down successfully");
+      console.debug("OpenTelemetry SDK shut down successfully");
     } catch (err) {
-      console.error("❌ Error during OpenTelemetry SDK shutdown:", err);
+      console.error("Error during OpenTelemetry SDK shutdown:", err);
     }
   };
 
@@ -1787,7 +1787,7 @@ CIRCUIT_BREAKER_TIMEOUT_MS=60000
   });
 
   await sdk.start();
-  console.log('✅ OpenTelemetry initialized successfully');
+  console.log('OpenTelemetry initialized successfully');
 
   // Setup graceful shutdown
   process.on('SIGTERM', async () => {
