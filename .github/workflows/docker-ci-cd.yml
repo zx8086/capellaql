@@ -56,11 +56,27 @@ jobs:
       - name: Setup Environment
         uses: ./.github/actions/setup-environment
 
-      - name: Set build metadata
-        id: metadata
+      - name: Extract package.json metadata
+        id: pkg
         run: |
+          # Extract metadata from package.json (single source of truth)
+          PKG_NAME=$(jq -r '.name' package.json)
+          PKG_VERSION=$(jq -r '.version' package.json)
+          PKG_DESCRIPTION=$(jq -r '.description // "GraphQL API for Couchbase Capella"' package.json)
+
+          # Set outputs for other steps
+          echo "name=${PKG_NAME}" >> $GITHUB_OUTPUT
+          echo "version=${PKG_VERSION}" >> $GITHUB_OUTPUT
+          echo "description=${PKG_DESCRIPTION}" >> $GITHUB_OUTPUT
+
+          # Set environment variables
+          echo "PKG_NAME=${PKG_NAME}" >> $GITHUB_ENV
+          echo "PKG_VERSION=${PKG_VERSION}" >> $GITHUB_ENV
+          echo "PKG_DESCRIPTION=${PKG_DESCRIPTION}" >> $GITHUB_ENV
           echo "BUILD_TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> $GITHUB_ENV
           echo "BUILD_START_TIME=$(date +%s)" >> $GITHUB_ENV
+
+          echo "Package: ${PKG_NAME} v${PKG_VERSION}"
 
       - name: Create .env file
         run: |
@@ -77,8 +93,8 @@ jobs:
           COUCHBASE_BUCKET=${{ vars.COUCHBASE_BUCKET }}
           COUCHBASE_SCOPE=${{ vars.COUCHBASE_SCOPE }}
           COUCHBASE_COLLECTION=${{ vars.COUCHBASE_COLLECTION }}
-          SERVICE_NAME=${{ vars.SERVICE_NAME }}
-          SERVICE_VERSION=${{ vars.SERVICE_VERSION }}
+          SERVICE_NAME=${{ env.PKG_NAME }}
+          SERVICE_VERSION=${{ env.PKG_VERSION }}
           DEPLOYMENT_ENVIRONMENT=${{ vars.DEPLOYMENT_ENVIRONMENT }}
           TRACES_ENDPOINT=${{ vars.TRACES_ENDPOINT }}
           METRICS_ENDPOINT=${{ vars.METRICS_ENDPOINT }}
@@ -107,13 +123,16 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,prefix={{date 'YYYYMMDD'}}-
+            type=raw,value=${{ env.PKG_VERSION }},enable={{is_default_branch}}
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
-            org.opencontainers.image.title=capellaql
-            org.opencontainers.image.description=CapellaQL is a high-performance GraphQL service for Couchbase Capella databases
-            org.opencontainers.image.version=${{ github.ref_name || '2.0.0' }}
+            org.opencontainers.image.title=${{ env.PKG_NAME }}
+            org.opencontainers.image.description=${{ env.PKG_DESCRIPTION }}
+            org.opencontainers.image.version=${{ env.PKG_VERSION }}
             org.opencontainers.image.created=${{ env.BUILD_TIMESTAMP }}
             org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.vendor=Tommy Hilfiger
 
       - name: Build and push Docker image
         id: build
@@ -127,7 +146,7 @@ jobs:
           target: production
           build-args: |
             BUILD_DATE=${{ env.BUILD_TIMESTAMP }}
-            BUILD_VERSION=${{ github.ref_name || '2.0.0' }}
+            BUILD_VERSION=${{ env.PKG_VERSION }}
             COMMIT_HASH=${{ github.sha }}
           cache-from: |
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache

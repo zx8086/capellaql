@@ -1,5 +1,5 @@
 {
-  "name": "capellaql",
+  "name": "CapellaQL",
   "version": "2.0.0",
   "scripts": {
     "test": "bun test --coverage --reporter=verbose",
@@ -44,9 +44,10 @@
     "security:audit": "bun audit",
     "prepublish": "npm run snyk-protect",
     "snyk-protect": "snyk-protect",
-    "docker:build": "docker build -t capellaql .",
-    "docker:build:dev": "docker build --target development -t capellaql:dev .",
-    "docker:run": "docker run -p 4000:4000 --env-file .env capellaql",
+    "docker:build": "./scripts/docker-build.sh",
+    "docker:build:dev": "BUILD_TARGET=development ./scripts/docker-build.sh",
+    "docker:build:multi": "MULTI_PLATFORM=true ./scripts/docker-build.sh",
+    "docker:run": "docker run -p 4000:4000 --env-file .env zx8086/capellaql:latest",
     "k6:smoke:health": "k6 run test/k6/smoke/health-smoke.ts",
     "k6:smoke:graphql": "k6 run test/k6/smoke/graphql-smoke.ts",
     "k6:smoke": "k6 run test/k6/legacy/smoke-test-health.js",

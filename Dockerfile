@@ -9,7 +9,7 @@
 # -----------------------------------------------------------------------------
 # ARG declarations for build-time configuration
 # -----------------------------------------------------------------------------
-ARG BUN_VERSION=1.1
+ARG BUN_VERSION=1.3
 ARG DHI_IMAGE=gcr.io/distroless/static-debian12:nonroot
 ARG BUILD_DATE=unknown
 ARG BUILD_VERSION=2.0.0

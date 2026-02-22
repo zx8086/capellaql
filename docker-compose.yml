@@ -14,7 +14,7 @@ services:
       context: .
       target: development
       args:
-        - BUN_VERSION=1.1
+        - BUN_VERSION=1.3
     container_name: capellaql-dev
     ports:
       - "4000:4000"

@@ -1,0 +1,368 @@
+[
+  {
+    "label": "graphql: performance stats",
+    "command": "echo '=== GraphQL Performance Stats ===' && curl -sf http://localhost:4000/health/graphql | jq '{resolvers: .resolvers, insights: .insights}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "graphql: recent operations",
+    "command": "echo '=== Recent GraphQL Operations ===' && curl -sf http://localhost:4000/health/graphql | jq '.recentOperations | map({field: .fieldName, duration_ms: .duration, source: .source, success: .success})'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "graphql: cache hit rate",
+    "command": "echo '=== Cache Hit Rate ===' && curl -sf http://localhost:4000/health/graphql | jq '.resolvers[] | {resolver: .resolver, cacheHitRate: .cacheHitRate, cacheHits: .cacheHits, dbFetches: .dbFetches}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "graphql: timing comparison",
+    "command": "echo '=== Timing Comparison (DB vs Cache) ===' && curl -sf http://localhost:4000/health/graphql | jq '.resolvers[] | {resolver: .resolver, minMs: .minDurationMs, maxMs: .maxDurationMs, p50Ms: .p50DurationMs, p95Ms: .p95DurationMs}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "graphql: full report",
+    "command": "echo '=== Full GraphQL Performance Report ===' && curl -sf http://localhost:4000/health/graphql | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "graphql: test looks query (DB)",
+    "command": "echo '=== Running Looks Query (Database) ===' && curl -sf -X POST http://localhost:4000/graphql -H 'Content-Type: application/json' -d '{\"query\":\"query Test { looks(brand: \\\"TH\\\", division: \\\"01\\\", season: \\\"C52\\\") { documentKey } }\"}' | jq '{count: (.data.looks | length), cache: .extensions.responseCache}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "graphql: test + check timing",
+    "command": "echo '=== Run Query + Check Timing ===' && curl -sf -X POST http://localhost:4000/graphql -H 'Content-Type: application/json' -d '{\"query\":\"query T1 { looks(brand: \\\"TH\\\", division: \\\"01\\\", season: \\\"C52\\\") { documentKey } }\"}' > /dev/null && sleep 1 && curl -sf http://localhost:4000/health/graphql | jq '.recentOperations[-1] | {field: .fieldName, duration_ms: .duration, source: .source}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: basic",
+    "command": "echo '=== Health Check ===' && curl -sf http://localhost:4000/health | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: system",
+    "command": "echo '=== System Health ===' && curl -sf http://localhost:4000/health/system | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: telemetry",
+    "command": "echo '=== Telemetry Health ===' && curl -sf http://localhost:4000/health/telemetry | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: performance",
+    "command": "echo '=== Performance Health ===' && curl -sf http://localhost:4000/health/performance | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: cache",
+    "command": "echo '=== Cache Health ===' && curl -sf http://localhost:4000/health/cache | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: comprehensive",
+    "command": "echo '=== Comprehensive Health ===' && curl -sf http://localhost:4000/health/comprehensive | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: summary",
+    "command": "echo '=== Health Summary ===' && curl -sf http://localhost:4000/health/summary | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "dev: start",
+    "command": "bun run dev",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "dev: start (clean)",
+    "command": "lsof -ti :4000 | xargs kill -9 2>/dev/null || true; bun run dev",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "server: start",
+    "command": "bun run start",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "server: kill (port 4000)",
+    "command": "echo '=== Kill Server ===' && PID=$(lsof -ti :4000) && if [ -n \"$PID\" ]; then kill -9 $PID 2>/dev/null && echo \"Port:   4000\" && echo \"PID:    $PID\" && echo \"Status: Killed\"; else echo \"Port:   4000\" && echo \"Status: No process running\"; fi",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "test: k6 smoke",
+    "command": "k6 run test/k6/smoke-test-health.js",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "test: k6 graphql",
+    "command": "k6 run test/k6/graphql-endpoints.js",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "test: bun (all)",
+    "command": "bun test",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "test: bun (watch)",
+    "command": "bun test --watch",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "build: production",
+    "command": "bun run build",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "quality: check",
+    "command": "bun run quality",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "quality: fix",
+    "command": "bun run quality:fix",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: telemetry detailed",
+    "command": "echo '=== Telemetry Detailed ===' && curl -sf http://localhost:4000/health/telemetry/detailed | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: status (all endpoints)",
+    "command": "echo '=== OTEL Endpoint Status ===' && set -a && source .env && set +a && echo '--- Base Endpoint ---' && echo $OTEL_EXPORTER_OTLP_ENDPOINT && curl -sf -o /dev/null -w 'HTTP: %{http_code}\\n' --max-time 3 $OTEL_EXPORTER_OTLP_ENDPOINT 2>/dev/null || echo 'Unreachable' && echo '--- Traces Endpoint ---' && echo $OTEL_EXPORTER_OTLP_TRACES_ENDPOINT && curl -sf -X POST -H 'Content-Type: application/json' -d '{}' --max-time 3 $OTEL_EXPORTER_OTLP_TRACES_ENDPOINT -w 'HTTP: %{http_code}\\n' 2>/dev/null || echo 'Unreachable' && echo '--- Metrics Endpoint ---' && echo $OTEL_EXPORTER_OTLP_METRICS_ENDPOINT && curl -sf -X POST -H 'Content-Type: application/json' -d '{}' --max-time 3 $OTEL_EXPORTER_OTLP_METRICS_ENDPOINT -w 'HTTP: %{http_code}\\n' 2>/dev/null || echo 'Unreachable' && echo '--- Logs Endpoint ---' && echo $OTEL_EXPORTER_OTLP_LOGS_ENDPOINT && curl -sf -X POST -H 'Content-Type: application/json' -d '{}' --max-time 3 $OTEL_EXPORTER_OTLP_LOGS_ENDPOINT -w 'HTTP: %{http_code}\\n' 2>/dev/null || echo 'Unreachable'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: show config",
+    "command": "echo '=== OTEL Configuration ===' && set -a && source .env && set +a && echo \"Service: $OTEL_SERVICE_NAME\" && echo \"---\" && echo \"Base:    $OTEL_EXPORTER_OTLP_ENDPOINT\" && echo \"Traces:  $OTEL_EXPORTER_OTLP_TRACES_ENDPOINT\" && echo \"Metrics: $OTEL_EXPORTER_OTLP_METRICS_ENDPOINT\" && echo \"Logs:    $OTEL_EXPORTER_OTLP_LOGS_ENDPOINT\"",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: network connectivity test",
+    "command": "echo '=== OTEL Network Test ===' && set -a && source .env && set +a && OTEL_HOST=$(echo $OTEL_EXPORTER_OTLP_ENDPOINT | sed 's|http://||' | cut -d: -f1) && OTEL_PORT=$(echo $OTEL_EXPORTER_OTLP_ENDPOINT | sed 's|http://||' | cut -d: -f2 | cut -d/ -f1) && echo \"Host: $OTEL_HOST\" && echo \"Port: $OTEL_PORT\" && nc -zv -w 3 $OTEL_HOST $OTEL_PORT 2>&1",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "dashboard: open",
+    "command": "open http://localhost:4000/dashboard",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "graphql: playground",
+    "command": "open http://localhost:4000/graphql",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: ps",
+    "command": "echo '=== Running Containers ===' && docker ps --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: ps (all)",
+    "command": "echo '=== All Containers ===' && docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: build",
+    "command": "./scripts/docker-build.sh",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "docker: build (dev)",
+    "command": "BUILD_TARGET=development ./scripts/docker-build.sh",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "docker: build (multi-arch)",
+    "command": "MULTI_PLATFORM=true ./scripts/docker-build.sh",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "docker: run",
+    "command": "docker run -p 4000:4000 --env-file .env zx8086/capellaql:latest",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "compose: up (app only)",
+    "command": "echo '=== Starting CapellaQL ===' && docker compose up capellaql -d 2>&1 | tail -5 && echo '---' && echo 'CapellaQL: localhost:4000'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "compose: up (with observability)",
+    "command": "echo '=== Starting CapellaQL + Observability ===' && docker compose --profile observability up -d 2>&1 | tail -5 && echo '---' && echo 'CapellaQL:  localhost:4000' && echo 'Jaeger:     localhost:16686' && echo 'Prometheus: localhost:9090' && echo 'Grafana:    localhost:3001'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "compose: down",
+    "command": "echo '=== Stopping Services ===' && docker compose down 2>&1 | tail -5 && echo '---' && echo 'Status: Stopped'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "compose: down (clean volumes)",
+    "command": "echo '=== Stopping Services (with volumes) ===' && docker compose down -v 2>&1 | tail -5 && echo '---' && echo 'Status:  Stopped' && echo 'Volumes: Removed'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "compose: logs",
+    "command": "docker compose logs -f",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "compose: logs (capellaql)",
+    "command": "docker compose logs -f capellaql",
+    "use_new_terminal": true,
+    "allow_concurrent_runs": false
+  },
+  {
+    "label": "compose: status",
+    "command": "docker compose ps",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "compose: rebuild",
+    "command": "echo '=== Rebuilding CapellaQL ===' && docker compose up -d --build capellaql 2>&1 | tail -5 && echo '---' && echo 'Status: Rebuilt and started'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: scout CVEs",
+    "command": "echo '=== Docker Scout CVE Scan ===' && echo 'Image: docker.io/zx8086/capellaql:latest' && echo 'Filter: CRITICAL, HIGH' && echo '---' && docker scout cves docker.io/zx8086/capellaql:latest --only-severities critical,high 2>&1 | head -50",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: scout quickview",
+    "command": "echo '=== Docker Scout Quickview ===' && echo 'Image: docker.io/zx8086/capellaql:latest' && echo '---' && docker scout quickview docker.io/zx8086/capellaql:latest 2>&1",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: scout SBOM",
+    "command": "echo '=== Docker Scout SBOM ===' && echo 'Image: docker.io/zx8086/capellaql:latest' && echo '---' && docker scout sbom docker.io/zx8086/capellaql:latest --format list 2>&1 | head -40",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: scout recommendations",
+    "command": "echo '=== Docker Scout Recommendations ===' && echo 'Image: docker.io/zx8086/capellaql:latest' && echo '---' && docker scout recommendations docker.io/zx8086/capellaql:latest 2>&1",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: inspect labels",
+    "command": "echo '=== Docker Image Labels ===' && docker pull -q docker.io/zx8086/capellaql:latest > /dev/null && docker inspect docker.io/zx8086/capellaql:latest --format '{{json .Config.Labels}}' | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: verify metadata",
+    "command": "echo '=== Docker Image Metadata ===' && docker pull -q docker.io/zx8086/capellaql:latest > /dev/null && docker inspect docker.io/zx8086/capellaql:latest --format '{{json .Config.Labels}}' | jq -r '[\"Version:  \" + .[\"org.opencontainers.image.version\"], \"Created:  \" + .[\"org.opencontainers.image.created\"], \"Revision: \" + .[\"org.opencontainers.image.revision\"], \"Title:    \" + .[\"org.opencontainers.image.title\"], \"Vendor:   \" + .[\"org.opencontainers.image.vendor\"]] | .[]'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: verify version (registry)",
+    "command": "echo '=== Docker Registry Version Check ===' && echo '--- Local Version ---' && grep '\"version\"' package.json | head -1 && echo '--- Registry Tags ---' && curl -s 'https://hub.docker.com/v2/repositories/zx8086/capellaql/tags?page_size=5' | jq . && echo '--- Platforms ---' && docker buildx imagetools inspect docker.io/zx8086/capellaql:latest --raw 2>/dev/null | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "docker: attestations (SLSA)",
+    "command": "echo '=== Docker Attestations (SLSA) ===' && echo 'Image: docker.io/zx8086/capellaql:latest' && echo '---' && docker scout attestation docker.io/zx8086/capellaql:latest 2>&1",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "github: workflow runs (CI/CD)",
+    "command": "echo '=== Docker CI/CD Workflow Runs ===' && gh run list --workflow='Docker CI/CD Pipeline' --limit=5",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "github: workflow runs (security)",
+    "command": "echo '=== Security Audit Workflow Runs ===' && gh run list --workflow='Daily Security Audit' --limit=5",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "github: trigger CI/CD",
+    "command": "echo '=== Triggering Docker CI/CD ===' && gh workflow run 'Docker CI/CD Pipeline' --ref master && echo 'Workflow: Docker CI/CD Pipeline' && echo 'Branch:   master' && echo 'Status:   Triggered' && echo '---' && echo 'Run: gh run list --workflow=\"Docker CI/CD Pipeline\" --limit=1'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "github: trigger security audit",
+    "command": "echo '=== Triggering Security Audit ===' && gh workflow run 'Daily Security Audit' --ref master && echo 'Workflow: Daily Security Audit' && echo 'Branch:   master' && echo 'Status:   Triggered' && echo '---' && echo 'Run: gh run list --workflow=\"Daily Security Audit\" --limit=1'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "github: security alerts (code scanning)",
+    "command": "echo '=== Code Scanning Alerts ===' && gh api repos/:owner/:repo/code-scanning/alerts --jq '.[] | select(.state == \"open\")' || echo 'No alerts found'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "github: security alerts (Dependabot)",
+    "command": "echo '=== Dependabot Alerts ===' && gh api repos/:owner/:repo/dependabot/alerts --jq '.[] | select(.state == \"open\")' || echo 'No alerts found'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "github: workflow artifacts",
+    "command": "echo '=== Workflow Artifacts ===' && gh run list --workflow='Docker CI/CD Pipeline' --limit=1 --json databaseId -q '.[0].databaseId' | xargs -I{} gh api repos/:owner/:repo/actions/runs/{}/artifacts",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "github: docker security (Trivy)",
+    "command": "echo '=== Docker Security Scan (Trivy) ===' && gh run list --workflow='Docker CI/CD Pipeline' --limit=1 --json databaseId -q '.[0].databaseId' | xargs -I{} gh run view {} --log | grep -E '(CRITICAL|HIGH|MEDIUM|CVE-)' | head -100",
+    "use_new_terminal": false,
+    "reveal": "always"
+  }
+]
