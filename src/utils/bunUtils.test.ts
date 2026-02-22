@@ -1,6 +1,6 @@
 // Enhanced Bun utilities test suite with modern testing patterns
 
-import { beforeAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
@@ -351,31 +351,36 @@ describe("BunUtils - Resilience Patterns", () => {
     });
 
     test("should apply exponential backoff", async () => {
-      const delays: number[] = [];
-      const sleepSpy = spyOn({ sleep }, "sleep").mockImplementation(async (ms) => {
-        delays.push(ms);
-        return Promise.resolve();
-      });
+      // Test by measuring actual elapsed time between attempts
+      const attemptTimes: number[] = [];
 
-      let _attempts = 0;
+      const start = Date.now();
       await expect(
         retryWithBackoff(
           async () => {
-            _attempts++;
+            attemptTimes.push(Date.now() - start);
             throw new Error("Always fails");
           },
           3,
-          100
+          50, // Use small delays for faster test
+          1000
         )
       ).rejects.toThrow("Always fails");
 
-      // Should have 2 delays (between 3 attempts)
-      expect(delays).toHaveLength(2);
-      expect(delays[0]).toBeGreaterThanOrEqual(100);
-      expect(delays[1]).toBeGreaterThanOrEqual(200);
-      expect(delays[1]).toBeGreaterThan(delays[0]);
+      // Should have 3 attempts
+      expect(attemptTimes).toHaveLength(3);
 
-      sleepSpy.mockRestore();
+      // First attempt should be immediate
+      expect(attemptTimes[0]).toBeLessThan(10);
+
+      // Second attempt should be after ~50ms delay (first backoff)
+      const firstDelay = attemptTimes[1] - attemptTimes[0];
+      expect(firstDelay).toBeGreaterThanOrEqual(45); // Allow small timing variance
+
+      // Third attempt should be after ~100ms delay (exponential backoff)
+      const secondDelay = attemptTimes[2] - attemptTimes[1];
+      expect(secondDelay).toBeGreaterThanOrEqual(90); // Allow small timing variance
+      expect(secondDelay).toBeGreaterThan(firstDelay); // Exponential growth
     });
   });
 });

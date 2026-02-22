@@ -52,11 +52,39 @@ const yoga = createYoga({
   },
   graphqlEndpoint: "/graphql",
   landingPage: true, // Enable GraphiQL
+  // Mask errors to prevent stack traces in responses
+  // But allow BAD_USER_INPUT errors through unmasked since they're expected
+  maskedErrors: {
+    maskError: (error, message) => {
+      // Don't mask user input validation errors - they should be shown to clients
+      if (
+        error?.extensions?.code === "BAD_USER_INPUT" ||
+        error?.message?.includes("Input validation failed")
+      ) {
+        return error;
+      }
+      // Mask other errors in production
+      if (config.runtime.NODE_ENV === "production") {
+        return new Error(message);
+      }
+      return error;
+    },
+  },
   plugins: [
     // Response Cache Plugin with ETag support
     // Automatically sends ETag headers for cache validation
     // Clients can use If-None-Match for conditional requests (304 Not Modified)
     useResponseCache({
+      // Allow cache bypass via header for testing
+      // Send "x-no-cache: true" or "Cache-Control: no-cache" to skip cache
+      enabled: (request) => {
+        const noCache = request.headers.get("x-no-cache");
+        const cacheControl = request.headers.get("cache-control");
+        if (noCache === "true" || cacheControl?.includes("no-cache")) {
+          return false; // Disable cache for this request
+        }
+        return true;
+      },
       // Session-based caching: extract user identifier from auth header
       // Returns null for global cache (unauthenticated requests)
       session: (request) => {
@@ -110,13 +138,27 @@ const yoga = createYoga({
         }
       },
     },
-    // Error logging plugin
+    // Error logging plugin - skip verbose logging for user input errors
     {
       onError: ({ error }) => {
-        err("GraphQL Error", {
-          error: error.message,
-          stack: error.stack,
-        });
+        // Check if this is a user input validation error (BAD_USER_INPUT)
+        const isUserInputError =
+          error?.extensions?.code === "BAD_USER_INPUT" ||
+          error?.message?.includes("Input validation failed");
+
+        if (isUserInputError) {
+          // Log validation errors at debug level without stack trace
+          debug("GraphQL validation error", {
+            error: error.message,
+            code: error?.extensions?.code,
+          });
+        } else {
+          // Log other errors with full details
+          err("GraphQL Error", {
+            error: error.message,
+            stack: error.stack,
+          });
+        }
       },
     },
     // OpenTelemetry span attributes plugin
@@ -140,17 +182,12 @@ const yoga = createYoga({
         }
       },
     },
-    // Cache hit/miss logging plugin
+    // Cache hit/miss logging plugin - one line per request
     {
       onResponse({ response, request }) {
-        const etag = response.headers.get("etag");
         const cacheStatus = response.headers.get("x-yoga-cache");
-        if (etag || cacheStatus) {
-          debug("Response cache status", {
-            path: new URL(request.url).pathname,
-            cacheStatus: cacheStatus || "MISS",
-            hasETag: !!etag,
-          });
+        if (cacheStatus === "HIT") {
+          log("Cache HIT", {});
         }
       },
     },

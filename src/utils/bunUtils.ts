@@ -261,28 +261,37 @@ export namespace BunProcess {
           stdin: options.stdin ? "pipe" : undefined,
         });
 
-        // Handle timeout if specified
-        let timeoutId: Timer | undefined;
-        if (options.timeout) {
-          timeoutId = setTimeout(() => {
-            proc.kill();
-          }, options.timeout);
-        }
+        // Handle timeout if specified - use Promise.race to properly reject
+        let timedOut = false;
+        const timeoutPromise = options.timeout
+          ? new Promise<never>((_, reject) => {
+              setTimeout(() => {
+                timedOut = true;
+                proc.kill();
+                reject(new Error(`Process timeout after ${options.timeout}ms`));
+              }, options.timeout);
+            })
+          : null;
 
         if (options.stdin && proc.stdin) {
           proc.stdin.write(options.stdin);
           proc.stdin.end();
         }
 
-        const stdout = await new Response(proc.stdout).text();
-        const stderr = await new Response(proc.stderr).text();
-        const exitCode = await proc.exited;
+        const processPromise = (async () => {
+          const stdout = await new Response(proc.stdout).text();
+          const stderr = await new Response(proc.stderr).text();
+          const exitCode = await proc.exited;
+          if (timedOut) {
+            throw new Error(`Process timeout after ${options.timeout}ms`);
+          }
+          return { stdout, stderr, exitCode };
+        })();
 
-        if (timeoutId) {
-          clearTimeout(timeoutId);
+        if (timeoutPromise) {
+          return await Promise.race([processPromise, timeoutPromise]);
         }
-
-        return { stdout, stderr, exitCode };
+        return await processPromise;
       } catch (error) {
         throw new Error(`Process spawn failed: ${error}`);
       }

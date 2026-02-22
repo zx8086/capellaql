@@ -273,25 +273,79 @@ tests/
 ### Background Process Management
 **CRITICAL**: Always kill background processes after testing/development sessions to prevent resource leaks and port conflicts.
 
+#### ⚠️ NEVER Spawn Multiple Server Instances
+**ABSOLUTE RULE**: Before starting ANY dev server, ALWAYS check if one is already running:
+```bash
+# ALWAYS run this FIRST before starting a server
+lsof -i :4000
+```
+
+**NEVER do this:**
+```bash
+# BAD - spawning without checking first
+bun run dev &
+# ... later ...
+bun run start &  # WRONG! Creates multiple instances
+```
+
+**ALWAYS do this:**
+```bash
+# GOOD - check first, then start if clear
+lsof -i :4000 || bun run dev
+```
+
+**Why this matters:**
+- Multiple instances cause requests to go to wrong server (no logs visible)
+- Port conflicts and unpredictable behavior
+- Memory/CPU waste with zombie processes
+- Test results may hit stale server instance
+
+**If user already has a server running in their terminal:**
+- DO NOT start another one - use their existing server
+- Ask user to confirm their server is running before running tests
+- Only start a server if user confirms none is running
+
+#### Claude Code Bash Tool Timeout Requirements
+**MANDATORY**: Always specify a timeout when using the Bash tool to prevent runaway processes:
+
+| Command Type | Recommended Timeout | Max Timeout |
+|--------------|---------------------|-------------|
+| Quick commands (ls, cat, git status) | 30000ms (30s) | 60000ms |
+| Build commands (bun build) | 120000ms (2min) | 300000ms |
+| Test commands (bun test) | 180000ms (3min) | 600000ms |
+| Long-running tests (coverage, e2e) | 300000ms (5min) | 600000ms |
+
+**Never run background processes without timeout** - use `timeout` command wrapper:
+```bash
+# Wrap long-running commands with timeout
+timeout 120 bun test --coverage
+
+# For background processes, always use timeout
+timeout 60 bun run start &
+```
+
 #### Process Cleanup Commands
 ```bash
 # Kill specific background process by ID
-# (Use KillBash tool with shell_id when using Claude Code)
+# (Use KillShell tool with shell_id when using Claude Code)
 
 # Manual cleanup if needed
 pkill -f "bun run dev"
-pkill -f "bun run start" 
+pkill -f "bun run start"
 lsof -ti:4000 | xargs kill -9  # Kill processes on port 4000
 ```
 
 #### Best Practices
+- **Always use timeout parameter** in Bash tool calls (default 120000ms, max 600000ms)
 - **Always terminate** background dev servers (`bun run dev`) after testing
 - **Check for running processes** before starting new sessions: `lsof -i :4000`
 - **Use process monitoring** to track active background tasks
+- **Use KillShell tool** to terminate background processes by shell_id
 - **Document cleanup steps** for complex testing scenarios
 
 This prevents:
 - Port conflicts when restarting servers
-- Memory/CPU resource accumulation  
+- Memory/CPU resource accumulation
 - Interference between test sessions
 - System performance degradation
+- Runaway background processes consuming resources

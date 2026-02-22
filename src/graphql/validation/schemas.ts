@@ -1,5 +1,6 @@
 /* src/graphql/validation/schemas.ts */
 
+import { GraphQLError } from "graphql";
 import { z } from "zod";
 
 // Schema for looks query - all parameters are optional strings
@@ -149,11 +150,22 @@ export function withValidation<TArgs, TResult>(
       // Call the original resolver with validated arguments
       return await resolver(_, validatedArgs, context);
     } catch (error) {
+      // Zod v4 uses .issues instead of .errors
       if (error instanceof z.ZodError) {
         // Transform Zod validation errors into GraphQL errors
-        const validationErrors = error.errors.map((err) => `${err.path.join(".")}: ${err.message}`).join(", ");
+        // Use GraphQLError with BAD_USER_INPUT code to avoid stack trace logging
+        const issues = error.issues ?? [];
+        const validationErrors = issues.map((err) => `${err.path.join(".")}: ${err.message}`).join(", ");
 
-        throw new Error(`Input validation failed: ${validationErrors}`);
+        throw new GraphQLError(`Input validation failed: ${validationErrors}`, {
+          extensions: {
+            code: "BAD_USER_INPUT",
+            validationErrors: issues.map((err) => ({
+              path: err.path,
+              message: err.message,
+            })),
+          },
+        });
       }
 
       // Re-throw non-validation errors
