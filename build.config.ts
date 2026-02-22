@@ -294,7 +294,7 @@ export interface BuildMetrics {
 export async function buildWithMetrics(config: BuildConfig = bunBuildConfig): Promise<BuildMetrics> {
   const startTime = Date.now();
 
-  console.log("🔨 Starting optimized build with Bun...");
+  console.log("Starting optimized build with Bun...");
   console.log(`Target: ${config.target}`);
   console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`Output: ${config.outdir}`);
@@ -334,7 +334,7 @@ export async function buildWithMetrics(config: BuildConfig = bunBuildConfig): Pr
     console.log(` Duration: ${duration}ms`);
     console.log(`Bundle size: ${(totalSize / 1024 / 1024).toFixed(2)}MB`);
     console.log(`Chunks: ${chunkCount}`);
-    console.log(`🎨 Assets: ${assetCount}`);
+    console.log(`Assets: ${assetCount}`);
 
     if (result.logs.length > 0) {
       console.log("Build logs:");

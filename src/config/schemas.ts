@@ -1,6 +1,7 @@
 /* src/config/schemas.ts */
-// Pillar 3: Configuration Schemas & Types
-// Aligned with migrate reference pattern
+// Pillar 4: Configuration Schemas & Validation
+// Per 4-pillar pattern: schemas provide VALIDATION ONLY, not defaults
+// Defaults live in defaults.ts (Pillar 1)
 
 import { z } from "zod";
 
@@ -83,190 +84,218 @@ export interface Config {
 }
 
 // =============================================================================
-// ZOD SCHEMAS
+// REUSABLE PRIMITIVES (per 4-pillar pattern)
 // =============================================================================
 
-// Application schema
-export const ApplicationConfigSchema = z.object({
-  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).default("info"),
-  YOGA_RESPONSE_CACHE_TTL: z.coerce
-    .number()
-    .min(0)
-    .max(3600000)
-    .default(900000)
-    .refine((val) => !Number.isNaN(val), "Cache TTL cannot be NaN"),
-  PORT: z.coerce.number().min(1).max(65535).default(4000),
-  ALLOWED_ORIGINS: z.array(z.string().url()).default(["http://localhost:3000"]),
-  BASE_URL: z.string().url("BASE_URL must be a valid URL").default("http://localhost"),
+export const NonEmptyString = z.string().min(1);
+export const PortNumber = z.number().int().min(1).max(65535);
+export const PositiveInt = z.number().int().min(1);
+export const EnvironmentType = z.enum(["development", "staging", "production", "test"]);
+
+// =============================================================================
+// ZOD SCHEMAS (Validation Only - No Defaults)
+// =============================================================================
+
+// Application schema - validation rules only
+export const ApplicationConfigSchema = z.strictObject({
+  LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).describe("Application log level"),
+  YOGA_RESPONSE_CACHE_TTL: z.number()
+    .min(0, "Cache TTL must be non-negative")
+    .max(3600000, "Cache TTL should not exceed 1 hour")
+    .refine((val) => !Number.isNaN(val), "Cache TTL cannot be NaN")
+    .describe("GraphQL Yoga response cache TTL in milliseconds"),
+  PORT: PortNumber.describe("Server listening port"),
+  ALLOWED_ORIGINS: z.array(z.string().url()).describe("CORS allowed origins"),
+  BASE_URL: z.string().url("BASE_URL must be a valid URL").describe("Application base URL"),
 });
 
-// Capella/Couchbase schema
-export const CapellaConfigSchema = z.object({
-  COUCHBASE_URL: z.string().url("Must be a valid Couchbase connection URL"),
-  COUCHBASE_USERNAME: z.string().min(1, "Username cannot be empty"),
-  COUCHBASE_PASSWORD: z.string().min(1, "Password cannot be empty"),
-  COUCHBASE_BUCKET: z.string().min(1, "Bucket name cannot be empty").default("default"),
-  COUCHBASE_SCOPE: z.string().min(1, "Scope name cannot be empty").default("_default"),
-  COUCHBASE_COLLECTION: z.string().min(1, "Collection name cannot be empty").default("_default"),
-  // SDK timeout configurations with production-ready defaults
-  COUCHBASE_KV_TIMEOUT: z.coerce
-    .number()
+// Capella/Couchbase schema - validation rules only
+export const CapellaConfigSchema = z.strictObject({
+  COUCHBASE_URL: z.string().url("Must be a valid Couchbase connection URL").describe("Couchbase cluster URL"),
+  COUCHBASE_USERNAME: NonEmptyString.describe("Couchbase username"),
+  COUCHBASE_PASSWORD: NonEmptyString.describe("Couchbase password"),
+  COUCHBASE_BUCKET: NonEmptyString.describe("Couchbase bucket name"),
+  COUCHBASE_SCOPE: NonEmptyString.describe("Couchbase scope name"),
+  COUCHBASE_COLLECTION: NonEmptyString.describe("Couchbase collection name"),
+  // SDK timeout configurations with validation only
+  COUCHBASE_KV_TIMEOUT: z.number()
     .min(1000, "KV timeout must be at least 1 second")
     .max(30000, "KV timeout should not exceed 30 seconds")
-    .default(5000),
-  COUCHBASE_KV_DURABLE_TIMEOUT: z.coerce
-    .number()
+    .describe("Key-value operation timeout"),
+  COUCHBASE_KV_DURABLE_TIMEOUT: z.number()
     .min(5000, "KV durable timeout must be at least 5 seconds")
     .max(60000, "KV durable timeout should not exceed 60 seconds")
-    .default(10000),
-  COUCHBASE_QUERY_TIMEOUT: z.coerce
-    .number()
+    .describe("Durable key-value operation timeout"),
+  COUCHBASE_QUERY_TIMEOUT: z.number()
     .min(5000, "Query timeout must be at least 5 seconds")
     .max(120000, "Query timeout should not exceed 2 minutes")
-    .default(15000),
-  COUCHBASE_ANALYTICS_TIMEOUT: z.coerce
-    .number()
+    .describe("N1QL query timeout"),
+  COUCHBASE_ANALYTICS_TIMEOUT: z.number()
     .min(10000, "Analytics timeout must be at least 10 seconds")
     .max(300000, "Analytics timeout should not exceed 5 minutes")
-    .default(30000),
-  COUCHBASE_SEARCH_TIMEOUT: z.coerce
-    .number()
+    .describe("Analytics query timeout"),
+  COUCHBASE_SEARCH_TIMEOUT: z.number()
     .min(5000, "Search timeout must be at least 5 seconds")
     .max(120000, "Search timeout should not exceed 2 minutes")
-    .default(15000),
-  COUCHBASE_CONNECT_TIMEOUT: z.coerce
-    .number()
+    .describe("Full-text search timeout"),
+  COUCHBASE_CONNECT_TIMEOUT: z.number()
     .min(5000, "Connect timeout must be at least 5 seconds")
     .max(60000, "Connect timeout should not exceed 60 seconds")
-    .default(10000),
-  COUCHBASE_BOOTSTRAP_TIMEOUT: z.coerce
-    .number()
+    .describe("Connection timeout"),
+  COUCHBASE_BOOTSTRAP_TIMEOUT: z.number()
     .min(10000, "Bootstrap timeout must be at least 10 seconds")
     .max(120000, "Bootstrap timeout should not exceed 2 minutes")
-    .default(15000),
+    .describe("Cluster bootstrap timeout"),
 });
 
-// Runtime schema
-export const RuntimeConfigSchema = z.object({
-  NODE_ENV: z.enum(["development", "staging", "production", "test"]).default("development"),
-  CN_ROOT: z.string().min(1).default("/usr/src/app"),
-  CN_CXXCBC_CACHE_DIR: z.string().optional(),
-  SOURCE_MAP_SUPPORT: z.coerce.boolean().default(true),
-  PRESERVE_SOURCE_MAPS: z.coerce.boolean().default(true),
-  BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: z.coerce
-    .number()
-    .min(0)
-    .max(3600)
-    .default(120)
-    .refine((val) => !Number.isNaN(val), "DNS TTL cannot be NaN"),
+// Runtime schema - validation rules only
+export const RuntimeConfigSchema = z.strictObject({
+  NODE_ENV: EnvironmentType.describe("Runtime environment"),
+  CN_ROOT: NonEmptyString.describe("Application root directory"),
+  CN_CXXCBC_CACHE_DIR: z.string().optional().describe("Couchbase C++ SDK cache directory"),
+  SOURCE_MAP_SUPPORT: z.boolean().describe("Enable source map support"),
+  PRESERVE_SOURCE_MAPS: z.boolean().describe("Preserve source maps in production"),
+  BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: z.number()
+    .min(0, "DNS TTL must be non-negative")
+    .max(3600, "DNS TTL should not exceed 1 hour")
+    .refine((val) => !Number.isNaN(val), "DNS TTL cannot be NaN")
+    .describe("Bun DNS cache TTL in seconds"),
 });
 
-// Deployment schema
-export const DeploymentConfigSchema = z.object({
-  BASE_URL: z.string().url().default("http://localhost"),
-  HOSTNAME: z.string().default("localhost"),
-  INSTANCE_ID: z.string().default("unknown"),
-  CONTAINER_ID: z.string().optional(),
-  K8S_POD_NAME: z.string().optional(),
-  K8S_NAMESPACE: z.string().optional(),
+// Deployment schema - validation rules only
+export const DeploymentConfigSchema = z.strictObject({
+  BASE_URL: z.string().url().describe("Deployment base URL"),
+  HOSTNAME: z.string().describe("Hostname"),
+  INSTANCE_ID: z.string().describe("Instance identifier"),
+  CONTAINER_ID: z.string().optional().describe("Container ID"),
+  K8S_POD_NAME: z.string().optional().describe("Kubernetes pod name"),
+  K8S_NAMESPACE: z.string().optional().describe("Kubernetes namespace"),
 });
 
-// Telemetry schema (2025 compliance)
-export const TelemetryConfigSchema = z.object({
-  ENABLE_OPENTELEMETRY: z.coerce.boolean().default(true),
-  SERVICE_NAME: z.string().min(1, "SERVICE_NAME is required and cannot be empty").default("capellaql-service"),
-  SERVICE_VERSION: z.string().min(1, "SERVICE_VERSION is required and cannot be empty").default("2.0"),
-  DEPLOYMENT_ENVIRONMENT: z.enum(["development", "staging", "production", "test"]).default("development"),
-  TRACES_ENDPOINT: z.string().url("TRACES_ENDPOINT must be a valid URL").default("http://localhost:4318/v1/traces"),
-  METRICS_ENDPOINT: z.string().url("METRICS_ENDPOINT must be a valid URL").default("http://localhost:4318/v1/metrics"),
-  LOGS_ENDPOINT: z.string().url("LOGS_ENDPOINT must be a valid URL").default("http://localhost:4318/v1/logs"),
-  METRIC_READER_INTERVAL: z.coerce
-    .number()
+// Telemetry schema (2025 compliance) - validation rules only
+export const TelemetryConfigSchema = z.strictObject({
+  ENABLE_OPENTELEMETRY: z.boolean().describe("Enable OpenTelemetry"),
+  SERVICE_NAME: NonEmptyString.describe("Service identifier for telemetry"),
+  SERVICE_VERSION: NonEmptyString.describe("Service version"),
+  DEPLOYMENT_ENVIRONMENT: EnvironmentType.describe("Deployment environment"),
+  TRACES_ENDPOINT: z.string().url("TRACES_ENDPOINT must be a valid URL").describe("OTLP traces endpoint"),
+  METRICS_ENDPOINT: z.string().url("METRICS_ENDPOINT must be a valid URL").describe("OTLP metrics endpoint"),
+  LOGS_ENDPOINT: z.string().url("LOGS_ENDPOINT must be a valid URL").describe("OTLP logs endpoint"),
+  METRIC_READER_INTERVAL: z.number()
     .min(1000, "METRIC_READER_INTERVAL must be at least 1000ms")
     .max(300000, "METRIC_READER_INTERVAL should not exceed 5 minutes")
-    .default(60000)
-    .refine((val) => !Number.isNaN(val), "METRIC_READER_INTERVAL cannot be NaN"),
-  SUMMARY_LOG_INTERVAL: z.coerce
-    .number()
+    .refine((val) => !Number.isNaN(val), "METRIC_READER_INTERVAL cannot be NaN")
+    .describe("Metric reader interval in milliseconds"),
+  SUMMARY_LOG_INTERVAL: z.number()
     .min(10000, "SUMMARY_LOG_INTERVAL must be at least 10 seconds")
     .max(3600000, "SUMMARY_LOG_INTERVAL should not exceed 1 hour")
-    .default(300000)
-    .refine((val) => !Number.isNaN(val), "SUMMARY_LOG_INTERVAL cannot be NaN"),
+    .refine((val) => !Number.isNaN(val), "SUMMARY_LOG_INTERVAL cannot be NaN")
+    .describe("Summary log interval in milliseconds"),
   // 2025 compliance settings with strict validation
-  EXPORT_TIMEOUT_MS: z.coerce
-    .number()
+  EXPORT_TIMEOUT_MS: z.number()
     .min(5000, "EXPORT_TIMEOUT_MS must be at least 5 seconds")
     .max(30000, "EXPORT_TIMEOUT_MS must not exceed 30 seconds (2025 standard)")
-    .default(30000),
-  BATCH_SIZE: z.coerce.number().min(1, "BATCH_SIZE must be at least 1").max(4096, "BATCH_SIZE should not exceed 4096").default(2048),
-  MAX_QUEUE_SIZE: z.coerce
-    .number()
+    .describe("Telemetry export timeout"),
+  BATCH_SIZE: z.number()
+    .min(1, "BATCH_SIZE must be at least 1")
+    .max(4096, "BATCH_SIZE should not exceed 4096")
+    .describe("Telemetry batch size"),
+  MAX_QUEUE_SIZE: z.number()
     .min(100, "MAX_QUEUE_SIZE must be at least 100")
     .max(20000, "MAX_QUEUE_SIZE should not exceed 20000")
-    .default(10000),
-  CIRCUIT_BREAKER_THRESHOLD: z.coerce
-    .number()
+    .describe("Maximum telemetry queue size"),
+  CIRCUIT_BREAKER_THRESHOLD: z.number()
     .min(1, "CIRCUIT_BREAKER_THRESHOLD must be at least 1")
     .max(20, "CIRCUIT_BREAKER_THRESHOLD should not exceed 20")
-    .default(5),
-  CIRCUIT_BREAKER_TIMEOUT_MS: z.coerce
-    .number()
+    .describe("Circuit breaker failure threshold"),
+  CIRCUIT_BREAKER_TIMEOUT_MS: z.number()
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
-    .default(60000),
+    .describe("Circuit breaker timeout"),
   // Log retention policy validation
-  LOG_RETENTION_DEBUG_DAYS: z.coerce.number().min(1).max(365).default(1),
-  LOG_RETENTION_INFO_DAYS: z.coerce.number().min(1).max(365).default(7),
-  LOG_RETENTION_WARN_DAYS: z.coerce.number().min(1).max(1095).default(30),
-  LOG_RETENTION_ERROR_DAYS: z.coerce.number().min(1).max(2555).default(90),
+  LOG_RETENTION_DEBUG_DAYS: z.number().min(1).max(365).describe("Debug log retention in days"),
+  LOG_RETENTION_INFO_DAYS: z.number().min(1).max(365).describe("Info log retention in days"),
+  LOG_RETENTION_WARN_DAYS: z.number().min(1).max(1095).describe("Warning log retention in days"),
+  LOG_RETENTION_ERROR_DAYS: z.number().min(1).max(2555).describe("Error log retention in days"),
 });
 
-// Unified configuration schema
+// =============================================================================
+// PRODUCTION SECURITY VALIDATION (per 4-pillar pattern)
+// =============================================================================
+
+/**
+ * Production security rules.
+ * These run ONLY in the ConfigSchema superRefine — the single validation
+ * boundary. They are never duplicated in env-level validation.
+ */
+function addProductionSecurityValidation(
+  data: Config,
+  ctx: z.RefinementCtx
+): void {
+  const isProduction =
+    data.runtime.NODE_ENV === "production" ||
+    data.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+
+  if (!isProduction) return;
+
+  // Critical security check for default passwords
+  if (data.capella.COUCHBASE_PASSWORD === "password") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "CRITICAL SECURITY: Default password not allowed in production - this is a security vulnerability",
+      path: ["capella", "COUCHBASE_PASSWORD"],
+    });
+  }
+
+  // Check for default usernames in production
+  if (data.capella.COUCHBASE_USERNAME === "Administrator") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "WARNING: Using default Administrator username in production is not recommended",
+      path: ["capella", "COUCHBASE_USERNAME"],
+    });
+  }
+
+  // Validate CORS origins in production
+  if (data.application.ALLOWED_ORIGINS.some((origin) => origin === "*" || origin.includes("localhost"))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Production CORS origins should not include localhost or wildcards",
+      path: ["application", "ALLOWED_ORIGINS"],
+    });
+  }
+
+  // Validate database host is not localhost in production
+  try {
+    const url = new URL(data.capella.COUCHBASE_URL);
+    if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Production database cannot use localhost",
+        path: ["capella", "COUCHBASE_URL"],
+      });
+    }
+  } catch {
+    // URL parsing failed, will be caught by schema validation
+  }
+}
+
+// =============================================================================
+// UNIFIED CONFIGURATION SCHEMA
+// =============================================================================
+
 export const ConfigSchema = z
-  .object({
+  .strictObject({
     application: ApplicationConfigSchema,
     capella: CapellaConfigSchema,
     runtime: RuntimeConfigSchema,
     deployment: DeploymentConfigSchema,
     telemetry: TelemetryConfigSchema,
   })
-  .superRefine((data, ctx) => {
-    // Determine environment for validation
-    const isProduction = data.runtime.NODE_ENV === "production" || data.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
-
-    // CRITICAL SECURITY VALIDATIONS (Production)
-    if (isProduction) {
-      // Critical security check for default passwords
-      if (data.capella.COUCHBASE_PASSWORD === "password") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "CRITICAL SECURITY: Default password not allowed in production - this is a security vulnerability",
-          path: ["capella", "COUCHBASE_PASSWORD"],
-        });
-      }
-
-      // Check for default usernames in production
-      if (data.capella.COUCHBASE_USERNAME === "Administrator") {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "WARNING: Using default Administrator username in production is not recommended",
-          path: ["capella", "COUCHBASE_USERNAME"],
-        });
-      }
-
-      // Validate CORS origins in production
-      if (data.application.ALLOWED_ORIGINS.some((origin) => origin === "*" || origin.includes("localhost"))) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "Production CORS origins should not include localhost or wildcards",
-          path: ["application", "ALLOWED_ORIGINS"],
-        });
-      }
-    }
-  });
+  .superRefine(addProductionSecurityValidation);
 
 // =============================================================================
-// SCHEMA REGISTRY (per migrate pattern)
+// SCHEMA REGISTRY (per 4-pillar pattern)
 // =============================================================================
 
 export const SchemaRegistry = {
@@ -285,7 +314,7 @@ export const SchemaRegistry = {
 export class ConfigurationError extends Error {
   constructor(
     message: string,
-    public readonly errors: any,
+    public readonly errors: z.ZodError,
     public readonly partialConfig?: unknown
   ) {
     super(message);
@@ -294,7 +323,7 @@ export class ConfigurationError extends Error {
 
   toDetailedString(): string {
     const issues = this.errors.issues
-      ?.map((issue: any) => {
+      ?.map((issue) => {
         const path = issue.path.join(".");
         return `  - ${path}: ${issue.message}`;
       })

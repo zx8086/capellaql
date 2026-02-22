@@ -1,13 +1,76 @@
 /* src/config/index.ts */
-// 4-Pillar Configuration Pattern - Simple Re-export
-// Aligned with migrate reference pattern
+// 4-Pillar Configuration Pattern - Public API
+// Keep exports explicit. Internal implementation details stay internal.
 
-// Re-export all from config (includes getters, proxies, metadata, utility functions)
-export * from "./config";
+// =============================================================================
+// CORE EXPORTS (per 4-pillar pattern)
+// =============================================================================
 
-// Re-export all from schemas (includes types, Zod schemas, SchemaRegistry)
-export * from "./schemas";
+// Config access
+export {
+  applicationConfig,
+  capellaConfig,
+  config,
+  configMetadata,
+  getApplicationConfig,
+  getCapellaConfig,
+  getConfig,
+  getDeploymentConfig,
+  getDeploymentEnvironment,
+  getEnvironment,
+  getRuntimeConfig,
+  getTelemetryConfig,
+  isProduction,
+  loadConfig,
+  loadTelemetryConfigFromEnv,
+  resetConfigCache,
+  telemetryConfig,
+} from "./config";
 
-// Default export for backward compatibility
+// Loader (for advanced usage)
+export { initializeConfig } from "./loader";
+
+// Helpers
+export {
+  describeConfig,
+  generateConfigHealthReport,
+  sanitizeConfigForLogging,
+  toBool,
+  validateConfigHealth,
+  validateCrossConfiguration,
+} from "./helpers";
+
+// Schemas and types
+export {
+  ApplicationConfigSchema,
+  CapellaConfigSchema,
+  ConfigSchema,
+  ConfigurationError,
+  DeploymentConfigSchema,
+  RuntimeConfigSchema,
+  SchemaRegistry,
+  TelemetryConfigSchema,
+} from "./schemas";
+
+export type {
+  ApplicationConfig,
+  CapellaConfig,
+  Config,
+  DeploymentConfig,
+  RuntimeConfig,
+  TelemetryConfig,
+} from "./schemas";
+
+// Env mapping (for documentation/tooling)
+export { envVarMapping, getEnvVarForPath, getEnvVarPath } from "./envMapping";
+export type { EnvVarEntry, EnvVarMapping, EnvVarType } from "./envMapping";
+
+// Defaults (for reference/testing)
+export { defaultConfig } from "./defaults";
+
+// =============================================================================
+// DEFAULT EXPORT
+// =============================================================================
+
 import { config } from "./config";
 export default config;
