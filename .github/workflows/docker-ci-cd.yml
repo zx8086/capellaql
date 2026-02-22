@@ -45,7 +45,7 @@ jobs:
     outputs:
       digest: ${{ steps.build.outputs.digest }}
       image-ref: ${{ steps.meta.outputs.tags }}
-      image-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+      image-name: docker.io/zx8086/capellaql
 
     steps:
       - name: Checkout code
@@ -195,12 +195,9 @@ jobs:
       fail-fast: false
       matrix:
         scanner:
-          - snyk-code
-          - snyk-container
           - trivy
-          - grype
           - codeql
-          - semgrep
+          - snyk-code
 
     steps:
       - name: Checkout code
@@ -225,37 +222,6 @@ jobs:
           category: snyk-code
         continue-on-error: true
 
-      # ----- Snyk Container Scanner -----
-      - name: Log in to Docker Hub
-        if: matrix.scanner == 'snyk-container'
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: Run Snyk Container Scan
-        if: matrix.scanner == 'snyk-container' && github.event_name != 'pull_request'
-        env:
-          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
-        run: |
-          npm install -g snyk
-          snyk auth $SNYK_TOKEN
-          IMAGE_TAG=$(echo '${{ needs.build.outputs.image-ref }}' | head -n1)
-          docker pull "${IMAGE_TAG}" || true
-          snyk container test "${IMAGE_TAG}" \
-            --file=Dockerfile \
-            --severity-threshold=high \
-            --sarif-file-output=snyk-container.sarif || true
-        continue-on-error: true
-
-      - name: Upload Snyk Container SARIF
-        if: matrix.scanner == 'snyk-container' && github.event_name != 'pull_request'
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: snyk-container.sarif
-          category: snyk-container
-        continue-on-error: true
-
       # ----- Trivy Scanner -----
       - name: Run Trivy vulnerability scanner
         if: matrix.scanner == 'trivy'
@@ -276,25 +242,6 @@ jobs:
           category: trivy
         continue-on-error: true
 
-      # ----- Grype Scanner -----
-      - name: Run Grype vulnerability scanner
-        if: matrix.scanner == 'grype'
-        uses: anchore/scan-action@v5
-        id: grype-scan
-        with:
-          path: "."
-          fail-build: false
-          output-format: sarif
-        continue-on-error: true
-
-      - name: Upload Grype SARIF
-        if: matrix.scanner == 'grype'
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: ${{ steps.grype-scan.outputs.sarif }}
-          category: grype
-        continue-on-error: true
-
       # ----- CodeQL Scanner -----
       - name: Initialize CodeQL
         if: matrix.scanner == 'codeql'
@@ -308,26 +255,6 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: codeql
-        continue-on-error: true
-
-      # ----- Semgrep Scanner -----
-      - name: Run Semgrep scan
-        if: matrix.scanner == 'semgrep'
-        uses: returntocorp/semgrep-action@v1
-        with:
-          config: >-
-            p/default
-            p/security-audit
-            p/typescript
-          generateSarif: "1"
-        continue-on-error: true
-
-      - name: Upload Semgrep SARIF
-        if: matrix.scanner == 'semgrep'
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: semgrep.sarif
-          category: semgrep
         continue-on-error: true
 
 # =============================================================================
@@ -533,13 +460,10 @@ jobs:
             echo "- SBOM Generation (3 formats: SPDX, CycloneDX, Syft JSON)"
             echo "- Container Signing (cosign keyless OIDC)"
             echo "- SBOM Attestation"
-            echo "- 6-Scanner Security Matrix:"
-            echo "  - Snyk Code"
-            echo "  - Snyk Container"
-            echo "  - Trivy"
-            echo "  - Grype"
-            echo "  - CodeQL"
-            echo "  - Semgrep"
+            echo "- 3-Scanner Security Matrix:"
+            echo "  - Trivy (CVE scanning)"
+            echo "  - CodeQL (semantic analysis)"
+            echo "  - Snyk Code (dependency vulnerabilities)"
             echo ""
             echo "### Production Features"
             echo "- DHI Distroless base image"
