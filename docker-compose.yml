@@ -1,0 +1,164 @@
+# =============================================================================
+# docker-compose.yml
+# Phase 5: SIO-421 - Development Docker Compose
+# =============================================================================
+# Development-only compose configuration for local development.
+# For production deployments, use Kubernetes or ECS.
+
+services:
+  # ===========================================================================
+  # CapellaQL Application Service
+  # ===========================================================================
+  capellaql:
+    build:
+      context: .
+      target: development
+      args:
+        - BUN_VERSION=1.1
+    container_name: capellaql-dev
+    ports:
+      - "4000:4000"
+    volumes:
+      # Mount source code for hot reload (read-only for safety)
+      - ./src:/usr/src/app/src:ro
+      # Mount package files (read-only)
+      - ./package.json:/usr/src/app/package.json:ro
+      - ./tsconfig.json:/usr/src/app/tsconfig.json:ro
+      - ./bunfig.toml:/usr/src/app/bunfig.toml:ro
+    environment:
+      - NODE_ENV=development
+      - LOG_LEVEL=debug
+      - ENABLE_OPENTELEMETRY=${ENABLE_OPENTELEMETRY:-false}
+      - ENABLE_FILE_LOGGING=${ENABLE_FILE_LOGGING:-false}
+      - BASE_URL=${BASE_URL:-http://localhost:4000}
+      - PORT=4000
+      # Couchbase configuration (from .env)
+      - COUCHBASE_URL=${COUCHBASE_URL}
+      - COUCHBASE_USERNAME=${COUCHBASE_USERNAME}
+      - COUCHBASE_PASSWORD=${COUCHBASE_PASSWORD}
+      - COUCHBASE_BUCKET=${COUCHBASE_BUCKET}
+      - COUCHBASE_SCOPE=${COUCHBASE_SCOPE}
+      - COUCHBASE_COLLECTION=${COUCHBASE_COLLECTION}
+      # Service metadata
+      - SERVICE_NAME=CapellaQL Dev
+      - SERVICE_VERSION=dev
+      - DEPLOYMENT_ENVIRONMENT=development
+      # Telemetry (optional - connect to local Jaeger)
+      - TRACES_ENDPOINT=${TRACES_ENDPOINT:-http://jaeger:4318/v1/traces}
+      - METRICS_ENDPOINT=${METRICS_ENDPOINT:-}
+      - LOGS_ENDPOINT=${LOGS_ENDPOINT:-}
+    env_file:
+      - .env
+    init: true  # Uses tini as PID 1 (alternative to dumb-init for compose)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "bun", "run", "healthcheck"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+    networks:
+      - capellaql-network
+    depends_on:
+      jaeger:
+        condition: service_started
+        required: false
+
+  # ===========================================================================
+  # Jaeger - Distributed Tracing (Optional)
+  # ===========================================================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.54
+    container_name: jaeger-dev
+    profiles:
+      - observability
+    ports:
+      - "6831:6831/udp"   # Jaeger Thrift compact
+      - "6832:6832/udp"   # Jaeger Thrift binary
+      - "5778:5778"       # Agent configs
+      - "16686:16686"     # Web UI
+      - "4317:4317"       # OTLP gRPC
+      - "4318:4318"       # OTLP HTTP
+      - "14250:14250"     # Model used by collectors
+      - "14268:14268"     # Jaeger Thrift HTTP
+      - "9411:9411"       # Zipkin compatible endpoint
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - COLLECTOR_OTLP_ENABLED=true
+    networks:
+      - capellaql-network
+
+  # ===========================================================================
+  # Prometheus - Metrics Collection (Optional)
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:v2.50.1
+    container_name: prometheus-dev
+    profiles:
+      - observability
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
+    networks:
+      - capellaql-network
+
+  # ===========================================================================
+  # Grafana - Visualization (Optional)
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:10.3.3
+    container_name: grafana-dev
+    profiles:
+      - observability
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - capellaql-network
+    depends_on:
+      - prometheus
+      - jaeger
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  capellaql-network:
+    driver: bridge
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  grafana-data:
+
+# =============================================================================
+# Usage Examples
+# =============================================================================
+# Basic development (no observability):
+#   docker compose up capellaql
+#
+# Development with observability stack:
+#   docker compose --profile observability up
+#
+# Build and run in detached mode:
+#   docker compose up -d --build
+#
+# View logs:
+#   docker compose logs -f capellaql
+#
+# Stop all services:
+#   docker compose down
+#
+# Clean up (including volumes):
+#   docker compose down -v
