@@ -1,16 +1,20 @@
 /* src/telemetry/instrumentation.ts */
+// Implementation follows migrate/telemetry/instrumentation.ts EXACTLY
 
 import os from "node:os";
+import { logs } from "@opentelemetry/api-logs";
 import { DiagConsoleLogger, DiagLogLevel, diag } from "@opentelemetry/api";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { CompositePropagator, W3CBaggagePropagator, W3CTraceContextPropagator } from "@opentelemetry/core";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { HostMetrics } from "@opentelemetry/host-metrics";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
+import { RedisInstrumentation } from "@opentelemetry/instrumentation-redis-4";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { PeriodicExportingMetricReader } from "@opentelemetry/sdk-metrics";
+import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
+import { PeriodicExportingMetricReader, type PushMetricExporter, type ResourceMetrics } from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import {
@@ -23,22 +27,43 @@ import {
   SEMRESATTRS_SERVICE_INSTANCE_ID,
   SEMRESATTRS_SERVICE_NAMESPACE,
 } from "@opentelemetry/semantic-conventions";
+import type { ExportResult } from "@opentelemetry/core";
 import { type TelemetryConfig, telemetryConfig } from "$config";
 import { BunPerf } from "$utils/bunUtils";
-import { BunLogExporter } from "./exporters/BunLogExporter";
-import { BunMetricExporter } from "./exporters/BunMetricExporter";
-import { BunMetricReader } from "./exporters/BunMetricReader";
-import { BunSpanProcessor } from "./exporters/BunSpanProcessor";
-// Bun-optimized exporters for better timeout handling
-import { BunTraceExporter } from "./exporters/BunTraceExporter";
-import { telemetryHealthMonitor } from "./health/telemetryHealth";
-import { log, telemetryLogger, warn } from "./logger";
+import {
+  createExportStatsTracker,
+  type ExportStats,
+  type ExportStatsTracker,
+  wrapLogRecordExporter,
+  wrapMetricExporter,
+  wrapSpanExporter,
+} from "./export-stats-tracker";
+import { log, warn, winstonTelemetryLogger } from "./winston-logger";
 import { SimpleSmartSampler, type SimpleSmartSamplingConfig } from "./sampling/SimpleSmartSampler";
 
+// ============================================================================
+// Module-level state (per migrate/telemetry/instrumentation.ts)
+// ============================================================================
+
+interface MetricReaderLike {
+  forceFlush(): Promise<void>;
+  shutdown(): Promise<void>;
+  collect?(): Promise<unknown>;
+}
+
 let sdk: NodeSDK | undefined;
+let loggerProvider: LoggerProvider | undefined;
+let hostMetrics: HostMetrics | undefined;
+let metricExporter: PushMetricExporter | undefined;
+let metricReader: MetricReaderLike | undefined;
 let isInitialized = false;
 let config: TelemetryConfig;
 let simpleSmartSampler: SimpleSmartSampler | undefined;
+
+// Export stats trackers (per migrate/telemetry/instrumentation.ts lines 57-59)
+const traceExportStats = createExportStatsTracker();
+const metricExportStats = createExportStatsTracker();
+const logExportStats = createExportStatsTracker();
 
 export async function initializeTelemetry(): Promise<void> {
   if (isInitialized) {
@@ -51,6 +76,25 @@ export async function initializeTelemetry(): Promise<void> {
     config = telemetryConfig;
 
     if (!config.ENABLE_OPENTELEMETRY) {
+      // Create no-op exporters for disabled mode (per migrate pattern)
+      const noOpExporter: PushMetricExporter = {
+        export: (_metrics: ResourceMetrics, resultCallback: (result: ExportResult) => void): void => {
+          metricExportStats.recordExportAttempt();
+          metricExportStats.recordExportSuccess();
+          resultCallback({ code: 0 });
+        },
+        forceFlush: (): Promise<void> => Promise.resolve(),
+        shutdown: (): Promise<void> => Promise.resolve(),
+        selectAggregationTemporality: () => 1,
+      };
+      metricExporter = noOpExporter;
+
+      const noOpReader: MetricReaderLike = {
+        forceFlush: (): Promise<void> => Promise.resolve(),
+        shutdown: (): Promise<void> => Promise.resolve(),
+      };
+      metricReader = noOpReader;
+
       if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
         console.debug("OpenTelemetry instrumentation is disabled");
       }
@@ -73,81 +117,60 @@ export async function initializeTelemetry(): Promise<void> {
       config.DEPLOYMENT_ENVIRONMENT === "development" ? DiagLogLevel.INFO : DiagLogLevel.WARN
     );
 
-    // Initialize health monitor with config
-    telemetryHealthMonitor.setConfig(config);
-
     // Create resource with all 2025-compliant semantic conventions (synchronous)
     const resource = createResource(config);
 
-    // Create 2025-compliant exporters - use Bun-optimized exporters when running under Bun
-    const traceExporter = createTraceExporter(config);
-    const metricExporter = createMetricExporter(config);
-    const logExporter = createLogExporter(config);
+    // Create OTLP exporters with tracking wrappers
+    // Per migrate/telemetry/instrumentation.ts lines 103-120
+    const baseOtlpTraceExporter = new OTLPTraceExporter({
+      url: config.TRACES_ENDPOINT,
+      timeoutMillis: config.EXPORT_TIMEOUT_MS,
+    });
+    const trackingTraceExporter = wrapSpanExporter(baseOtlpTraceExporter, traceExportStats);
 
-    // Create span processor - use custom Bun processor when running under Bun
-    let spanProcessor;
-    if (typeof Bun !== "undefined") {
-      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        console.debug("Using Bun-optimized span processor (bypasses BatchSpanProcessor)");
-      }
-      spanProcessor = new BunSpanProcessor({
-        url: config.TRACES_ENDPOINT,
-        maxBatchSize: config.BATCH_SIZE,
-        scheduledDelayMillis: 5000,
-        maxQueueSize: config.MAX_QUEUE_SIZE,
-        timeoutMillis: 10000,
-        retryConfig: {
-          maxRetries: 3,
-          initialDelayMs: 1000,
-          maxDelayMs: 10000,
-          backoffMultiplier: 2,
-        },
-      });
-    } else {
-      spanProcessor = new BatchSpanProcessor(traceExporter, {
-        maxExportBatchSize: config.BATCH_SIZE, // 2048 (2025 standard)
-        maxQueueSize: config.MAX_QUEUE_SIZE, // 10,000 (2025 standard)
-        scheduledDelayMillis: 5000, // 5 seconds
-        exportTimeoutMillis: config.EXPORT_TIMEOUT_MS, // 30 seconds (2025 standard)
-      });
-    }
+    const baseOtlpMetricExporter = new OTLPMetricExporter({
+      url: config.METRICS_ENDPOINT,
+      timeoutMillis: config.EXPORT_TIMEOUT_MS,
+    });
+    const trackingMetricExporter = wrapMetricExporter(baseOtlpMetricExporter, metricExportStats);
+    metricExporter = trackingMetricExporter;
 
-    // Create log processor with 2025 batch settings
-    const logProcessor = new BatchLogRecordProcessor(logExporter, {
-      maxExportBatchSize: Math.min(config.BATCH_SIZE, 512), // Logs can be smaller batches
-      maxQueueSize: config.MAX_QUEUE_SIZE,
-      scheduledDelayMillis: 5000,
-      exportTimeoutMillis: config.EXPORT_TIMEOUT_MS,
+    const baseOtlpLogExporter = new OTLPLogExporter({
+      url: config.LOGS_ENDPOINT,
+      timeoutMillis: config.EXPORT_TIMEOUT_MS,
+    });
+    const trackingLogExporter = wrapLogRecordExporter(baseOtlpLogExporter, logExportStats);
+
+    // Create processors per migrate/telemetry/instrumentation.ts lines 122-139
+    const traceProcessor = new BatchSpanProcessor(trackingTraceExporter, {
+      maxExportBatchSize: 10,
+      scheduledDelayMillis: 1000,
     });
 
-    // Create metric reader - use custom Bun reader when running under Bun
-    let metricReader: BunMetricReader | PeriodicExportingMetricReader;
-    if (typeof Bun !== "undefined") {
-      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        console.debug("Using Bun-optimized metric reader (bypasses PeriodicExportingMetricReader)");
-      }
-      metricReader = new BunMetricReader({
-        url: config.METRICS_ENDPOINT,
-        exportIntervalMillis: config.METRIC_READER_INTERVAL,
-        timeoutMillis: 10000,
-        retryConfig: {
-          maxRetries: 3,
-          initialDelayMs: 1000,
-          maxDelayMs: 10000,
-          backoffMultiplier: 2,
-        },
-      });
-    } else {
-      metricReader = new PeriodicExportingMetricReader({
-        exporter: metricExporter,
-        exportIntervalMillis: config.METRIC_READER_INTERVAL,
-        exportTimeoutMillis: config.EXPORT_TIMEOUT_MS,
-      });
+    if (!metricExporter) {
+      throw new Error("metricExporter must be initialized before creating PeriodicExportingMetricReader");
     }
+
+    const periodicReader = new PeriodicExportingMetricReader({
+      exporter: metricExporter,
+      exportIntervalMillis: 10000,
+    });
+    metricReader = periodicReader;
+
+    const logProcessor = new BatchLogRecordProcessor(trackingLogExporter);
+
+    // OTel SDK 0.212.0 breaking change: LoggerProvider must be explicitly registered
+    // as the global provider for OpenTelemetryTransportV3 (Winston) to work.
+    // NodeSDK no longer automatically sets the global LoggerProvider.
+    // Per migrate/telemetry/instrumentation.ts lines 141-149
+    loggerProvider = new LoggerProvider({
+      resource,
+      processors: [logProcessor],
+    });
+    logs.setGlobalLoggerProvider(loggerProvider);
 
     // Create simple 3-tier sampling strategy (streamlined approach)
     const simpleSamplingConfig: SimpleSmartSamplingConfig = {
-      // Use new simplified rates or fall back to derived values for backward compatibility
       traces: config.TRACES_SAMPLING_RATE || config.SAMPLING_RATE,
       metrics:
         config.METRICS_SAMPLING_RATE ||
@@ -160,8 +183,7 @@ export async function initializeTelemetry(): Promise<void> {
         config.LOGS_SAMPLING_RATE ||
         (config.LOG_SAMPLING_DEBUG + config.LOG_SAMPLING_INFO + config.LOG_SAMPLING_WARN + config.LOG_SAMPLING_ERROR) /
           4,
-
-      preserveErrors: true, // Always preserve errors
+      preserveErrors: true,
       costOptimizationMode:
         config.COST_OPTIMIZATION_MODE !== undefined
           ? config.COST_OPTIMIZATION_MODE
@@ -177,45 +199,69 @@ export async function initializeTelemetry(): Promise<void> {
       propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
     });
 
-    // Initialize NodeSDK with 2025-compliant configuration
+    // Get instrumentations
+    const baseInstrumentations = getNodeAutoInstrumentations({
+      "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
+      "@opentelemetry/instrumentation-aws-sdk": { enabled: false },
+      "@opentelemetry/instrumentation-fs": { enabled: false },
+      "@opentelemetry/instrumentation-winston": { enabled: false },
+      "@opentelemetry/instrumentation-runtime-node": { enabled: false },
+      "@opentelemetry/instrumentation-grpc": { enabled: false },
+      "@opentelemetry/instrumentation-http": {
+        enabled: true,
+        ignoreIncomingRequestHook: (req) => {
+          return req.url?.includes("/health") || false;
+        },
+      },
+    });
+
+    const graphqlInstrumentation = new GraphQLInstrumentation({
+      allowValues: true,
+      depth: -1,
+      mergeItems: true,
+    });
+
+    const redisInstrumentation = new RedisInstrumentation({
+      dbStatementSerializer: (cmdName, cmdArgs) => {
+        const sanitizedArgs = cmdArgs.map((arg, i) => {
+          const argStr = arg instanceof Buffer ? arg.toString() : String(arg);
+          if (cmdName.toUpperCase() === "SET" && i === 1) {
+            return "***";
+          }
+          if (cmdName.toUpperCase() === "GET" && argStr.includes("consumer_secret")) {
+            return "consumer_secret:***";
+          }
+          return argStr;
+        });
+        return [cmdName, ...sanitizedArgs].join(" ");
+      },
+    });
+
+    const instrumentations = [...baseInstrumentations, graphqlInstrumentation, redisInstrumentation];
+
+    // Initialize NodeSDK per migrate/telemetry/instrumentation.ts lines 201-208
     sdk = new NodeSDK({
       resource,
-      autoDetectResources: false, // Disable async resource detection to eliminate warnings
+      autoDetectResources: false,
       sampler,
       textMapPropagator: propagator,
-      spanProcessors: [spanProcessor],
-      logRecordProcessors: [logProcessor],
-      metricReader,
-      instrumentations: [
-        // Auto-instrumentations with optimized settings
-        getNodeAutoInstrumentations({
-          "@opentelemetry/instrumentation-aws-lambda": { enabled: false },
-          "@opentelemetry/instrumentation-aws-sdk": { enabled: false },
-          "@opentelemetry/instrumentation-fs": { enabled: false },
-          "@opentelemetry/instrumentation-winston": { enabled: false }, // We use our own
-          "@opentelemetry/instrumentation-runtime-node": { enabled: false }, // Not compatible with Bun
-          "@opentelemetry/instrumentation-http": {
-            enabled: true,
-            ignoreIncomingRequestHook: (req) => {
-              // Reduce noise from health checks
-              return req.url?.includes("/health") || false;
-            },
-          },
-        }),
-        // GraphQL instrumentation with proper settings
-        new GraphQLInstrumentation({
-          allowValues: true,
-          depth: -1, // Capture full query depth
-          mergeItems: true, // Merge similar operations
-        }),
-      ],
+      spanProcessors: [traceProcessor],
+      metricReaders: [periodicReader],
+      // LoggerProvider is managed separately and registered globally above
+      instrumentations: [instrumentations],
     });
 
     // Start the SDK
-    await sdk.start();
+    sdk.start();
 
-    // Initialize logger after SDK is started
-    telemetryLogger.initialize();
+    // Start host metrics collection
+    hostMetrics = new HostMetrics({});
+    hostMetrics.start();
+
+    // OTel SDK 0.212.0 breaking change fix:
+    // Winston logger must be reinitialized AFTER the global LoggerProvider is set.
+    // Per migrate/telemetry/instrumentation.ts lines 215-220
+    winstonTelemetryLogger.reinitialize();
 
     isInitialized = true;
 
@@ -234,147 +280,38 @@ export async function initializeTelemetry(): Promise<void> {
     setupGracefulShutdown();
   } catch (err) {
     console.error("Failed to initialize OpenTelemetry SDK:", err);
-    throw err; // Re-throw to fail fast
+    throw err;
   }
 }
 
 function createResource(config: TelemetryConfig) {
-  // Create fully synchronous resource to avoid "async attributes settled" warnings
   const attributes = {
-    // Service identification (2025 standards)
     [ATTR_SERVICE_NAME]: config.SERVICE_NAME,
     [ATTR_SERVICE_VERSION]: config.SERVICE_VERSION,
     [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: config.DEPLOYMENT_ENVIRONMENT,
-    [SEMRESATTRS_SERVICE_NAMESPACE]: "capella-graphql-api", // 2025 standard
+    [SEMRESATTRS_SERVICE_NAMESPACE]: "capella-graphql-api",
     [SEMRESATTRS_SERVICE_INSTANCE_ID]: config.runtime?.HOSTNAME || config.runtime?.INSTANCE_ID || os.hostname(),
-
-    // OpenTelemetry SDK identification (2025 standards)
     [ATTR_TELEMETRY_SDK_NAME]: "opentelemetry",
     [ATTR_TELEMETRY_SDK_LANGUAGE]: "nodejs",
     [ATTR_TELEMETRY_SDK_VERSION]: "2.0.1",
-
-    // Runtime information (manual, synchronous)
     "runtime.name": "bun",
     "runtime.version": typeof Bun !== "undefined" ? Bun.version : process.version,
-
-    // Process information (replaces processDetector)
     "process.pid": process.pid,
     "process.executable.name": typeof Bun !== "undefined" ? "bun" : "node",
     "process.executable.path": process.execPath,
     "process.command": process.argv[1] || "unknown",
     "process.runtime.name": typeof Bun !== "undefined" ? "bun" : "nodejs",
     "process.runtime.version": typeof Bun !== "undefined" ? Bun.version : process.version,
-
-    // Host information (replaces hostDetector)
     "host.name": os.hostname(),
     "host.arch": os.arch(),
     "host.type": os.type(),
     "host.cpu.family": os.cpus()[0]?.model || "unknown",
-
-    // Container information if available through unified config (synchronous)
     ...(config.runtime?.CONTAINER_ID && { "container.id": config.runtime.CONTAINER_ID }),
     ...(config.runtime?.K8S_POD_NAME && { "k8s.pod.name": config.runtime.K8S_POD_NAME }),
     ...(config.runtime?.K8S_NAMESPACE && { "k8s.namespace.name": config.runtime.K8S_NAMESPACE }),
   };
 
-  // Use direct resource creation to ensure all attributes are immediately available
   return resourceFromAttributes(attributes);
-}
-
-function createTraceExporter(config: TelemetryConfig): OTLPTraceExporter | BunTraceExporter {
-  // Use Bun-optimized exporter when running under Bun to eliminate timeout issues
-  if (typeof Bun !== "undefined") {
-    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      console.debug("Using Bun-optimized trace exporter");
-    }
-    return new BunTraceExporter({
-      url: config.TRACES_ENDPOINT,
-      timeoutMillis: 10000, // Reduced timeout for faster failure detection
-      concurrencyLimit: 10,
-      retryConfig: {
-        maxRetries: 3,
-        initialDelayMs: 1000,
-        maxDelayMs: 10000,
-        backoffMultiplier: 2,
-      },
-    });
-  }
-
-  // Fallback to standard exporter for Node.js compatibility
-  return new OTLPTraceExporter({
-    url: config.TRACES_ENDPOINT,
-    headers: {
-      "Content-Type": "application/json", // JSON over HTTP for collector on port 4318
-      // Gzip compression can cause timeout with some collectors
-    },
-    timeoutMillis: config.EXPORT_TIMEOUT_MS, // 30 seconds (2025 standard)
-    concurrencyLimit: 10, // Reasonable concurrency
-    keepAlive: true,
-  });
-}
-
-function createMetricExporter(config: TelemetryConfig): OTLPMetricExporter | BunMetricExporter {
-  // Use Bun-optimized exporter when running under Bun to eliminate timeout issues
-  if (typeof Bun !== "undefined") {
-    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      console.debug("Using Bun-optimized metric exporter");
-    }
-    return new BunMetricExporter({
-      url: config.METRICS_ENDPOINT,
-      timeoutMillis: 10000, // Reduced timeout for faster failure detection
-      concurrencyLimit: 10,
-      retryConfig: {
-        maxRetries: 3,
-        initialDelayMs: 1000,
-        maxDelayMs: 10000,
-        backoffMultiplier: 2,
-      },
-    });
-  }
-
-  // Fallback to standard exporter for Node.js compatibility
-  return new OTLPMetricExporter({
-    url: config.METRICS_ENDPOINT,
-    headers: {
-      "Content-Type": "application/json", // JSON over HTTP for collector on port 4318
-      // Gzip compression can cause timeout with some collectors
-    },
-    timeoutMillis: config.EXPORT_TIMEOUT_MS, // 30 seconds (2025 standard)
-    concurrencyLimit: 10,
-    keepAlive: true,
-  });
-}
-
-function createLogExporter(config: TelemetryConfig): OTLPLogExporter | BunLogExporter {
-  // Use Bun-optimized exporter when running under Bun to eliminate timeout issues
-  if (typeof Bun !== "undefined") {
-    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      console.debug("Using Bun-optimized log exporter with circuit breaker");
-    }
-    return new BunLogExporter({
-      url: config.LOGS_ENDPOINT,
-      timeoutMillis: 10000, // Reduced timeout for faster failure detection
-      concurrencyLimit: 10,
-      retryConfig: {
-        maxRetries: 3,
-        initialDelayMs: 1000,
-        maxDelayMs: 10000,
-        backoffMultiplier: 2,
-      },
-    });
-  }
-
-  // Fallback to standard exporter for Node.js compatibility
-  return new OTLPLogExporter({
-    url: config.LOGS_ENDPOINT,
-    headers: {
-      "Content-Type": "application/json", // JSON over HTTP for collector on port 4318
-      // Gzip compression can cause timeout with some collectors
-    },
-    timeoutMillis: config.EXPORT_TIMEOUT_MS, // 30 seconds (2025 standard)
-    concurrencyLimit: 10,
-    keepAlive: true,
-  });
 }
 
 function setupGracefulShutdown(): void {
@@ -398,21 +335,87 @@ function setupGracefulShutdown(): void {
   process.on("SIGQUIT", () => gracefulShutdown("SIGQUIT"));
 }
 
+// Per migrate/telemetry/instrumentation.ts lines 223-243
 export async function shutdownTelemetry(): Promise<void> {
-  if (!sdk || !isInitialized) {
-    return;
+  if (hostMetrics) {
+    hostMetrics = undefined;
   }
 
-  try {
-    await sdk.shutdown();
-    sdk = undefined;
-    isInitialized = false;
-    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      console.debug("OpenTelemetry SDK shutdown completed");
+  if (loggerProvider) {
+    try {
+      await loggerProvider.shutdown();
+    } catch (error) {
+      console.warn("Error shutting down LoggerProvider:", error);
     }
-  } catch (err) {
-    console.error("Error shutting down OpenTelemetry SDK:", err);
-    throw err;
+  }
+
+  if (sdk) {
+    try {
+      await sdk.shutdown();
+      sdk = undefined;
+      isInitialized = false;
+    } catch (error) {
+      console.warn("Error shutting down OpenTelemetry:", error);
+    }
+  }
+}
+
+// Per migrate/telemetry/instrumentation.ts lines 245-256
+export function getTelemetryStatus() {
+  return {
+    initialized: !!sdk,
+    config: telemetryConfig,
+    exportStats: {
+      traces: traceExportStats.getStats(),
+      metrics: metricExportStats.getStats(),
+      logs: logExportStats.getStats(),
+    },
+    metricsExportStats: metricExportStats,
+  };
+}
+
+// Per migrate/telemetry/instrumentation.ts lines 258-277
+export async function forceMetricsFlush(): Promise<void> {
+  if (!metricReader) {
+    throw new Error("Metrics reader not initialized");
+  }
+  await metricReader.forceFlush();
+
+  if (metricExporter) {
+    if (!config.ENABLE_OPENTELEMETRY) {
+      const emptyMetrics: ResourceMetrics = {
+        resource: resourceFromAttributes({}),
+        scopeMetrics: [],
+      };
+      metricExporter.export(emptyMetrics, () => {});
+    } else {
+      await metricExporter.forceFlush();
+    }
+  }
+}
+
+// Per migrate/telemetry/instrumentation.ts lines 279-289
+export function getTraceExportStats(): ExportStats {
+  return traceExportStats.getStats();
+}
+
+export function getMetricsExportStats(): ExportStatsTracker {
+  return metricExportStats;
+}
+
+export function getLogExportStats(): ExportStats {
+  return logExportStats.getStats();
+}
+
+// Per migrate/telemetry/instrumentation.ts lines 291-300
+export async function triggerImmediateMetricsExport(): Promise<void> {
+  if (!metricReader) {
+    throw new Error("Metrics reader not initialized");
+  }
+  if (typeof metricReader.collect === "function") {
+    await metricReader.collect();
+  } else {
+    await metricReader.forceFlush();
   }
 }
 
@@ -428,11 +431,17 @@ export function getSimpleSmartSampler(): SimpleSmartSampler | undefined {
   return simpleSmartSampler;
 }
 
-// Backward compatibility
+// Backward compatibility aliases
 export function getUnifiedSamplingCoordinator(): SimpleSmartSampler | undefined {
   console.warn("getUnifiedSamplingCoordinator() is deprecated - use getSimpleSmartSampler() instead");
   return simpleSmartSampler;
 }
+
+export const initializeBunFullTelemetry = initializeTelemetry;
+export const initializeSimpleTelemetry = initializeTelemetry;
+export const getBunTelemetryStatus = getTelemetryStatus;
+export const getSimpleTelemetryStatus = getTelemetryStatus;
+export const shutdownSimpleTelemetry = shutdownTelemetry;
 
 // Performance monitoring utilities with Bun integration
 export async function measureDatabaseOperation<T>(
@@ -442,10 +451,8 @@ export async function measureDatabaseOperation<T>(
 ): Promise<T> {
   const { result, duration } = await BunPerf.measure(operation, `DB:${operationName}`);
 
-  // Record custom metrics
   if (isInitialized) {
     try {
-      // Log performance metrics
       log(`Database operation completed`, {
         operation: operationName,
         queryType,
@@ -467,7 +474,6 @@ export async function measureGraphQLResolver<T>(
 ): Promise<T> {
   const { result, duration } = await BunPerf.measure(operation, `GraphQL:${resolverName}.${fieldName}`);
 
-  // Record resolver performance
   if (isInitialized) {
     try {
       log(`GraphQL resolver completed`, {
@@ -492,7 +498,6 @@ export function createPerformanceTimer(label: string) {
 if (typeof Bun !== "undefined" || process.env.NODE_ENV !== "test") {
   initializeTelemetry().catch((err) => {
     console.error("Critical: Failed to initialize OpenTelemetry:", err);
-    // In production, we might want to exit here
     if (config?.DEPLOYMENT_ENVIRONMENT === "production") {
       process.exit(1);
     }

@@ -76,3 +76,5 @@ AGENTS/
 # Misc
 .vercel
 .vscode/
+
+migrate/

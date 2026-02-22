@@ -144,18 +144,7 @@ function validateBusinessRules(config: TelemetryConfig): void {
     console.warn("SAMPLING_RATE above 50% may impact performance in production");
   }
 
-  // Validate endpoint consistency (same host for all endpoints is recommended)
-  try {
-    const tracesUrl = new URL(config.TRACES_ENDPOINT);
-    const metricsUrl = new URL(config.METRICS_ENDPOINT);
-    const logsUrl = new URL(config.LOGS_ENDPOINT);
-
-    if (tracesUrl.host !== metricsUrl.host || tracesUrl.host !== logsUrl.host) {
-      console.warn("Telemetry endpoints use different hosts - consider using the same OTLP collector");
-    }
-  } catch (_error) {
-    // URL parsing already validated by Zod, this is just for warnings
-  }
+  // Note: Different hosts for telemetry endpoints is valid (separate collectors per signal)
 }
 
 // Remove this function - use unified config from $config instead

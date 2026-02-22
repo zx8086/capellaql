@@ -342,36 +342,7 @@ const ConfigSchema = z
 
     // BUSINESS RULE VALIDATIONS
 
-    // Ensure application and telemetry environment alignment
-    if (data.runtime.NODE_ENV !== data.telemetry.DEPLOYMENT_ENVIRONMENT) {
-      // Log warning but don't fail validation - this might be intentional
-      console.warn(
-        `Environment mismatch: NODE_ENV=${data.runtime.NODE_ENV} but DEPLOYMENT_ENVIRONMENT=${data.telemetry.DEPLOYMENT_ENVIRONMENT}`
-      );
-    }
-
-    // Validate port availability (basic check)
-    if (data.application.PORT < 1024 && !isProduction) {
-      console.warn(`Port ${data.application.PORT} is a privileged port - ensure proper permissions`);
-    }
-
-    // Validate telemetry endpoint consistency (same host recommended)
-    try {
-      const tracesUrl = new URL(data.telemetry.TRACES_ENDPOINT);
-      const metricsUrl = new URL(data.telemetry.METRICS_ENDPOINT);
-      const logsUrl = new URL(data.telemetry.LOGS_ENDPOINT);
-
-      if (tracesUrl.host !== metricsUrl.host || tracesUrl.host !== logsUrl.host) {
-        console.warn("Telemetry endpoints use different hosts - consider using the same OTLP collector");
-      }
-    } catch (_error) {
-      // URL parsing already validated by schema, this is just for warnings
-    }
-
-    // Validate batch sizes are optimal for production
-    if (isProduction && data.telemetry.BATCH_SIZE < 1024) {
-      console.warn("BATCH_SIZE is below recommended 1024 for production environments");
-    }
+    // Note: Environment alignment and other warnings handled by validateConfig()
   });
 
 // Validates configuration for production readiness

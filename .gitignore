@@ -56,3 +56,5 @@ logs
 
 # AGENTS/
 .bun-cache/
+
+migrate/

@@ -103,36 +103,60 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
 
   /**
    * Serialize histogram data point
+   * Ensures all numeric values are finite to prevent JSON null serialization
    */
   private serializeHistogramDataPoint(dataPoint: any): any {
     const startTimeUnixNano = dataPoint.startTime ? hrTimeToMicroseconds(dataPoint.startTime) * 1000 : undefined;
     const timeUnixNano = hrTimeToMicroseconds(dataPoint.endTime) * 1000;
 
+    // Helper to ensure finite numbers
+    const ensureFinite = (val: any, defaultVal: number = 0): number => {
+      if (typeof val !== "number" || !Number.isFinite(val)) {
+        return defaultVal;
+      }
+      return val;
+    };
+
     return {
       attributes: this.serializeAttributes(dataPoint.attributes),
       startTimeUnixNano: startTimeUnixNano?.toString(),
       timeUnixNano: timeUnixNano.toString(),
-      count: dataPoint.value.count?.toString() || "0",
-      sum: dataPoint.value.sum || 0,
-      bucketCounts: (dataPoint.value.buckets?.counts || []).map((c: number) => c.toString()),
-      explicitBounds: dataPoint.value.buckets?.boundaries || [],
-      min: dataPoint.value.min,
-      max: dataPoint.value.max,
+      count: (dataPoint.value?.count ?? 0).toString(),
+      sum: ensureFinite(dataPoint.value?.sum, 0),
+      bucketCounts: (dataPoint.value?.buckets?.counts || []).map((c: number) =>
+        ensureFinite(c, 0).toString()
+      ),
+      explicitBounds: (dataPoint.value?.buckets?.boundaries || []).map((b: number) =>
+        ensureFinite(b, 0)
+      ),
+      min: ensureFinite(dataPoint.value?.min, 0),
+      max: ensureFinite(dataPoint.value?.max, 0),
     };
   }
 
   /**
    * Extract numeric value from data point value
+   * Handles edge cases like NaN, Infinity, and undefined values
+   * which would cause JSON.stringify to produce null
    */
   private getNumericValue(value: any): number {
+    let result = 0;
+
     if (typeof value === "number") {
-      return value;
+      result = value;
     } else if (value && typeof value.value === "number") {
-      return value.value;
+      result = value.value;
     } else if (value && typeof value.sum === "number") {
-      return value.sum;
+      result = value.sum;
     }
-    return 0;
+
+    // Handle NaN and Infinity which JSON.stringify converts to null
+    // This prevents OTLP 400 errors like "ReadUint64: unsupported value type"
+    if (!Number.isFinite(result)) {
+      return 0;
+    }
+
+    return result;
   }
 
   /**

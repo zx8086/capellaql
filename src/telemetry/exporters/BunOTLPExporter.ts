@@ -1,6 +1,7 @@
 // Base OTLP Exporter for Bun runtime with native fetch API
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
 import { telemetryHealthMonitor } from "../health/telemetryHealth";
+import { log, warn } from "../winston-logger";
 
 export interface BunOTLPExporterConfig {
   url: string;
@@ -250,9 +251,17 @@ export abstract class BunOTLPExporter<T> {
     }
 
     if (this.activeRequests > 0) {
-      console.warn(`${this.exporterType} exporter shutdown with ${this.activeRequests} active requests`);
+      warn(`${this.exporterType} exporter shutdown with active requests`, {
+        activeRequests: this.activeRequests,
+        component: "otlp-exporter",
+        exporterType: this.exporterType,
+      });
     }
 
-    console.log(`${this.exporterType} exporter shutdown complete`, this.getStats());
+    log(`${this.exporterType} exporter shutdown complete`, {
+      component: "otlp-exporter",
+      exporterType: this.exporterType,
+      ...this.getStats(),
+    });
   }
 }

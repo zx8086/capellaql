@@ -174,8 +174,50 @@
     "reveal": "always"
   },
   {
-    "label": "dashboard: open",
-    "command": "open http://localhost:4000/dashboard",
+    "label": "otel: ping collector",
+    "command": "echo '=== OTEL Collector Ping ===' && set -a && source .env && set +a && echo \"Endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT\" && curl -sf --max-time 3 -v $OTEL_EXPORTER_OTLP_ENDPOINT 2>&1 || echo 'Unreachable'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: traces endpoint check",
+    "command": "echo '=== OTEL Traces Endpoint ===' && set -a && source .env && set +a && echo \"Endpoint: $OTEL_EXPORTER_OTLP_TRACES_ENDPOINT\" && curl -sf --max-time 3 -X POST -H 'Content-Type: application/json' -d '{\"resourceSpans\":[]}' $OTEL_EXPORTER_OTLP_TRACES_ENDPOINT -v 2>&1 || echo 'Not responding'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: metrics endpoint check",
+    "command": "echo '=== OTEL Metrics Endpoint ===' && set -a && source .env && set +a && echo \"Endpoint: $OTEL_EXPORTER_OTLP_METRICS_ENDPOINT\" && curl -sf --max-time 3 -X POST -H 'Content-Type: application/json' -d '{\"resourceMetrics\":[]}' $OTEL_EXPORTER_OTLP_METRICS_ENDPOINT -v 2>&1 || echo 'Not responding'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: logs endpoint check",
+    "command": "echo '=== OTEL Logs Endpoint ===' && set -a && source .env && set +a && echo \"Endpoint: $OTEL_EXPORTER_OTLP_LOGS_ENDPOINT\" && curl -sf --max-time 3 -X POST -H 'Content-Type: application/json' -d '{\"resourceLogs\":[]}' $OTEL_EXPORTER_OTLP_LOGS_ENDPOINT -v 2>&1 || echo 'Not responding'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: service telemetry health",
+    "command": "echo '=== Service Telemetry Health ===' && curl -sf http://localhost:4000/health/telemetry | jq . || echo 'Status: Not responding'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: ssh tunnel start",
+    "command": "echo '=== SSH Tunnel Start ===' && OTEL_REMOTE=192.168.178.3 && OTEL_PORT=4318 && if lsof -i :${OTEL_PORT} 2>/dev/null | grep -q ssh; then echo \"Local:  localhost:${OTEL_PORT}\" && echo \"Remote: ${OTEL_REMOTE}:${OTEL_PORT}\" && echo \"Status: Already running\"; else ssh -L ${OTEL_PORT}:127.0.0.1:${OTEL_PORT} pi@${OTEL_REMOTE} -N -f && echo \"Local:  localhost:${OTEL_PORT}\" && echo \"Remote: ${OTEL_REMOTE}:${OTEL_PORT}\" && echo \"Status: Started\"; fi",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: ssh tunnel stop",
+    "command": "echo '=== SSH Tunnel Stop ===' && set -a && source .env && set +a && OTEL_PORT=$(echo $OTEL_EXPORTER_OTLP_ENDPOINT | sed 's|http://||' | cut -d: -f2 | cut -d/ -f1) && PID=$(lsof -t -i :$OTEL_PORT | head -1) && if [ -n \"$PID\" ]; then kill $PID && echo \"Port:   $OTEL_PORT\" && echo \"PID:    $PID\" && echo \"Status: Stopped\"; else echo \"Port:   $OTEL_PORT\" && echo \"Status: No tunnel running\"; fi",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "otel: ssh tunnel status",
+    "command": "echo '=== SSH Tunnel Status ===' && set -a && source .env && set +a && OTEL_PORT=$(echo $OTEL_EXPORTER_OTLP_ENDPOINT | sed 's|http://||' | cut -d: -f2 | cut -d/ -f1) && echo \"Port: $OTEL_PORT\" && lsof -i :$OTEL_PORT 2>&1",
     "use_new_terminal": false,
     "reveal": "always"
   },

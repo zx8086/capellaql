@@ -9,7 +9,6 @@ import { fileURLToPath } from "url";
 import config from "../config";
 // Telemetry
 import { err, initializeHttpMetrics, initializeTelemetry, log, telemetryLogger, warn } from "../telemetry";
-import { dashboardHandler } from "./handlers/dashboard";
 import { graphqlHandler } from "./handlers/graphql";
 
 // Handlers
@@ -119,7 +118,6 @@ const wrappedHealthHandlers = {
   graphql: withMiddleware(healthHandlers.graphql),
 };
 
-const wrappedDashboardHandler = withMiddleware(dashboardHandler);
 const wrappedGraphqlHandler = withMiddleware(graphqlHandler);
 
 let server: Server | null = null;
@@ -188,12 +186,6 @@ export async function createServer(): Promise<Server> {
         return wrappedHealthHandlers.graphql(request, context);
       },
 
-      // Dashboard
-      "/dashboard": async (request) => {
-        const context = createRequestContext(request);
-        return wrappedDashboardHandler(request, context);
-      },
-
       // GraphQL with per-method handling
       "/graphql": {
         GET: async (request) => {
@@ -241,21 +233,21 @@ export async function createServer(): Promise<Server> {
     },
   });
 
-  // Log startup information
+  // Log startup information in JSON ECS format
   const baseUrl = config.application.BASE_URL || "http://localhost";
   const graphqlUrl = `${baseUrl}:${config.application.PORT}/graphql`;
   const healthUrl = `${baseUrl}:${config.application.PORT}/health`;
   const telemetryHealthUrl = `${baseUrl}:${config.application.PORT}/health/telemetry`;
-  const dashboardUrl = `${baseUrl}:${config.application.PORT}/dashboard`;
 
   log("CapellaQL Server started", {
     serverPort: config.application.PORT,
+    hostname: config.deployment.HOSTNAME || "0.0.0.0",
     environment: config.telemetry.DEPLOYMENT_ENVIRONMENT,
+    maxRequestBodySize: "512KB",
     endpoints: {
       graphql: graphqlUrl,
       health: healthUrl,
       telemetryHealth: telemetryHealthUrl,
-      dashboard: dashboardUrl,
     },
     telemetry: {
       enabled: config.telemetry.ENABLE_OPENTELEMETRY,
@@ -269,34 +261,6 @@ export async function createServer(): Promise<Server> {
       version: Bun.version,
     },
   });
-
-  console.log(`
-CapellaQL Server started successfully!
-
-Server Configuration:
-   - Hostname: ${config.deployment.HOSTNAME || "0.0.0.0"}
-   - Port: ${config.application.PORT}
-   - Max Request Body: 512KB
-   - Development Mode: ${config.telemetry.DEPLOYMENT_ENVIRONMENT === "development" ? "Enabled" : "Disabled"}
-   - Environment: ${config.telemetry.DEPLOYMENT_ENVIRONMENT}
-
-Endpoints:
-   - GraphQL Playground: ${graphqlUrl}
-   - Health Check: ${healthUrl}
-   - Telemetry Health: ${telemetryHealthUrl}
-   - Dashboard: ${dashboardUrl}
-
-OpenTelemetry:
-   - Status: ${config.telemetry.ENABLE_OPENTELEMETRY ? "Enabled" : "Disabled"}
-   - Traces Endpoint: ${config.telemetry.TRACES_ENDPOINT}
-   - Metrics Endpoint: ${config.telemetry.METRICS_ENDPOINT}
-   - Logs Endpoint: ${config.telemetry.LOGS_ENDPOINT}
-   - Sampling Rate: ${config.telemetry.SAMPLING_RATE} (${(config.telemetry.SAMPLING_RATE * 100).toFixed(0)}%)
-
-Powered by Bun.serve() native HTTP server (v${Bun.version})
-
-Ready to accept requests!
-`);
 
   // Setup graceful shutdown
   setupGracefulShutdown();

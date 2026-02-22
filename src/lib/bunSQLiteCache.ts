@@ -1,7 +1,7 @@
 /* src/lib/bunSQLiteCache.ts - Bun-native SQLite Query Cache */
 
 import { Database } from "bun:sqlite";
-import { err, log, warn } from "../telemetry/logger";
+import { debug, err, log, warn } from "../telemetry/logger";
 import type { CacheStats } from "./queryCache";
 
 /**
@@ -187,7 +187,7 @@ export class BunSQLiteCache {
       // Update stats
       this.updateStats();
 
-      log("SQLite cache set", {
+      debug("SQLite cache set", {
         key: key.substring(0, 50) + (key.length > 50 ? "..." : ""),
         size,
         ttl: ttlMs || this.config.defaultTtlMs,

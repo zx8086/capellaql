@@ -4,14 +4,17 @@ import type { TelemetryConfig } from "../base";
 import { getEnvVar, parseEnvVar } from "../utils/env-parser";
 
 // Environment variable mapping for telemetry section
+// Uses standard OTEL environment variable names per OpenTelemetry specification
 export const telemetryEnvMapping = {
   ENABLE_OPENTELEMETRY: "ENABLE_OPENTELEMETRY",
-  SERVICE_NAME: "SERVICE_NAME",
-  SERVICE_VERSION: "SERVICE_VERSION",
+  SERVICE_NAME: "OTEL_SERVICE_NAME",
+  SERVICE_VERSION: "OTEL_SERVICE_VERSION",
   DEPLOYMENT_ENVIRONMENT: "DEPLOYMENT_ENVIRONMENT",
-  TRACES_ENDPOINT: "TRACES_ENDPOINT",
-  METRICS_ENDPOINT: "METRICS_ENDPOINT",
-  LOGS_ENDPOINT: "LOGS_ENDPOINT",
+  // Standard OTEL exporter endpoint environment variables
+  OTLP_ENDPOINT: "OTEL_EXPORTER_OTLP_ENDPOINT", // Base endpoint (fallback)
+  TRACES_ENDPOINT: "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+  METRICS_ENDPOINT: "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+  LOGS_ENDPOINT: "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
   METRIC_READER_INTERVAL: "METRIC_READER_INTERVAL",
   SUMMARY_LOG_INTERVAL: "SUMMARY_LOG_INTERVAL",
   EXPORT_TIMEOUT_MS: "EXPORT_TIMEOUT_MS",
@@ -40,7 +43,7 @@ export const telemetryEnvMapping = {
 // Telemetry configuration defaults (2025 compliance)
 export const telemetryDefaults: TelemetryConfig = {
   ENABLE_OPENTELEMETRY: true,
-  SERVICE_NAME: "CapellaQL Service",
+  SERVICE_NAME: "capellaql-service",
   SERVICE_VERSION: "2.0",
   DEPLOYMENT_ENVIRONMENT: "development",
   TRACES_ENDPOINT: "http://localhost:4318/v1/traces",
@@ -75,7 +78,7 @@ export const telemetryDefaults: TelemetryConfig = {
 // Zod schema for telemetry configuration (2025 compliance)
 export const TelemetryConfigSchema = z.object({
   ENABLE_OPENTELEMETRY: z.coerce.boolean().default(true),
-  SERVICE_NAME: z.string().min(1, "SERVICE_NAME is required and cannot be empty").default("CapellaQL Service"),
+  SERVICE_NAME: z.string().min(1, "SERVICE_NAME is required and cannot be empty").default("capellaql-service"),
   SERVICE_VERSION: z.string().min(1, "SERVICE_VERSION is required and cannot be empty").default("2.0"),
   DEPLOYMENT_ENVIRONMENT: z.enum(["development", "staging", "production", "test"]).default("development"),
   TRACES_ENDPOINT: z.string().url("TRACES_ENDPOINT must be a valid URL").default("http://localhost:4318/v1/traces"),
@@ -189,8 +192,23 @@ export const TelemetryConfigSchema = z.object({
     .default(90),
 });
 
+// Helper to derive endpoint from base OTLP endpoint
+function deriveEndpoint(baseEndpoint: string | undefined, path: string, defaultValue: string): string {
+  if (!baseEndpoint) return defaultValue;
+  // Remove trailing slash if present, then append path
+  const base = baseEndpoint.replace(/\/$/, "");
+  return `${base}${path}`;
+}
+
 // Load telemetry configuration from environment variables
 export function loadTelemetryConfigFromEnv(): TelemetryConfig {
+  // Get base OTLP endpoint for fallback derivation
+  const baseOtlpEndpoint = parseEnvVar(
+    getEnvVar(telemetryEnvMapping.OTLP_ENDPOINT),
+    "string",
+    "OTEL_EXPORTER_OTLP_ENDPOINT"
+  ) as string | undefined;
+
   return {
     ENABLE_OPENTELEMETRY:
       (parseEnvVar(
@@ -200,11 +218,11 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
       ) as boolean) ?? telemetryDefaults.ENABLE_OPENTELEMETRY,
 
     SERVICE_NAME:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.SERVICE_NAME), "string", "SERVICE_NAME") as string) ||
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.SERVICE_NAME), "string", "OTEL_SERVICE_NAME") as string) ||
       telemetryDefaults.SERVICE_NAME,
 
     SERVICE_VERSION:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.SERVICE_VERSION), "string", "SERVICE_VERSION") as string) ||
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.SERVICE_VERSION), "string", "OTEL_SERVICE_VERSION") as string) ||
       telemetryDefaults.SERVICE_VERSION,
 
     DEPLOYMENT_ENVIRONMENT:
@@ -214,17 +232,18 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
         "DEPLOYMENT_ENVIRONMENT"
       ) as string) || telemetryDefaults.DEPLOYMENT_ENVIRONMENT,
 
+    // Use specific endpoint if set, otherwise derive from base endpoint, otherwise use default
     TRACES_ENDPOINT:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.TRACES_ENDPOINT), "string", "TRACES_ENDPOINT") as string) ||
-      telemetryDefaults.TRACES_ENDPOINT,
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.TRACES_ENDPOINT), "string", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") as string) ||
+      deriveEndpoint(baseOtlpEndpoint, "/v1/traces", telemetryDefaults.TRACES_ENDPOINT),
 
     METRICS_ENDPOINT:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRICS_ENDPOINT), "string", "METRICS_ENDPOINT") as string) ||
-      telemetryDefaults.METRICS_ENDPOINT,
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRICS_ENDPOINT), "string", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT") as string) ||
+      deriveEndpoint(baseOtlpEndpoint, "/v1/metrics", telemetryDefaults.METRICS_ENDPOINT),
 
     LOGS_ENDPOINT:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOGS_ENDPOINT), "string", "LOGS_ENDPOINT") as string) ||
-      telemetryDefaults.LOGS_ENDPOINT,
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOGS_ENDPOINT), "string", "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT") as string) ||
+      deriveEndpoint(baseOtlpEndpoint, "/v1/logs", telemetryDefaults.LOGS_ENDPOINT),
 
     METRIC_READER_INTERVAL:
       (parseEnvVar(
@@ -376,32 +395,22 @@ export function validateTelemetryConfig(config: TelemetryConfig, isProduction: b
     }
   }
 
-  // Validate telemetry endpoint consistency (same host recommended)
-  try {
-    const tracesUrl = new URL(config.TRACES_ENDPOINT);
-    const metricsUrl = new URL(config.METRICS_ENDPOINT);
-    const logsUrl = new URL(config.LOGS_ENDPOINT);
-
-    if (tracesUrl.host !== metricsUrl.host || tracesUrl.host !== logsUrl.host) {
-      console.warn("Telemetry endpoints use different hosts - consider using the same OTLP collector");
-    }
-  } catch (_error) {
-    // URL parsing already validated by schema, this is just for warnings
-  }
+  // Note: Different hosts for telemetry endpoints is valid (separate collectors per signal)
 
   return warnings;
 }
 
 // Environment variable path mapping for error reporting
+// Uses standard OTEL environment variable names
 export function getTelemetryEnvVarPath(configPath: string): string | undefined {
   const mapping: Record<string, string> = {
     "telemetry.ENABLE_OPENTELEMETRY": "ENABLE_OPENTELEMETRY",
-    "telemetry.SERVICE_NAME": "SERVICE_NAME",
-    "telemetry.SERVICE_VERSION": "SERVICE_VERSION",
+    "telemetry.SERVICE_NAME": "OTEL_SERVICE_NAME",
+    "telemetry.SERVICE_VERSION": "OTEL_SERVICE_VERSION",
     "telemetry.DEPLOYMENT_ENVIRONMENT": "DEPLOYMENT_ENVIRONMENT",
-    "telemetry.TRACES_ENDPOINT": "TRACES_ENDPOINT",
-    "telemetry.METRICS_ENDPOINT": "METRICS_ENDPOINT",
-    "telemetry.LOGS_ENDPOINT": "LOGS_ENDPOINT",
+    "telemetry.TRACES_ENDPOINT": "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+    "telemetry.METRICS_ENDPOINT": "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+    "telemetry.LOGS_ENDPOINT": "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
     "telemetry.METRIC_READER_INTERVAL": "METRIC_READER_INTERVAL",
     "telemetry.SUMMARY_LOG_INTERVAL": "SUMMARY_LOG_INTERVAL",
     "telemetry.EXPORT_TIMEOUT_MS": "EXPORT_TIMEOUT_MS",

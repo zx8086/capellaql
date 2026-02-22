@@ -2,6 +2,7 @@ import type { LogRecord } from "@opentelemetry/api-logs";
 import type { MetricData } from "@opentelemetry/sdk-metrics";
 import type { SpanData } from "@opentelemetry/sdk-trace-base";
 import config from "$config";
+import { log } from "../winston-logger";
 
 // Batch data types for coordinated exports
 interface TelemetryBatch {
@@ -466,7 +467,10 @@ export class TelemetryBatchCoordinator {
       await this.flushBatch();
     }
 
-    console.info("Telemetry batch coordinator shutdown complete", this.statistics);
+    log("Telemetry batch coordinator shutdown complete", {
+      component: "batch-coordinator",
+      ...this.statistics,
+    });
   }
 
   // Memory Management Methods

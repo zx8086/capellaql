@@ -1,6 +1,9 @@
 /* src/telemetry/health/telemetryHealth.ts */
+// Updated to use export-stats-tracker per migrate pattern
+// Now uses loadConfig() for 4-pillar lazy initialization pattern
 
-import config from "$config";
+import { loadConfig } from "$config";
+import { getTraceExportStats, getLogExportStats, getMetricsExportStats } from "../instrumentation";
 import { TelemetryCircuitBreaker } from "./CircuitBreaker";
 
 export interface TelemetryHealthData {
@@ -20,6 +23,8 @@ export interface TelemetryHealthData {
     totalFailures: number;
   };
   configuration: {
+    serviceName: string;
+    serviceVersion: string;
     samplingRate: number;
     exportTimeoutMs: number;
     batchSize: number;
@@ -36,82 +41,44 @@ export interface TelemetryHealthData {
 export interface ExporterHealth {
   name: string;
   status: "healthy" | "degraded" | "unhealthy";
-  lastExportTime: number | null;
+  lastExportTime: string | null;
   exportCount: number;
   failureCount: number;
-  successRate: number;
+  successRate: string;
 }
 
 class TelemetryHealthMonitor {
   private circuitBreaker: TelemetryCircuitBreaker;
-  private exporters: Map<string, ExporterHealth>;
-  private config: any;
 
   constructor() {
     // Use unified configuration for circuit breaker (2025 standard)
-    const failureThreshold = config.telemetry.CIRCUIT_BREAKER_THRESHOLD;
-    const recoveryTimeoutMs = config.telemetry.CIRCUIT_BREAKER_TIMEOUT_MS;
+    // Using loadConfig() for 4-pillar lazy initialization pattern
+    const cfg = loadConfig();
+    const failureThreshold = cfg.telemetry.CIRCUIT_BREAKER_THRESHOLD;
+    const recoveryTimeoutMs = cfg.telemetry.CIRCUIT_BREAKER_TIMEOUT_MS;
 
     this.circuitBreaker = new TelemetryCircuitBreaker({
-      failureThreshold, // From environment (default: 5 per 2025 standards)
-      recoveryTimeoutMs, // From environment (default: 60000 per 2025 standards)
-      successThreshold: 3, // 2025 standard
+      failureThreshold,
+      recoveryTimeoutMs,
+      successThreshold: 3,
     });
-
-    this.exporters = new Map([
-      ["traces", this.createInitialExporterHealth("traces")],
-      ["metrics", this.createInitialExporterHealth("metrics")],
-      ["logs", this.createInitialExporterHealth("logs")],
-    ]);
   }
 
-  public setConfig(config: any): void {
-    this.config = config;
+  // Deprecated: config is now loaded via loadConfig() pattern
+  public setConfig(_config: any): void {
+    // No-op - config is now loaded dynamically via loadConfig()
   }
 
   public getCircuitBreaker(): TelemetryCircuitBreaker {
     return this.circuitBreaker;
   }
 
-  public recordExporterSuccess(exporterName: string): void {
-    const exporter = this.exporters.get(exporterName);
-    if (exporter) {
-      exporter.lastExportTime = Date.now();
-      exporter.exportCount++;
-      exporter.successRate = ((exporter.exportCount - exporter.failureCount) / exporter.exportCount) * 100;
-
-      // Update exporter status with hysteresis to prevent flapping
-      if (exporter.successRate >= 95) {
-        exporter.status = "healthy";
-      } else if (exporter.successRate >= 85 && exporter.status === "healthy") {
-        exporter.status = "healthy"; // Keep healthy until drops below 85%
-      } else if (exporter.successRate >= 80) {
-        exporter.status = "degraded";
-      } else {
-        exporter.status = "unhealthy";
-      }
-    }
-
+  // Legacy methods for backward compatibility - now no-op since stats are tracked in export-stats-tracker
+  public recordExporterSuccess(_exporterName: string): void {
     this.circuitBreaker.recordSuccess();
   }
 
-  public recordExporterFailure(exporterName: string, _error?: Error): void {
-    const exporter = this.exporters.get(exporterName);
-    if (exporter) {
-      exporter.failureCount++;
-      exporter.exportCount++;
-      exporter.successRate = ((exporter.exportCount - exporter.failureCount) / exporter.exportCount) * 100;
-
-      // Update exporter status
-      if (exporter.successRate >= 95) {
-        exporter.status = "healthy";
-      } else if (exporter.successRate >= 80) {
-        exporter.status = "degraded";
-      } else {
-        exporter.status = "unhealthy";
-      }
-    }
-
+  public recordExporterFailure(_exporterName: string, _error?: Error): void {
     this.circuitBreaker.recordFailure();
   }
 
@@ -119,8 +86,18 @@ class TelemetryHealthMonitor {
     const circuitBreakerStats = this.circuitBreaker.getHealthStatus();
     const memoryUsage = process.memoryUsage();
 
+    // Get export stats from the new export-stats-tracker
+    const traceStats = getTraceExportStats();
+    const metricStats = getMetricsExportStats().getStats();
+    const logStats = getLogExportStats();
+
+    // Convert stats to exporter health format
+    const tracesHealth = this.statsToExporterHealth("traces", traceStats);
+    const metricsHealth = this.statsToExporterHealth("metrics", metricStats);
+    const logsHealth = this.statsToExporterHealth("logs", logStats);
+
     // Determine overall status
-    const exporterStatuses = Array.from(this.exporters.values()).map((e) => e.status);
+    const exporterStatuses = [tracesHealth.status, metricsHealth.status, logsHealth.status];
     let overallStatus: "healthy" | "degraded" | "unhealthy";
 
     if (exporterStatuses.every((s) => s === "healthy") && circuitBreakerStats.isHealthy) {
@@ -131,13 +108,17 @@ class TelemetryHealthMonitor {
       overallStatus = "degraded";
     }
 
+    // Get telemetry config using 4-pillar loadConfig() pattern
+    const cfg = loadConfig();
+    const telemetryCfg = cfg.telemetry;
+
     return {
       timestamp: Date.now(),
       status: overallStatus,
       exporters: {
-        traces: this.exporters.get("traces") || { healthy: false, lastError: "Exporter not found" },
-        metrics: this.exporters.get("metrics") || { healthy: false, lastError: "Exporter not found" },
-        logs: this.exporters.get("logs") || { healthy: false, lastError: "Exporter not found" },
+        traces: tracesHealth,
+        metrics: metricsHealth,
+        logs: logsHealth,
       },
       circuitBreaker: {
         state: circuitBreakerStats.state,
@@ -148,28 +129,43 @@ class TelemetryHealthMonitor {
         totalFailures: this.circuitBreaker.getStats().totalFailures,
       },
       configuration: {
-        samplingRate: this.config?.SAMPLING_RATE || 0.15,
-        exportTimeoutMs: this.config?.EXPORT_TIMEOUT_MS || 30000,
-        batchSize: this.config?.BATCH_SIZE || 2048,
-        maxQueueSize: this.config?.MAX_QUEUE_SIZE || 10000,
+        serviceName: telemetryCfg.SERVICE_NAME,
+        serviceVersion: telemetryCfg.SERVICE_VERSION,
+        samplingRate: telemetryCfg.SAMPLING_RATE,
+        exportTimeoutMs: telemetryCfg.EXPORT_TIMEOUT_MS,
+        batchSize: telemetryCfg.BATCH_SIZE,
+        maxQueueSize: telemetryCfg.MAX_QUEUE_SIZE,
       },
       runtime: {
         memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
         uptimeMs: process.uptime() * 1000,
-        environment: config.telemetry.DEPLOYMENT_ENVIRONMENT,
-        version: this.config?.serviceVersion || "unknown",
+        environment: telemetryCfg.DEPLOYMENT_ENVIRONMENT,
+        version: telemetryCfg.SERVICE_VERSION,
       },
     };
   }
 
-  private createInitialExporterHealth(name: string): ExporterHealth {
+  private statsToExporterHealth(name: string, stats: { successRate: string; total: number; failures: number; lastExportTime: string | null }): ExporterHealth {
+    const successRateNum = parseInt(stats.successRate.replace('%', ''), 10) || 0;
+
+    let status: "healthy" | "degraded" | "unhealthy";
+    if (stats.total === 0) {
+      status = "healthy"; // No exports yet, assume healthy
+    } else if (successRateNum >= 95) {
+      status = "healthy";
+    } else if (successRateNum >= 80) {
+      status = "degraded";
+    } else {
+      status = "unhealthy";
+    }
+
     return {
       name,
-      status: "healthy",
-      lastExportTime: null,
-      exportCount: 0,
-      failureCount: 0,
-      successRate: 100,
+      status,
+      lastExportTime: stats.lastExportTime,
+      exportCount: stats.total,
+      failureCount: stats.failures,
+      successRate: stats.successRate,
     };
   }
 }

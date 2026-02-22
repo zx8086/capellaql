@@ -1,6 +1,6 @@
 import { metrics } from "@opentelemetry/api";
 import { pingCouchbase } from "$lib/couchbaseConnector";
-import { getTelemetryHealth } from "$telemetry";
+import { debug, log, getTelemetryHealth } from "$telemetry";
 import { BunPerf } from "$utils/bunUtils";
 import { getGraphQLPerformanceStats, getRecentGraphQLPerformance } from "./graphqlPerformanceTracker";
 
@@ -117,7 +117,7 @@ class PerformanceMonitor {
     totalCleaned = before - this.recentMetrics.length;
 
     if (totalCleaned > 0) {
-      console.debug(`Performance Monitor: Cleaned ${totalCleaned} old metrics (time-based + count-based cleanup)`);
+      debug("Performance Monitor metrics cleaned", { totalCleaned, component: "performance-monitor" });
     }
   }
 
@@ -153,7 +153,10 @@ class PerformanceMonitor {
     // Final cleanup before shutdown
     this.performCleanup();
 
-    console.info(`Performance Monitor: Shutdown complete. Final metrics count: ${this.recentMetrics.length}`);
+    log("Performance Monitor shutdown complete", {
+      finalMetricsCount: this.recentMetrics.length,
+      component: "performance-monitor",
+    });
   }
 
   async collectMetrics(): Promise<PerformanceMetrics> {
