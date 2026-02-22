@@ -1,43 +1,33 @@
 /* src/server/index.ts */
 
 import type { Server } from "bun";
-import { ulid } from "ulid";
 import { isIP } from "net";
 import * as path from "path";
+import { ulid } from "ulid";
 import { fileURLToPath } from "url";
 
 import config from "../config";
-import type { RequestContext, WebSocketData } from "./types";
-import { StaticResponses } from "./types";
-
-// Middleware
-import {
-  compose,
-  corsMiddleware,
-  rateLimitMiddleware,
-  securityMiddleware,
-  tracingMiddleware,
-  loggingMiddleware,
-  cleanupRateLimitStore,
-} from "./middleware";
-
-// Handlers
-import { healthHandlers } from "./handlers/health";
+// Telemetry
+import { err, initializeHttpMetrics, initializeTelemetry, log, telemetryLogger, warn } from "../telemetry";
 import { dashboardHandler } from "./handlers/dashboard";
 import { graphqlHandler } from "./handlers/graphql";
 
-// WebSocket
-import { websocketHandlers, shouldUpgradeWebSocket } from "./websocket/subscriptions";
-
-// Telemetry
+// Handlers
+import { healthHandlers } from "./handlers/health";
+// Middleware
 import {
-  log,
-  warn,
-  err,
-  initializeTelemetry,
-  initializeHttpMetrics,
-  telemetryLogger,
-} from "../telemetry";
+  cleanupRateLimitStore,
+  compose,
+  corsMiddleware,
+  loggingMiddleware,
+  rateLimitMiddleware,
+  securityMiddleware,
+  tracingMiddleware,
+} from "./middleware";
+import type { RequestContext, WebSocketData } from "./types";
+import { StaticResponses } from "./types";
+// WebSocket
+import { shouldUpgradeWebSocket, websocketHandlers } from "./websocket/subscriptions";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -126,6 +116,7 @@ const wrappedHealthHandlers = {
   cache: withMiddleware(healthHandlers.cache),
   telemetryDetailed: withMiddleware(healthHandlers.telemetryDetailed),
   comprehensive: withMiddleware(healthHandlers.comprehensive),
+  graphql: withMiddleware(healthHandlers.graphql),
 };
 
 const wrappedDashboardHandler = withMiddleware(dashboardHandler);
@@ -146,8 +137,12 @@ export async function createServer(): Promise<Server> {
   log("Server initialization completed");
 
   server = Bun.serve({
+    // Bun-native performance optimizations
+    hostname: config.deployment.HOSTNAME || "0.0.0.0",
     port: config.application.PORT,
+    maxRequestBodySize: 512 * 1024, // 512KB - prevents memory exhaustion from oversized requests
     idleTimeout: 30,
+    development: config.telemetry.DEPLOYMENT_ENVIRONMENT === "development",
 
     // Static routes using Bun.serve() routes object (SIMD-accelerated matching)
     routes: {
@@ -187,6 +182,10 @@ export async function createServer(): Promise<Server> {
       "/health/comprehensive": async (request) => {
         const context = createRequestContext(request);
         return wrappedHealthHandlers.comprehensive(request, context);
+      },
+      "/health/graphql": async (request) => {
+        const context = createRequestContext(request);
+        return wrappedHealthHandlers.graphql(request, context);
       },
 
       // Dashboard
@@ -274,20 +273,25 @@ export async function createServer(): Promise<Server> {
   console.log(`
 CapellaQL Server started successfully!
 
-Server Information:
-   • Port: ${config.application.PORT}
-   • Environment: ${config.telemetry.DEPLOYMENT_ENVIRONMENT}
-   • GraphQL Playground: ${graphqlUrl}
-   • Health Check: ${healthUrl}
-   • Telemetry Health: ${telemetryHealthUrl}
-   • Dashboard: ${dashboardUrl}
+Server Configuration:
+   - Hostname: ${config.deployment.HOSTNAME || "0.0.0.0"}
+   - Port: ${config.application.PORT}
+   - Max Request Body: 512KB
+   - Development Mode: ${config.telemetry.DEPLOYMENT_ENVIRONMENT === "development" ? "Enabled" : "Disabled"}
+   - Environment: ${config.telemetry.DEPLOYMENT_ENVIRONMENT}
 
-OpenTelemetry Configuration:
-   • Status: ${config.telemetry.ENABLE_OPENTELEMETRY ? "Enabled" : "Disabled"}
-   • Traces Endpoint: ${config.telemetry.TRACES_ENDPOINT}
-   • Metrics Endpoint: ${config.telemetry.METRICS_ENDPOINT}
-   • Logs Endpoint: ${config.telemetry.LOGS_ENDPOINT}
-   • Sampling Rate: ${config.telemetry.SAMPLING_RATE} (${(config.telemetry.SAMPLING_RATE * 100).toFixed(0)}%)
+Endpoints:
+   - GraphQL Playground: ${graphqlUrl}
+   - Health Check: ${healthUrl}
+   - Telemetry Health: ${telemetryHealthUrl}
+   - Dashboard: ${dashboardUrl}
+
+OpenTelemetry:
+   - Status: ${config.telemetry.ENABLE_OPENTELEMETRY ? "Enabled" : "Disabled"}
+   - Traces Endpoint: ${config.telemetry.TRACES_ENDPOINT}
+   - Metrics Endpoint: ${config.telemetry.METRICS_ENDPOINT}
+   - Logs Endpoint: ${config.telemetry.LOGS_ENDPOINT}
+   - Sampling Rate: ${config.telemetry.SAMPLING_RATE} (${(config.telemetry.SAMPLING_RATE * 100).toFixed(0)}%)
 
 Powered by Bun.serve() native HTTP server (v${Bun.version})
 

@@ -5,7 +5,7 @@ import http from "k6/http";
 import type { Options } from "k6/options";
 import { getAllOperations, getQueryWithVariables } from "../data/test-data-loader.ts";
 import { getConfig, getHealthEndpoint, performanceThresholds } from "../utils/config.ts";
-import { executeGraphQLQuery, validateGraphQLResponse } from "../utils/graphql-helpers.ts";
+import { executeGraphQLQuery } from "../utils/graphql-helpers.ts";
 import { dbConnections, httpSuccessRate } from "../utils/metrics.ts";
 
 export const options: Options = {

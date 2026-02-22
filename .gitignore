@@ -55,3 +55,4 @@ logs
 #k6
 
 # AGENTS/
+.bun-cache/

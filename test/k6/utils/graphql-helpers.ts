@@ -72,7 +72,7 @@ export const executeGraphQLQuery = (query: GraphQLQuery, options: GraphQLTestOpt
 export const parseGraphQLResponse = (response: Response): GraphQLResponse | null => {
   try {
     return JSON.parse(response.body as string) as GraphQLResponse;
-  } catch (e) {
+  } catch (_e) {
     console.error(`Failed to parse GraphQL response: ${response.body}`);
     return null;
   }
@@ -115,7 +115,7 @@ export const validateGraphQLResponse = (response: Response, options: GraphQLTest
       const graphqlResponse = parseGraphQLResponse(r);
       if (!graphqlResponse?.data) return false;
 
-      return options.expectedFields!.every((field) => {
+      return options.expectedFields?.every((field) => {
         const hasField = hasNestedField(graphqlResponse.data, field);
         if (!hasField) {
           console.error(`Missing expected field '${field}' in ${options.operation} response`);

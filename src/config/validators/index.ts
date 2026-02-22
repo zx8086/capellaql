@@ -1,5 +1,3 @@
-// Configuration validation orchestration
-import { z } from "zod";
 import type { Config } from "../base";
 
 // Cross-domain validation rules

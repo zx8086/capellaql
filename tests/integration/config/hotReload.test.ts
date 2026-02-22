@@ -1,7 +1,7 @@
 /* tests/integration/config/hotReload.test.ts */
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { mkdir, readFile, unlink, writeFile } from "fs/promises";
+import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { setTimeout } from "timers/promises";
 import { configHotReload } from "../../../src/lib/configHotReload";
@@ -25,7 +25,7 @@ describe("Configuration Hot-Reload System", () => {
     try {
       await unlink(testEnvFile).catch(() => {});
       await unlink(testEnvLocalFile).catch(() => {});
-    } catch (error) {
+    } catch (_error) {
       // Ignore cleanup errors
     }
 
@@ -113,7 +113,7 @@ describe("Configuration Hot-Reload System", () => {
       await configHotReload.initialize([testEnvFile]);
 
       // Trigger reload by modifying the file
-      await writeFile(testEnvFile, invalidConfig + "\n# Modified");
+      await writeFile(testEnvFile, `${invalidConfig}\n# Modified`);
       await setTimeout(500); // Wait for file watcher to detect change
 
       expect(validationFailedEventFired).toBe(true);
@@ -140,7 +140,7 @@ describe("Configuration Hot-Reload System", () => {
       });
 
       await configHotReload.initialize([testEnvFile]);
-      await writeFile(testEnvFile, invalidUrlConfig + "\n# Modified");
+      await writeFile(testEnvFile, `${invalidUrlConfig}\n# Modified`);
       await setTimeout(500);
 
       expect(validationFailedEventFired).toBe(true);
@@ -167,7 +167,7 @@ describe("Configuration Hot-Reload System", () => {
       });
 
       await configHotReload.initialize([testEnvFile]);
-      await writeFile(testEnvFile, invalidNumericConfig + "\n# Modified");
+      await writeFile(testEnvFile, `${invalidNumericConfig}\n# Modified`);
       await setTimeout(500);
 
       expect(validationFailedEventFired).toBe(true);
@@ -201,7 +201,7 @@ describe("Configuration Hot-Reload System", () => {
       });
 
       await configHotReload.initialize([testEnvFile]);
-      await writeFile(testEnvFile, productionConfigWithDefaultPassword + "\n# Modified");
+      await writeFile(testEnvFile, `${productionConfigWithDefaultPassword}\n# Modified`);
       await setTimeout(500);
 
       expect(validationFailedEventFired).toBe(true);
@@ -228,12 +228,12 @@ describe("Configuration Hot-Reload System", () => {
 
       let configReloadedEventFired = false;
 
-      configHotReload.on("configurationReloaded", (event) => {
+      configHotReload.on("configurationReloaded", (_event) => {
         configReloadedEventFired = true;
       });
 
       await configHotReload.initialize([testEnvFile]);
-      await writeFile(testEnvFile, productionConfigWithWildcardCors + "\n# Modified");
+      await writeFile(testEnvFile, `${productionConfigWithWildcardCors}\n# Modified`);
       await setTimeout(500);
 
       // Should succeed with warning, not fail
@@ -366,10 +366,10 @@ describe("Configuration Hot-Reload System", () => {
       const initialUrl = process.env.COUCHBASE_URL;
       const initialPort = process.env.APPLICATION_PORT;
 
-      let rollbackEventFired = false;
+      let _rollbackEventFired = false;
 
       configHotReload.on("configurationRolledBack", () => {
-        rollbackEventFired = true;
+        _rollbackEventFired = true;
       });
 
       configHotReload.on("configurationReloadFailed", () => {
@@ -489,12 +489,12 @@ describe("Configuration Hot-Reload System", () => {
 
       let configReloadedEventFired = false;
 
-      configHotReload.on("configurationReloaded", (event) => {
+      configHotReload.on("configurationReloaded", (_event) => {
         configReloadedEventFired = true;
         // Should succeed with warnings
       });
 
-      await writeFile(testEnvFile, otelConfigIncomplete + "\n# Modified");
+      await writeFile(testEnvFile, `${otelConfigIncomplete}\n# Modified`);
       await setTimeout(500);
 
       expect(configReloadedEventFired).toBe(true);

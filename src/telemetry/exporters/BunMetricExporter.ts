@@ -1,6 +1,5 @@
 // Bun-optimized OTLP Metric Exporter
 
-import type { ExportResult } from "@opentelemetry/core";
 import { hrTimeToMicroseconds } from "@opentelemetry/core";
 import type { PushMetricExporter, ResourceMetrics } from "@opentelemetry/sdk-metrics";
 import { BunOTLPExporter, type BunOTLPExporterConfig } from "./BunOTLPExporter";
@@ -186,7 +185,7 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
   /**
    * Select aggregation temporality for metric type
    */
-  selectAggregationTemporality(metricType: any): any {
+  selectAggregationTemporality(_metricType: any): any {
     // Default to cumulative for most metric types
     // This can be customized based on specific requirements
     return 2; // AGGREGATION_TEMPORALITY_CUMULATIVE

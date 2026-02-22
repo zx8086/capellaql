@@ -287,20 +287,32 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
 
     // Metric sampling rates by category
     METRIC_SAMPLING_BUSINESS:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_BUSINESS), "number", "METRIC_SAMPLING_BUSINESS") as number) ||
-      telemetryDefaults.METRIC_SAMPLING_BUSINESS,
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_BUSINESS),
+        "number",
+        "METRIC_SAMPLING_BUSINESS"
+      ) as number) || telemetryDefaults.METRIC_SAMPLING_BUSINESS,
 
     METRIC_SAMPLING_TECHNICAL:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_TECHNICAL), "number", "METRIC_SAMPLING_TECHNICAL") as number) ||
-      telemetryDefaults.METRIC_SAMPLING_TECHNICAL,
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_TECHNICAL),
+        "number",
+        "METRIC_SAMPLING_TECHNICAL"
+      ) as number) || telemetryDefaults.METRIC_SAMPLING_TECHNICAL,
 
     METRIC_SAMPLING_INFRASTRUCTURE:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_INFRASTRUCTURE), "number", "METRIC_SAMPLING_INFRASTRUCTURE") as number) ||
-      telemetryDefaults.METRIC_SAMPLING_INFRASTRUCTURE,
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_INFRASTRUCTURE),
+        "number",
+        "METRIC_SAMPLING_INFRASTRUCTURE"
+      ) as number) || telemetryDefaults.METRIC_SAMPLING_INFRASTRUCTURE,
 
     METRIC_SAMPLING_DEBUG:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_DEBUG), "number", "METRIC_SAMPLING_DEBUG") as number) ||
-      telemetryDefaults.METRIC_SAMPLING_DEBUG,
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_DEBUG),
+        "number",
+        "METRIC_SAMPLING_DEBUG"
+      ) as number) || telemetryDefaults.METRIC_SAMPLING_DEBUG,
 
     // Log retention policy
     LOG_RETENTION_DEBUG_DAYS:

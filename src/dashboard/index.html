@@ -465,18 +465,18 @@
             const k = 1024;
             const sizes = ['B', 'KB', 'MB', 'GB'];
             const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+            return `${parseFloat((bytes / k ** i).toFixed(2))} ${sizes[i]}`;
         }
 
         // Format percentage
         function formatPercent(value) {
-            return (value * 100).toFixed(1) + '%';
+            return `${(value * 100).toFixed(1)}%`;
         }
 
         // Format duration
         function formatDuration(ms) {
-            if (ms < 1000) return ms.toFixed(1) + 'ms';
-            return (ms / 1000).toFixed(2) + 's';
+            if (ms < 1000) return `${ms.toFixed(1)}ms`;
+            return `${(ms / 1000).toFixed(2)}s`;
         }
 
         // Get status class
@@ -510,7 +510,7 @@
         }
 
         // Create progress bar
-        function createProgressBar(label, value, max = 100, threshold = { warning: 70, critical: 90 }) {
+        function _createProgressBar(label, value, max = 100, threshold = { warning: 70, critical: 90 }) {
             const percentage = Math.min((value / max) * 100, 100);
             let className = '';
             if (percentage >= threshold.critical) className = 'critical';

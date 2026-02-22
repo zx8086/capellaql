@@ -8,9 +8,9 @@ import { performanceThresholds } from "../utils/config.ts";
 import { executeGraphQLQuery, validateGraphQLResponse } from "../utils/graphql-helpers.ts";
 
 // Load test data using SharedArray for memory efficiency
-const brands = new SharedArray("brands-graphql", () => JSON.parse(open("../data/brands.json")));
+const _brands = new SharedArray("brands-graphql", () => JSON.parse(open("../data/brands.json")));
 
-const seasons = ["C51", "C52"];
+const _seasons = ["C51", "C52"];
 
 export const options: Options = {
   scenarios: {

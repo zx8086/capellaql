@@ -1,8 +1,10 @@
 /* src/graphql/resolvers/getDivisionalAssignment.ts */
 
-import { SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
+import { cacheEntities, getEntity, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
 import { getCluster } from "$lib/clusterProvider";
+import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
+import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
 import type { GraphQLContext } from "../context";
 import { type GetDivisionAssignmentArgs, GetDivisionAssignmentArgsSchema, withValidation } from "../validation/schemas";
@@ -13,25 +15,48 @@ const getDivisionAssignmentResolver = withValidation(
   async (_: unknown, args: GetDivisionAssignmentArgs, context: GraphQLContext): Promise<any> => {
     try {
       const { styleSeasonCode, companyCode, divisionCode } = args;
-      
-      const cacheKey = SQLiteCacheKeys.getDivisionAssignment(styleSeasonCode, companyCode, divisionCode);
+
+      // Use QueryFingerprintBuilder for SIMD-accelerated cache key generation
+      const _cacheKey = QueryFingerprintBuilder.for("getDivisionAssignment")
+        .withVariables({ styleSeasonCode, companyCode, divisionCode })
+        .withPrefix("gql")
+        .build();
 
       log("Get division assignment query initiated", {
         requestId: context.requestId,
         styleSeasonCode,
         companyCode,
         divisionCode,
-        user: context.user?.id
+        user: context.user?.id,
       });
 
-      // Use SQLite cache with 5-minute TTL for assignments
+      // Check entity cache first (may have been populated by getAllSeasonalAssignments query)
+      const entityKey = SQLiteCacheKeys.entityDivisionAssignment(styleSeasonCode, companyCode, divisionCode);
+      const cached = await getEntity<any>(entityKey, {
+        userScoped: true,
+        userId: context.user?.id,
+      });
+      if (cached) {
+        log("Division assignment entity cache hit", {
+          requestId: context.requestId,
+          styleSeasonCode,
+          companyCode,
+          divisionCode,
+          cacheStatus: "entity-hit",
+        });
+        return cached;
+      }
+
+      // Use entity key for cache (enables reuse from getAllSeasonalAssignments query)
+      const userScopedKey = context.user?.id ? `user:${context.user.id}:${entityKey}` : entityKey;
       return await withSQLiteCache(
-        cacheKey,
+        userScopedKey,
         async () => {
-          const cluster = await getCluster().catch((error) => {
-            err("Error in getCluster:", { error, requestId: context.requestId });
-            throw error;
-          });
+          const cluster = await CouchbaseErrorHandler.executeWithRetry(
+            async () => await getCluster(),
+            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
+          );
+
           const query = `EXECUTE FUNCTION \`default\`.\`new_model\`.getDivisionAssignment($styleSeasonCode, $companyCode, $divisionCode)`;
           const queryOptions = {
             parameters: {
@@ -41,29 +66,47 @@ const getDivisionAssignmentResolver = withValidation(
             },
           };
 
-          log("Executing get division assignment query (cache miss)", { 
-            query, 
+          log("Executing get division assignment query (cache miss)", {
+            query,
             queryOptions,
-            requestId: context.requestId
+            requestId: context.requestId,
           });
 
-          const result = await cluster.cluster.query(query, queryOptions);
-          
+          const result = await CouchbaseErrorHandler.executeWithRetry(
+            async () => await cluster.cluster.query(query, queryOptions),
+            CouchbaseErrorHandler.createQueryOperationContext(
+              "getDivisionAssignment",
+              query,
+              context.requestId,
+              "default"
+            )
+          );
+
           debug("Get division assignment query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0][0], null, 2)
+            result: JSON.stringify(result.rows[0][0], null, 2),
           });
 
-          return result.rows[0][0];
+          const data = result.rows[0][0];
+
+          // Cache as entity for future reuse
+          cacheEntities(data, () => entityKey, {
+            requiredFields: ["styleSeasonCode", "companyCode"],
+            ttlMs: 5 * 60 * 1000,
+            userScoped: true,
+            userId: context.user?.id,
+          });
+
+          return data;
         },
         5 * 60 * 1000 // 5-minute TTL
       );
     } catch (error) {
-      err("Error in get division assignment resolver:", { 
-        error, 
+      err("Error in get division assignment resolver:", {
+        error,
         requestId: context.requestId,
-        args
+        args,
       });
       throw error;
     }

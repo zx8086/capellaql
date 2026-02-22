@@ -14,9 +14,9 @@ import {
   type StreamableRowPromise,
 } from "couchbase";
 import config from "$config";
-import { CircuitBreaker, retryWithBackoff } from "$utils/bunUtils";
-import { log, warn, err } from "../telemetry/logger";
 import { getPerformanceStats } from "$lib/couchbaseMetrics";
+import { CircuitBreaker, retryWithBackoff } from "$utils/bunUtils";
+import { err, warn } from "../telemetry/logger";
 
 interface QueryableCluster extends Cluster {
   query<TRow = any>(
@@ -77,9 +77,9 @@ export async function clusterConn(): Promise<capellaConn> {
         const bucket: Bucket = cluster.bucket(bucketName);
         const scope: Scope = bucket.scope(scopeName);
         const collection: Collection = scope.collection(collectionName);
-        
+
         const totalConnectionTime = Date.now() - connectionStartTime;
-        
+
         // Only log slow connections or errors
         if (totalConnectionTime > 5000) {
           warn("Slow Couchbase connection", {
@@ -160,10 +160,10 @@ export async function getCouchbaseHealth(): Promise<{
 
     // Analyze service health
     const serviceHealth = {
-      kv: { status: 'unknown', healthy: false },
-      query: { status: 'unknown', healthy: false },
-      analytics: { status: 'unknown', healthy: false },
-      search: { status: 'unknown', healthy: false }
+      kv: { status: "unknown", healthy: false },
+      query: { status: "unknown", healthy: false },
+      analytics: { status: "unknown", healthy: false },
+      search: { status: "unknown", healthy: false },
     };
 
     // Check service states from ping
@@ -174,23 +174,39 @@ export async function getCouchbaseHealth(): Promise<{
       const searchServices = ping.services.search || [];
 
       serviceHealth.kv = {
-        status: kvServices.length > 0 ? (kvServices.every(s => s.state === 'ok') ? 'healthy' : 'degraded') : 'unavailable',
-        healthy: kvServices.length > 0 && kvServices.every(s => s.state === 'ok')
+        status:
+          kvServices.length > 0 ? (kvServices.every((s) => s.state === "ok") ? "healthy" : "degraded") : "unavailable",
+        healthy: kvServices.length > 0 && kvServices.every((s) => s.state === "ok"),
       };
 
       serviceHealth.query = {
-        status: queryServices.length > 0 ? (queryServices.every(s => s.state === 'ok') ? 'healthy' : 'degraded') : 'unavailable',
-        healthy: queryServices.length > 0 && queryServices.every(s => s.state === 'ok')
+        status:
+          queryServices.length > 0
+            ? queryServices.every((s) => s.state === "ok")
+              ? "healthy"
+              : "degraded"
+            : "unavailable",
+        healthy: queryServices.length > 0 && queryServices.every((s) => s.state === "ok"),
       };
 
       serviceHealth.analytics = {
-        status: analyticsServices.length > 0 ? (analyticsServices.every(s => s.state === 'ok') ? 'healthy' : 'degraded') : 'unavailable',
-        healthy: analyticsServices.length > 0 && analyticsServices.every(s => s.state === 'ok')
+        status:
+          analyticsServices.length > 0
+            ? analyticsServices.every((s) => s.state === "ok")
+              ? "healthy"
+              : "degraded"
+            : "unavailable",
+        healthy: analyticsServices.length > 0 && analyticsServices.every((s) => s.state === "ok"),
       };
 
       serviceHealth.search = {
-        status: searchServices.length > 0 ? (searchServices.every(s => s.state === 'ok') ? 'healthy' : 'degraded') : 'unavailable',
-        healthy: searchServices.length > 0 && searchServices.every(s => s.state === 'ok')
+        status:
+          searchServices.length > 0
+            ? searchServices.every((s) => s.state === "ok")
+              ? "healthy"
+              : "degraded"
+            : "unavailable",
+        healthy: searchServices.length > 0 && searchServices.every((s) => s.state === "ok"),
       };
     }
 
@@ -203,7 +219,7 @@ export async function getCouchbaseHealth(): Promise<{
       ...circuitBreakerStats,
       totalOperations,
       errorRate,
-      lastFailure: circuitBreakerStats.failures > 0 ? 'Recent failures detected' : undefined
+      lastFailure: circuitBreakerStats.failures > 0 ? "Recent failures detected" : undefined,
     };
 
     // Get real performance metrics
@@ -212,7 +228,7 @@ export async function getCouchbaseHealth(): Promise<{
       avgQueryTime: performanceStats.averageQueryTime,
       errorRate: performanceStats.errorRate,
       documentsPerSecond: performanceStats.documentsPerSecond,
-      connectionPoolSize: 10 // would come from connection pool metrics when available
+      connectionPoolSize: 10, // would come from connection pool metrics when available
     };
 
     // Determine overall health status with enhanced logic
@@ -277,17 +293,17 @@ export async function getCouchbaseHealth(): Promise<{
         serviceHealth,
         errors: errors.length > 0 ? errors : undefined,
         warnings: warnings.length > 0 ? warnings : undefined,
-        recommendations: recommendations.length > 0 ? recommendations : undefined
+        recommendations: recommendations.length > 0 ? recommendations : undefined,
       },
     };
   } catch (error) {
     const circuitBreakerStats = dbCircuitBreaker.getStats();
     const errorMessage = error instanceof Error ? error.message : String(error);
-    
+
     err("Couchbase health check failed", {
       error: errorMessage,
       connectionLatency: Date.now() - startTime,
-      circuitBreakerState: circuitBreakerStats.state
+      circuitBreakerState: circuitBreakerStats.state,
     });
 
     return {
@@ -297,28 +313,25 @@ export async function getCouchbaseHealth(): Promise<{
         circuitBreaker: {
           ...circuitBreakerStats,
           totalOperations: circuitBreakerStats.successes + circuitBreakerStats.failures,
-          errorRate: 100
+          errorRate: 100,
         },
         connectionLatency: Date.now() - startTime,
         performance: {
           errorRate: 100,
-          documentsPerSecond: 0
+          documentsPerSecond: 0,
         },
         serviceHealth: {
-          kv: { status: 'unavailable', healthy: false },
-          query: { status: 'unavailable', healthy: false },
-          analytics: { status: 'unavailable', healthy: false },
-          search: { status: 'unavailable', healthy: false }
+          kv: { status: "unavailable", healthy: false },
+          query: { status: "unavailable", healthy: false },
+          analytics: { status: "unavailable", healthy: false },
+          search: { status: "unavailable", healthy: false },
         },
-        errors: [
-          errorMessage,
-          "Unable to establish connection to Couchbase cluster"
-        ],
+        errors: [errorMessage, "Unable to establish connection to Couchbase cluster"],
         recommendations: [
           "Check connection configuration and credentials",
           "Verify cluster availability and network connectivity",
-          "Review circuit breaker thresholds if failures persist"
-        ]
+          "Review circuit breaker thresholds if failures persist",
+        ],
       },
     };
   }

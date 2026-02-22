@@ -1,7 +1,7 @@
 /* src/lib/bunSQLiteCache.ts - Bun-native SQLite Query Cache */
 
 import { Database } from "bun:sqlite";
-import { err, log } from "../telemetry/logger";
+import { err, log, warn } from "../telemetry/logger";
 import type { CacheStats } from "./queryCache";
 
 /**
@@ -672,6 +672,28 @@ export class BunSQLiteCache {
   }
 }
 
+/**
+ * Generate a hashed cache key using Bun.hash() for faster, collision-resistant key generation
+ * Falls back to plain string if Bun is not available
+ */
+export function generateHashedKey(input: string): string {
+  if (typeof Bun !== "undefined" && typeof Bun.hash === "function") {
+    // Use Bun.hash() for fast, collision-resistant hashing (SIMD-accelerated)
+    return Bun.hash(input).toString(16);
+  }
+  // Fallback for non-Bun environments
+  return input;
+}
+
+/**
+ * Generate a hashed cache key from operation name and variables
+ * Uses Bun.hash() for optimal performance and better key distribution
+ */
+export function generateOperationKey(operation: string, variables?: unknown): string {
+  const input = variables ? `${operation}:${JSON.stringify(variables)}` : operation;
+  return generateHashedKey(input);
+}
+
 // Default cache instance
 export const bunSQLiteCache = new BunSQLiteCache();
 
@@ -684,6 +706,7 @@ export async function withSQLiteCache<T>(key: string, fetcher: () => Promise<T>,
 
 /**
  * Enhanced cache keys for SQLite cache
+ * Uses Bun.hash() for complex keys to improve performance and distribution
  */
 export const SQLiteCacheKeys = {
   looks: (brand: string, season: string, division: string) => `looks:${brand}:${season}:${division}`,
@@ -691,24 +714,54 @@ export const SQLiteCacheKeys = {
   lookDetails: (lookId: string) => `lookDetails:${lookId}`,
   looksSummary: (brand: string, season: string, division: string) => `looksSummary:${brand}:${season}:${division}`,
 
+  // Use Bun.hash() for keys with complex filter objects
   options: (lookId: string, filters?: Record<string, any>) => {
-    const filterStr = filters ? `:${JSON.stringify(filters, Object.keys(filters).sort())}` : "";
-    return `options:${lookId}${filterStr}`;
+    if (!filters) return `options:${lookId}`;
+    const filterStr = JSON.stringify(filters, Object.keys(filters).sort());
+    return `options:${lookId}:${generateHashedKey(filterStr)}`;
   },
 
-  optionsSummary: (salesOrg: string, styleSeasonCode: string, divisionCode: string, activeOption: boolean, salesChannels: string[]) => 
-    `optionsSummary:${salesOrg}:${styleSeasonCode}:${divisionCode}:${activeOption}:${salesChannels.sort().join(",")}`,
-  imageDetails: (divisionCode: string, styleSeasonCode: string, styleCode: string) => 
+  // Use Bun.hash() for keys with array parameters
+  optionsSummary: (
+    salesOrg: string,
+    styleSeasonCode: string,
+    divisionCode: string,
+    activeOption: boolean,
+    salesChannels: string[]
+  ) => {
+    const input = `optionsSummary:${salesOrg}:${styleSeasonCode}:${divisionCode}:${activeOption}:${salesChannels.sort().join(",")}`;
+    return generateHashedKey(input);
+  },
+
+  imageDetails: (divisionCode: string, styleSeasonCode: string, styleCode: string) =>
     `imageDetails:${divisionCode}:${styleSeasonCode}:${styleCode}`,
-  optionsProductView: (brandCode: string, salesOrg: string, styleSeasonCode: string, divisionCode: string, activeOption: boolean, salesChannels: string[]) => 
-    `optionsProductView:${brandCode}:${salesOrg}:${styleSeasonCode}:${divisionCode}:${activeOption}:${salesChannels.sort().join(",")}`,
-  imageUrlCheck: (divisions: string[], season: string) => 
-    `imageUrlCheck:${divisions.sort().join(",")}:${season}`,
-  looksUrlCheck: (divisions: string[], season: string) => 
-    `looksUrlCheck:${divisions.sort().join(",")}:${season}`,
-  getAllSeasonalAssignments: (styleSeasonCode: string, companyCode?: string, isActive?: boolean) => 
-    `getAllSeasonalAssignments:${styleSeasonCode}:${companyCode || 'null'}:${isActive ?? 'undefined'}`,
-  getDivisionAssignment: (styleSeasonCode: string, companyCode: string, divisionCode: string) => 
+
+  optionsProductView: (
+    brandCode: string,
+    salesOrg: string,
+    styleSeasonCode: string,
+    divisionCode: string,
+    activeOption: boolean,
+    salesChannels: string[]
+  ) => {
+    const input = `optionsProductView:${brandCode}:${salesOrg}:${styleSeasonCode}:${divisionCode}:${activeOption}:${salesChannels.sort().join(",")}`;
+    return generateHashedKey(input);
+  },
+
+  imageUrlCheck: (divisions: string[], season: string) => {
+    const input = `imageUrlCheck:${divisions.sort().join(",")}:${season}`;
+    return generateHashedKey(input);
+  },
+
+  looksUrlCheck: (divisions: string[], season: string) => {
+    const input = `looksUrlCheck:${divisions.sort().join(",")}:${season}`;
+    return generateHashedKey(input);
+  },
+
+  getAllSeasonalAssignments: (styleSeasonCode: string, companyCode?: string, isActive?: boolean) =>
+    `getAllSeasonalAssignments:${styleSeasonCode}:${companyCode || "null"}:${isActive ?? "undefined"}`,
+
+  getDivisionAssignment: (styleSeasonCode: string, companyCode: string, divisionCode: string) =>
     `getDivisionAssignment:${styleSeasonCode}:${companyCode}:${divisionCode}`,
 
   assignments: (userId: string, status?: string) => `assignments:${userId}${status ? `:${status}` : ""}`,
@@ -716,4 +769,96 @@ export const SQLiteCacheKeys = {
   documentSearch: (collection: string, term: string, limit: number) => `documentSearch:${collection}:${term}:${limit}`,
 
   healthCheck: (component: string) => `health:${component}`,
+
+  // Entity-level cache keys (for cross-query entity reuse)
+  entityLook: (documentKey: string) => `entity:look:${documentKey}`,
+  entityImage: (divisionCode: string, styleSeasonCode: string, styleCode: string) =>
+    `entity:image:${divisionCode}:${styleSeasonCode}:${styleCode}`,
+  entityDivisionAssignment: (styleSeasonCode: string, companyCode: string, divisionCode: string) =>
+    `entity:divAssign:${styleSeasonCode}:${companyCode}:${divisionCode}`,
+  entityDocument: (bucket: string, scope: string, collection: string, id: string) =>
+    `entity:doc:${bucket}:${scope}:${collection}:${id}`,
 };
+
+/**
+ * Options for entity caching with configurable scope
+ */
+export interface EntityCacheOptions {
+  requiredFields: string[];
+  ttlMs?: number;
+  userScoped?: boolean;
+  userId?: string;
+}
+
+/**
+ * Generate entity cache key with optional user scoping
+ */
+function getEntityKey(baseKey: string, options: EntityCacheOptions): string {
+  if (options.userScoped && options.userId) {
+    return `user:${options.userId}:${baseKey}`;
+  }
+  return baseKey;
+}
+
+/**
+ * Cache individual entities from a list OR single-document query result.
+ * Only caches items that have all required fields (conservative approach).
+ * Uses fire-and-forget pattern to avoid blocking the response.
+ */
+export function cacheEntities<T extends Record<string, unknown>>(
+  data: T | T[] | null | undefined,
+  keyExtractor: (item: T) => string | null,
+  options: EntityCacheOptions
+): void {
+  if (!data) return;
+
+  const items = Array.isArray(data) ? data : [data];
+  if (!items.length) return;
+
+  const { requiredFields, ttlMs = 10 * 60 * 1000 } = options;
+
+  // Fire-and-forget: don't block the response
+  setImmediate(async () => {
+    let cached = 0;
+    for (const item of items) {
+      if (!item) continue;
+
+      // Skip if missing required fields (conservative approach)
+      const hasAllFields = requiredFields.every((field) => {
+        const value = field.includes(".") ? field.split(".").reduce((obj: any, key) => obj?.[key], item) : item[field];
+        return value !== undefined && value !== null;
+      });
+      if (!hasAllFields) continue;
+
+      const baseKey = keyExtractor(item);
+      if (baseKey) {
+        const key = getEntityKey(baseKey, options);
+        try {
+          await bunSQLiteCache.set(key, item, ttlMs);
+          cached++;
+        } catch {
+          // Ignore cache errors - fire and forget
+        }
+      }
+    }
+    if (cached > 0) {
+      log("Entity cache populated", {
+        count: cached,
+        total: items.length,
+        userScoped: options.userScoped ?? false,
+        cacheOperation: "entity-populate",
+      });
+    }
+  });
+}
+
+/**
+ * Get entity from cache with optional user scoping
+ */
+export async function getEntity<T>(
+  baseKey: string,
+  options?: { userScoped?: boolean; userId?: string }
+): Promise<T | null> {
+  const key = options?.userScoped && options?.userId ? `user:${options.userId}:${baseKey}` : baseKey;
+  return bunSQLiteCache.get<T>(key);
+}

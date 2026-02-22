@@ -1,8 +1,5 @@
 // Base OTLP Exporter for Bun runtime with native fetch API
 import { type ExportResult, ExportResultCode } from "@opentelemetry/core";
-import type { LogRecord } from "@opentelemetry/sdk-logs";
-import type { ResourceMetrics } from "@opentelemetry/sdk-metrics";
-import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { telemetryHealthMonitor } from "../health/telemetryHealth";
 
 export interface BunOTLPExporterConfig {
@@ -192,7 +189,7 @@ export abstract class BunOTLPExporter<T> {
       // Check for error messages in response body
       try {
         const responseData = JSON.parse(responseText);
-        if (responseData.message && responseData.message.includes("timed out")) {
+        if (responseData.message?.includes("timed out")) {
           console.warn(`${this.exporterType} export: Server reported timeout but request completed`);
           // Don't treat this as an error since we got a response
         }

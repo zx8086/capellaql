@@ -1,8 +1,8 @@
 /* src/server/middleware/rateLimit.ts */
 
+import { err, warn } from "../../telemetry";
 import type { Middleware, RequestContext } from "../types";
 import { StaticResponses } from "../types";
-import { warn, err } from "../../telemetry";
 
 const RATE_LIMIT = 500;
 const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
@@ -34,7 +34,7 @@ startCleanup();
 /**
  * Get rate limit key from request (IP + path combination)
  */
-function getRateLimitKey(request: Request, context: RequestContext): string {
+function getRateLimitKey(_request: Request, context: RequestContext): string {
   return `${context.clientIp}:${context.url.pathname}`;
 }
 

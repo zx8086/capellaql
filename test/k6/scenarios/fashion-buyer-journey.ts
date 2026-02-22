@@ -2,8 +2,7 @@
 
 import { check, sleep } from "k6";
 import type { Options } from "k6/options";
-import { getQueryWithVariables, getScenarioStep, scenarios } from "../data/test-data-loader.ts";
-import { performanceThresholds } from "../utils/config.ts";
+import { getQueryWithVariables, scenarios } from "../data/test-data-loader.ts";
 import { executeGraphQLQuery, validateGraphQLResponse } from "../utils/graphql-helpers.ts";
 import { businessOperations } from "../utils/metrics.ts";
 

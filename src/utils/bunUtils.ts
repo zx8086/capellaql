@@ -110,24 +110,24 @@ export namespace BunFile {
 
 // Error types that should NOT be retried (expected application errors)
 const NON_RETRYABLE_ERROR_TYPES = new Set([
-  'DocumentNotFoundError',      // Document doesn't exist - won't change on retry
-  'DocumentExistsError',        // Document already exists - won't change on retry
-  'CasMismatchError',           // CAS conflict - requires app-level handling
-  'AuthenticationFailureError', // Credentials wrong - won't change on retry
-  'BucketNotFoundError',        // Config error - won't change on retry
-  'ScopeNotFoundError',         // Config error - won't change on retry
-  'CollectionNotFoundError',    // Config error - won't change on retry
-  'IndexNotFoundError',         // Index missing - won't change on retry
-  'QueryError',                 // Query syntax/semantic error - won't change on retry
-  'ValidationError',            // Input validation - won't change on retry
-  'AmbiguousTimeoutError',      // NEVER retry ambiguous operations
+  "DocumentNotFoundError", // Document doesn't exist - won't change on retry
+  "DocumentExistsError", // Document already exists - won't change on retry
+  "CasMismatchError", // CAS conflict - requires app-level handling
+  "AuthenticationFailureError", // Credentials wrong - won't change on retry
+  "BucketNotFoundError", // Config error - won't change on retry
+  "ScopeNotFoundError", // Config error - won't change on retry
+  "CollectionNotFoundError", // Config error - won't change on retry
+  "IndexNotFoundError", // Index missing - won't change on retry
+  "QueryError", // Query syntax/semantic error - won't change on retry
+  "ValidationError", // Input validation - won't change on retry
+  "AmbiguousTimeoutError", // NEVER retry ambiguous operations
 ]);
 
 /**
  * Check if an error is retryable based on its type
  */
 function isRetryableError(error: unknown): boolean {
-  const errorType = error?.constructor?.name || 'UnknownError';
+  const errorType = error?.constructor?.name || "UnknownError";
   return !NON_RETRYABLE_ERROR_TYPES.has(errorType);
 }
 
@@ -156,8 +156,10 @@ export async function retryWithBackoff<T>(
       const delay = Math.min(baseDelay * 2 ** (attempt - 1) * (1 + jitter), maxDelay);
 
       const errorMessage = error instanceof Error ? error.message : String(error);
-      const errorType = error?.constructor?.name || 'UnknownError';
-      console.warn(`Operation failed (attempt ${attempt}/${maxRetries}): [${errorType}] ${errorMessage.substring(0, 200)}. Retrying in ${delay.toFixed(0)}ms...`);
+      const errorType = error?.constructor?.name || "UnknownError";
+      console.warn(
+        `Operation failed (attempt ${attempt}/${maxRetries}): [${errorType}] ${errorMessage.substring(0, 200)}. Retrying in ${delay.toFixed(0)}ms...`
+      );
       await sleep(delay);
     }
   }
@@ -374,6 +376,141 @@ export namespace BunEnv {
   }
 }
 
+/**
+ * Bun.Glob - Native file pattern matching
+ * SIMD-accelerated glob pattern matching using Bun.Glob
+ */
+export namespace BunGlob {
+  /**
+   * Scan directory for files matching a glob pattern
+   * Uses Bun.Glob for native SIMD-accelerated matching when available
+   */
+  export async function scan(pattern: string, cwd = "."): Promise<string[]> {
+    if (typeof Bun !== "undefined" && typeof Bun.Glob !== "undefined") {
+      const glob = new Bun.Glob(pattern);
+      const files: string[] = [];
+      for await (const file of glob.scan(cwd)) {
+        files.push(file);
+      }
+      return files;
+    }
+
+    // Fallback to simple fs-based implementation for non-Bun environments
+    const { promises: fs } = await import("fs");
+    const { join, relative } = await import("path");
+
+    const files: string[] = [];
+    const simplePattern = pattern.replace(/\*\*/g, ".*").replace(/\*/g, "[^/]*");
+    const regex = new RegExp(`^${simplePattern}$`);
+
+    async function walkDir(dir: string): Promise<void> {
+      const entries = await fs.readdir(dir, { withFileTypes: true });
+      for (const entry of entries) {
+        const fullPath = join(dir, entry.name);
+        const relativePath = relative(cwd, fullPath);
+        if (entry.isDirectory()) {
+          await walkDir(fullPath);
+        } else if (regex.test(relativePath)) {
+          files.push(relativePath);
+        }
+      }
+    }
+
+    try {
+      await walkDir(cwd);
+    } catch {
+      // Directory might not exist
+    }
+    return files;
+  }
+
+  /**
+   * Match a string against a glob pattern
+   * Uses Bun.Glob.match() for native pattern matching
+   */
+  export function match(pattern: string, input: string): boolean {
+    if (typeof Bun !== "undefined" && typeof Bun.Glob !== "undefined") {
+      const glob = new Bun.Glob(pattern);
+      return glob.match(input);
+    }
+
+    // Fallback to regex-based matching
+    const regexPattern = pattern
+      .replace(/[.+^${}()|[\]\\]/g, "\\$&") // Escape regex special chars
+      .replace(/\*\*/g, ".*") // ** matches anything
+      .replace(/\*/g, "[^/]*") // * matches non-slash
+      .replace(/\?/g, "."); // ? matches single char
+    const regex = new RegExp(`^${regexPattern}$`);
+    return regex.test(input);
+  }
+
+  /**
+   * Check if Bun.Glob is available
+   */
+  export function isAvailable(): boolean {
+    return typeof Bun !== "undefined" && typeof Bun.Glob !== "undefined";
+  }
+}
+
+/**
+ * Bun.deepEquals - Fast deep equality comparison
+ * Uses Bun's native SIMD-accelerated deep comparison when available
+ */
+export namespace BunCompare {
+  /**
+   * Deep equality comparison using Bun.deepEquals
+   * Falls back to JSON.stringify comparison for non-Bun environments
+   */
+  export function deepEquals<T>(a: T, b: T): boolean {
+    if (typeof Bun !== "undefined" && typeof Bun.deepEquals === "function") {
+      return Bun.deepEquals(a, b);
+    }
+
+    // Fallback: JSON.stringify comparison (handles most common cases)
+    // Note: This doesn't handle functions, undefined values, or circular references
+    if (a === b) return true;
+    if (a === null || b === null) return a === b;
+    if (typeof a !== typeof b) return false;
+    if (typeof a !== "object") return a === b;
+
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+      // Circular reference or other JSON error
+      return false;
+    }
+  }
+
+  /**
+   * Strict deep equality (Bun.deepEquals with strict mode)
+   * Differentiates between 0 and -0, and uses SameValueZero semantics
+   */
+  export function strictDeepEquals<T>(a: T, b: T): boolean {
+    if (typeof Bun !== "undefined" && typeof Bun.deepEquals === "function") {
+      return Bun.deepEquals(a, b, true); // strict mode
+    }
+
+    // Fallback with stricter comparison
+    if (Object.is(a, b)) return true;
+    if (a === null || b === null) return a === b;
+    if (typeof a !== typeof b) return false;
+    if (typeof a !== "object") return Object.is(a, b);
+
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Check if Bun.deepEquals is available
+   */
+  export function isAvailable(): boolean {
+    return typeof Bun !== "undefined" && typeof Bun.deepEquals === "function";
+  }
+}
+
 // Enhanced performance measurement with memory tracking
 export namespace BunPerf {
   export async function measure<T>(
@@ -552,6 +689,8 @@ export default {
   CircuitBreaker,
   BunProcess,
   BunEnv,
+  BunGlob,
+  BunCompare,
   BunPerf,
   createHealthcheck,
 };

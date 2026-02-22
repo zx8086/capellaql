@@ -1,8 +1,8 @@
 /* src/server/middleware/logging.ts */
 
 import { metrics } from "@opentelemetry/api";
+import { err, recordHttpRequest, recordHttpResponseTime, warn } from "../../telemetry";
 import type { Middleware, RequestContext } from "../types";
-import { warn, err, recordHttpRequest, recordHttpResponseTime } from "../../telemetry";
 
 // Create custom metrics
 const meter = metrics.getMeter("capellaql-custom-metrics", "1.0.0");

@@ -23,7 +23,7 @@ export interface GraphQLContext {
 export function contextFactory({ request }: { request: Request }): GraphQLContext {
   const requestId = ulid();
   const startTime = Date.now();
-  
+
   // Extract client information for security and debugging
   const clientIp = getClientIp(request);
   const userAgent = request.headers.get("user-agent");
@@ -48,10 +48,12 @@ function getClientIp(request: Request): string {
   if (forwardedFor) {
     return forwardedFor.split(",")[0].trim();
   }
-  return request.headers.get("cf-connecting-ip") || 
-         request.headers.get("x-real-ip") || 
-         request.headers.get("x-client-ip") || 
-         "unknown";
+  return (
+    request.headers.get("cf-connecting-ip") ||
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-client-ip") ||
+    "unknown"
+  );
 }
 
 /**

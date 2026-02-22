@@ -1,6 +1,6 @@
 // Integration tests for database connection and operations
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
-import type { Cluster, QueryableCluster } from "couchbase";
+import type { QueryableCluster } from "couchbase";
 import { clusterConn, getCouchbaseHealth, pingCouchbase } from "../../../src/lib/couchbaseConnector";
 
 describe("Database Connection Integration", () => {
@@ -196,7 +196,7 @@ describe("Database Connection Integration", () => {
 
       // All operations should complete (either successfully or with error)
       expect(results.length).toBe(5);
-      results.forEach((result, index) => {
+      results.forEach((result, _index) => {
         expect(result.status).toMatch(/^(fulfilled|rejected)$/);
 
         if (result.status === "fulfilled") {

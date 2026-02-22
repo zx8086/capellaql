@@ -1,8 +1,10 @@
 /* src/graphql/resolvers/lookDetails.ts */
 
-import { SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
+import { cacheEntities, getEntity, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
 import { getCluster } from "$lib/clusterProvider";
+import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
+import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
 import type { GraphQLContext } from "../context";
 import { type LookDetailsArgs, LookDetailsArgsSchema, withValidation } from "../validation/schemas";
@@ -13,48 +15,78 @@ const lookDetailsResolver = withValidation(
   async (_: unknown, args: LookDetailsArgs, context: GraphQLContext): Promise<any> => {
     try {
       const { lookDocKey } = args;
-      const cacheKey = SQLiteCacheKeys.lookDetails(lookDocKey);
+
+      // Use QueryFingerprintBuilder for SIMD-accelerated cache key generation
+      const _cacheKey = QueryFingerprintBuilder.for("lookDetails")
+        .withVariables({ lookDocKey })
+        .withPrefix("gql")
+        .build();
 
       log("Look details query initiated", {
         requestId: context.requestId,
         lookDocKey: lookDocKey.substring(0, 50) + (lookDocKey.length > 50 ? "..." : ""),
-        user: context.user?.id
+        user: context.user?.id,
       });
 
+      // Check entity cache first (may have been populated by looks query)
+      const entityKey = SQLiteCacheKeys.entityLook(lookDocKey);
+      const cached = await getEntity<any>(entityKey);
+      if (cached) {
+        log("Look details entity cache hit", {
+          requestId: context.requestId,
+          lookDocKey: lookDocKey.substring(0, 50),
+          cacheStatus: "entity-hit",
+        });
+        return cached;
+      }
+
+      // Use entity key for cache (enables reuse from looks query)
       return await withSQLiteCache(
-        cacheKey,
+        entityKey,
         async () => {
-          const cluster = await getCluster().catch((error) => {
-            err("Error in getCluster:", { error, requestId: context.requestId });
-            throw error;
-          });
+          const cluster = await CouchbaseErrorHandler.executeWithRetry(
+            async () => await getCluster(),
+            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
+          );
 
           const query = `EXECUTE FUNCTION \`default\`.\`media_assets\`.getLookDetails($lookDocKey)`;
           const queryOptions = { parameters: { lookDocKey } };
 
-          log("Executing look details query (cache miss)", { 
-            query, 
+          log("Executing look details query (cache miss)", {
+            query,
             queryOptions,
-            requestId: context.requestId
+            requestId: context.requestId,
           });
 
-          const result = await cluster.cluster.query(query, queryOptions);
-          
+          const result = await CouchbaseErrorHandler.executeWithRetry(
+            async () => await cluster.cluster.query(query, queryOptions),
+            CouchbaseErrorHandler.createQueryOperationContext("getLookDetails", query, context.requestId, "default")
+          );
+
           debug("Look details query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2)
+            result: JSON.stringify(result.rows[0], null, 2),
           });
 
-          return result.rows[0][0];
+          const data = result.rows[0][0];
+
+          // Cache as entity for future reuse
+          cacheEntities(data, () => entityKey, {
+            requiredFields: ["documentKey", "divisionCode"],
+            ttlMs: 10 * 60 * 1000,
+            userScoped: false,
+          });
+
+          return data;
         },
         10 * 60 * 1000 // 10-minute TTL for look details
       );
     } catch (error) {
-      err("Error in look details resolver:", { 
-        error, 
+      err("Error in look details resolver:", {
+        error,
         requestId: context.requestId,
-        args
+        args,
       });
       throw error;
     }

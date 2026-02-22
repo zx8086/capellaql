@@ -143,7 +143,7 @@ describe("BunUtils", () => {
 
     test("should get environment variables", () => {
       // Set a test environment variable
-      process.env["TEST_VAR"] = "test_value";
+      process.env.TEST_VAR = "test_value";
 
       const value = BunEnv.get("TEST_VAR");
       expect(value).toBe("test_value");
@@ -152,7 +152,7 @@ describe("BunUtils", () => {
       expect(nonExistent).toBeUndefined();
 
       // Cleanup
-      delete process.env["TEST_VAR"];
+      delete process.env.TEST_VAR;
     });
   });
 

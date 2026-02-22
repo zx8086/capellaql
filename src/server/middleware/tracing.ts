@@ -1,8 +1,8 @@
 /* src/server/middleware/tracing.ts */
 
-import { trace, context as otelContext, SpanStatusCode } from "@opentelemetry/api";
-import type { Middleware, RequestContext } from "../types";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { err } from "../../telemetry";
+import type { Middleware, RequestContext } from "../types";
 
 const tracer = trace.getTracer("bun-server");
 

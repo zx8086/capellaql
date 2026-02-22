@@ -143,7 +143,7 @@ export function getPerformanceCategory(durationMs: number): string {
  * Helper function to create cache key summaries for logging
  */
 export function summarizeCacheKey(key: string, maxLength = 50): string {
-  return key.length > maxLength ? key.substring(0, maxLength) + "..." : key;
+  return key.length > maxLength ? `${key.substring(0, maxLength)}...` : key;
 }
 
 /**
@@ -175,17 +175,17 @@ export function getClientIp(request: Request): string {
   if (forwardedFor) {
     return forwardedFor.split(",")[0].trim();
   }
-  
+
   const otherHeaders = [
     request.headers.get("cf-connecting-ip"),
     request.headers.get("x-real-ip"),
-    request.headers.get("x-client-ip")
+    request.headers.get("x-client-ip"),
   ];
-  
+
   for (const ip of otherHeaders) {
     if (ip) return ip;
   }
-  
+
   return "unknown";
 }
 
@@ -195,7 +195,7 @@ export function getClientIp(request: Request): string {
 export function createTimingMetadata(startTime: number, operationName?: string) {
   const endTime = Date.now();
   const duration = endTime - startTime;
-  
+
   return {
     operationName,
     startTime,

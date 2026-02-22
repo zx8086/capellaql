@@ -97,7 +97,7 @@ export const parseHttpDate = (httpDateString: string): string => {
   try {
     const date = new Date(httpDateString);
     return formatDevTimestamp(date, { includeTimezone: true });
-  } catch (error) {
+  } catch (_error) {
     console.warn("Failed to parse HTTP date:", httpDateString);
     return httpDateString;
   }
@@ -144,4 +144,87 @@ export const isDevelopment = (): boolean => {
     process.env.BUN_ENV === "development" ||
     !!process.env.BUN_CONFIG_VERBOSE_FETCH
   );
+};
+
+/**
+ * Format object for logging using Bun.inspect() when available
+ * Falls back to JSON.stringify for non-Bun environments
+ */
+export interface InspectOptions {
+  colors?: boolean;
+  depth?: number;
+  sorted?: boolean;
+  compact?: boolean;
+}
+
+/**
+ * Inspect and format an object using Bun.inspect() for better debugging output
+ * Uses Bun's native inspection when available for superior formatting
+ */
+export const formatObject = (obj: unknown, options: InspectOptions = {}): string => {
+  const { colors = false, depth = 4, sorted = false, compact = true } = options;
+
+  if (typeof Bun !== "undefined" && typeof Bun.inspect === "function") {
+    // Use Bun.inspect() for native, optimized object inspection
+    return Bun.inspect(obj, {
+      colors,
+      depth,
+      sorted,
+      compact,
+    });
+  }
+
+  // Fallback to JSON.stringify for non-Bun environments
+  try {
+    if (sorted && typeof obj === "object" && obj !== null) {
+      const sortedObj = sortObjectKeys(obj);
+      return JSON.stringify(sortedObj, null, compact ? 0 : 2);
+    }
+    return JSON.stringify(obj, null, compact ? 0 : 2);
+  } catch {
+    // Handle circular references or other JSON errors
+    return String(obj);
+  }
+};
+
+/**
+ * Development-friendly object logging with Bun.inspect()
+ */
+export const devInspect = (label: string, obj: unknown, options: InspectOptions = {}): void => {
+  if (!isDevelopment()) return;
+
+  const timestamp = formatDevTimestamp();
+  const formatted = formatObject(obj, { ...options, colors: true });
+
+  console.log(`${timestamp} ${label}:`);
+  console.log(formatted);
+};
+
+/**
+ * Sort object keys recursively for consistent output
+ */
+const sortObjectKeys = (obj: unknown): unknown => {
+  if (obj === null || typeof obj !== "object") {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map(sortObjectKeys);
+  }
+
+  const sorted: Record<string, unknown> = {};
+  const keys = Object.keys(obj).sort();
+
+  for (const key of keys) {
+    sorted[key] = sortObjectKeys((obj as Record<string, unknown>)[key]);
+  }
+
+  return sorted;
+};
+
+/**
+ * Check if Bun.inspect is available
+ */
+export const isBunInspectAvailable = (): boolean => {
+  return typeof Bun !== "undefined" && typeof Bun.inspect === "function";
 };

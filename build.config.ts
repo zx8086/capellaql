@@ -1,7 +1,6 @@
 /* build.config.ts - Optimized Bun Build Configuration */
 
 import type { BuildConfig } from "bun";
-import { existsSync } from "fs";
 
 /**
  * Environment-specific build configuration
@@ -345,7 +344,7 @@ export async function buildWithMetrics(config: BuildConfig = bunBuildConfig): Pr
     return metrics;
   } catch (error) {
     const endTime = Date.now();
-    const duration = endTime - startTime;
+    const _duration = endTime - startTime;
 
     console.error("Build failed:");
     console.error(error);
@@ -373,7 +372,7 @@ if (import.meta.main) {
   console.log("CapellaQL Build System");
 
   try {
-    const metrics = await autoBuild();
+    const _metrics = await autoBuild();
 
     // Exit with success
     process.exit(0);

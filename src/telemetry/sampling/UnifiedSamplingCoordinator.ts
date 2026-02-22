@@ -31,10 +31,10 @@ export interface LogSamplingConfig {
 export interface UnifiedSamplingConfig {
   // Trace sampling (using existing SmartSampler)
   trace: SmartSamplingConfig;
-  
+
   // Metric sampling by category
   metrics: MetricSamplingConfig;
-  
+
   // Log sampling by level
   logs: LogSamplingConfig;
 }
@@ -46,29 +46,29 @@ export const SAMPLING_REASONS = {
   TRACE_ENDPOINT_ENABLED: "trace_endpoint_enabled",
   TRACE_HEALTH_CHECK: "trace_health_check",
   TRACE_DEFAULT_SAMPLING: "trace_default_sampling",
-  
+
   // Metric sampling reasons
   METRIC_BUSINESS_CRITICAL: "metric_business_critical",
   METRIC_TECHNICAL_SAMPLED: "metric_technical_sampled",
   METRIC_INFRASTRUCTURE_SAMPLED: "metric_infrastructure_sampled",
   METRIC_DEBUG_SAMPLED: "metric_debug_sampled",
-  
+
   // Log sampling reasons
   LOG_LEVEL_SAMPLED: "log_level_sampled",
   LOG_ERROR_RETENTION: "log_error_retention",
 } as const;
 
-export type SamplingReason = typeof SAMPLING_REASONS[keyof typeof SAMPLING_REASONS];
+export type SamplingReason = (typeof SAMPLING_REASONS)[keyof typeof SAMPLING_REASONS];
 
 // Metric categories for classification
 export const METRIC_CATEGORIES = {
   BUSINESS: "business",
-  TECHNICAL: "technical", 
+  TECHNICAL: "technical",
   INFRASTRUCTURE: "infrastructure",
   DEBUG: "debug",
 } as const;
 
-export type MetricCategory = typeof METRIC_CATEGORIES[keyof typeof METRIC_CATEGORIES];
+export type MetricCategory = (typeof METRIC_CATEGORIES)[keyof typeof METRIC_CATEGORIES];
 
 // Sampling decision result with enhanced metadata
 export interface UnifiedSamplingDecision {
@@ -82,20 +82,51 @@ export interface UnifiedSamplingDecision {
 // Metric classification patterns for automatic categorization
 const METRIC_CLASSIFICATION_PATTERNS = {
   [METRIC_CATEGORIES.BUSINESS]: [
-    /revenue/i, /conversion/i, /user_action/i, /purchase/i, /signup/i,
-    /order/i, /payment/i, /subscription/i, /engagement/i, /retention/i
+    /revenue/i,
+    /conversion/i,
+    /user_action/i,
+    /purchase/i,
+    /signup/i,
+    /order/i,
+    /payment/i,
+    /subscription/i,
+    /engagement/i,
+    /retention/i,
   ],
   [METRIC_CATEGORIES.TECHNICAL]: [
-    /http_/i, /graphql_/i, /response_time/i, /latency/i, /throughput/i,
-    /request/i, /query/i, /operation/i, /duration/i, /rate/i
+    /http_/i,
+    /graphql_/i,
+    /response_time/i,
+    /latency/i,
+    /throughput/i,
+    /request/i,
+    /query/i,
+    /operation/i,
+    /duration/i,
+    /rate/i,
   ],
   [METRIC_CATEGORIES.INFRASTRUCTURE]: [
-    /memory/i, /cpu/i, /disk/i, /network/i, /connection/i,
-    /gc_/i, /heap/i, /process_/i, /system_/i, /resource/i
+    /memory/i,
+    /cpu/i,
+    /disk/i,
+    /network/i,
+    /connection/i,
+    /gc_/i,
+    /heap/i,
+    /process_/i,
+    /system_/i,
+    /resource/i,
   ],
   [METRIC_CATEGORIES.DEBUG]: [
-    /debug/i, /trace/i, /internal/i, /diagnostic/i, /dev_/i,
-    /test_/i, /sample/i, /mock/i, /benchmark/i
+    /debug/i,
+    /trace/i,
+    /internal/i,
+    /diagnostic/i,
+    /dev_/i,
+    /test_/i,
+    /sample/i,
+    /mock/i,
+    /benchmark/i,
   ],
 };
 
@@ -107,7 +138,7 @@ export class UnifiedSamplingCoordinator implements Sampler {
   constructor(config: UnifiedSamplingConfig) {
     this.config = config;
     this.traceSampler = new SmartSampler(config.trace);
-    
+
     // Validate configuration
     this.validateConfiguration(config);
   }
@@ -122,7 +153,7 @@ export class UnifiedSamplingCoordinator implements Sampler {
     links: Link[]
   ): SamplingResult {
     const result = this.traceSampler.shouldSample(context, traceId, spanName, spanKind, attributes, links);
-    
+
     // Cache the decision for correlation with logs and metrics
     this.cacheDecision(traceId, {
       shouldSample: result.decision === SamplingDecision.RECORD_AND_SAMPLED,
@@ -139,7 +170,7 @@ export class UnifiedSamplingCoordinator implements Sampler {
     const category = this.classifyMetric(metricName, attributes);
     const samplingRate = this.getSamplingRateForCategory(category);
     const shouldSample = Math.random() < samplingRate;
-    
+
     // Get correlation context from active trace
     const traceId = this.getActiveTraceId();
     const correlationId = traceId || this.generateCorrelationId();
@@ -223,7 +254,7 @@ export class UnifiedSamplingCoordinator implements Sampler {
 
   private validateConfiguration(config: UnifiedSamplingConfig): void {
     // Validate trace config (done by SmartSampler)
-    
+
     // Validate metric sampling rates
     Object.values(config.metrics).forEach((rate, index) => {
       if (rate < 0 || rate > 1) {
@@ -250,7 +281,7 @@ export class UnifiedSamplingCoordinator implements Sampler {
 
     // Pattern-based classification
     for (const [category, patterns] of Object.entries(METRIC_CLASSIFICATION_PATTERNS)) {
-      if (patterns.some(pattern => pattern.test(metricName))) {
+      if (patterns.some((pattern) => pattern.test(metricName))) {
         return category as MetricCategory;
       }
     }
@@ -308,7 +339,7 @@ export class UnifiedSamplingCoordinator implements Sampler {
   private isErrorLog(message?: string): boolean {
     if (!message) return false;
     const errorPatterns = [/error/i, /exception/i, /failed/i, /failure/i, /fatal/i];
-    return errorPatterns.some(pattern => pattern.test(message));
+    return errorPatterns.some((pattern) => pattern.test(message));
   }
 
   private getActiveTraceId(): string | undefined {
@@ -332,7 +363,7 @@ export class UnifiedSamplingCoordinator implements Sampler {
         this.traceIdCache.delete(firstKey);
       }
     }
-    
+
     this.traceIdCache.set(traceId, decision);
   }
 

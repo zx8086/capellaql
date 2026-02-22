@@ -31,9 +31,7 @@ export function compose(...middlewares: Middleware[]): Middleware {
 /**
  * Create a middleware pipeline that applies headers to all responses.
  */
-export function applyHeaders(
-  headers: Record<string, string>
-): (response: Response) => Response {
+export function applyHeaders(headers: Record<string, string>): (response: Response) => Response {
   return (response: Response) => {
     const newHeaders = new Headers(response.headers);
     for (const [key, value] of Object.entries(headers)) {
@@ -68,7 +66,7 @@ export function withRequestId(
 }
 
 export { corsMiddleware } from "./cors";
-export { rateLimitMiddleware, cleanupRateLimitStore } from "./rateLimit";
+export { loggingMiddleware } from "./logging";
+export { cleanupRateLimitStore, rateLimitMiddleware } from "./rateLimit";
 export { securityMiddleware } from "./security";
 export { tracingMiddleware } from "./tracing";
-export { loggingMiddleware } from "./logging";

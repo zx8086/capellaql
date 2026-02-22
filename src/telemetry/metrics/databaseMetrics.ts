@@ -1,8 +1,8 @@
 /* src/telemetry/metrics/databaseMetrics.ts - 2025-compliant database observability */
 
 import { type Counter, context, type Histogram, metrics, trace, type UpDownCounter } from "@opentelemetry/api";
-import { getSimpleSmartSampler } from "../instrumentation";
 import { telemetryHealthMonitor } from "../health/telemetryHealth";
+import { getSimpleSmartSampler } from "../instrumentation";
 
 let dbOperationCounter: Counter | undefined;
 let dbResponseTimeHistogram: Histogram | undefined;
@@ -76,7 +76,7 @@ export function recordDatabaseOperation(
   const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const metricName = "db_operations_total";
-    const attributes = { 
+    const attributes = {
       metric_category: "technical",
       operation: operation.toLowerCase(),
       bucket,
@@ -85,7 +85,7 @@ export function recordDatabaseOperation(
       ...(collection && { collection }),
       ...(errorType && !success && { error_type: errorType }),
     };
-    
+
     const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
     if (!decision.shouldSample) {
       return; // Skip this metric based on sampling decision
@@ -186,13 +186,13 @@ export function recordSLIMetric(
   const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const metricName = `sli_${sliName}_total`;
-    const attributes = { 
+    const attributes = {
       metric_category: "business", // SLIs are business metrics
       sli_name: sliName,
       status: success ? "success" : "failure",
       ...additionalLabels,
     };
-    
+
     const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
     if (!decision.shouldSample) {
       return; // Skip this metric based on sampling decision

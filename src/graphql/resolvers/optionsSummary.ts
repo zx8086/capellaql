@@ -1,8 +1,10 @@
 /* src/graphql/resolvers/optionsSummary.ts */
 
-import { SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
+import { withSQLiteCache } from "$lib/bunSQLiteCache";
 import { getCluster } from "$lib/clusterProvider";
+import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
+import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
 import type { GraphQLContext } from "../context";
 import { type OptionsSummaryArgs, OptionsSummaryArgsSchema, withValidation } from "../validation/schemas";
@@ -13,14 +15,12 @@ const optionsSummaryResolver = withValidation(
   async (_: unknown, args: OptionsSummaryArgs, context: GraphQLContext): Promise<any> => {
     try {
       const { SalesOrganizationCode, StyleSeasonCode, DivisionCode, ActiveOption, SalesChannels } = args;
-      
-      const cacheKey = SQLiteCacheKeys.optionsSummary(
-        SalesOrganizationCode,
-        StyleSeasonCode, 
-        DivisionCode,
-        ActiveOption,
-        SalesChannels
-      );
+
+      // Use QueryFingerprintBuilder for SIMD-accelerated cache key generation
+      const cacheKey = QueryFingerprintBuilder.for("optionsSummary")
+        .withVariables({ SalesOrganizationCode, StyleSeasonCode, DivisionCode, ActiveOption, SalesChannels })
+        .withPrefix("gql")
+        .build();
 
       log("Options summary query initiated", {
         requestId: context.requestId,
@@ -29,17 +29,17 @@ const optionsSummaryResolver = withValidation(
         DivisionCode,
         ActiveOption,
         SalesChannelsCount: SalesChannels.length,
-        user: context.user?.id
+        user: context.user?.id,
       });
 
       // Use SQLite cache with 3-minute TTL for options summary data
       return await withSQLiteCache(
         cacheKey,
         async () => {
-          const cluster = await getCluster().catch((error) => {
-            err("Error in getCluster:", { error, requestId: context.requestId });
-            throw error;
-          });
+          const cluster = await CouchbaseErrorHandler.executeWithRetry(
+            async () => await getCluster(),
+            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
+          );
 
           const query = `EXECUTE FUNCTION \`default\`.\`_default\`.get_options_summary($SalesOrganizationCode, $StyleSeasonCode, $DivisionCode, $ActiveOption, $SalesChannels)`;
           const queryOptions = {
@@ -52,18 +52,26 @@ const optionsSummaryResolver = withValidation(
             },
           };
 
-          log("Executing options summary query (cache miss)", { 
-            query, 
+          log("Executing options summary query (cache miss)", {
+            query,
             queryOptions,
-            requestId: context.requestId
+            requestId: context.requestId,
           });
 
-          const result = await cluster.cluster.query(query, queryOptions);
-          
+          const result = await CouchbaseErrorHandler.executeWithRetry(
+            async () => await cluster.cluster.query(query, queryOptions),
+            CouchbaseErrorHandler.createQueryOperationContext(
+              "get_options_summary",
+              query,
+              context.requestId,
+              "default"
+            )
+          );
+
           debug("Options summary query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2)
+            result: JSON.stringify(result.rows[0], null, 2),
           });
 
           return result.rows[0][0];
@@ -71,10 +79,10 @@ const optionsSummaryResolver = withValidation(
         3 * 60 * 1000 // 3-minute TTL
       );
     } catch (error) {
-      err("Error in options summary resolver:", { 
-        error, 
+      err("Error in options summary resolver:", {
+        error,
         requestId: context.requestId,
-        args
+        args,
       });
       throw error;
     }

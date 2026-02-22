@@ -1,19 +1,18 @@
 /* src/lib/dataLoader.ts */
 
+import {
+  AmbiguousTimeoutError,
+  AuthenticationFailureError,
+  CouchbaseError,
+  DocumentLockedError,
+  DocumentNotFoundError,
+  RateLimitedError,
+  ServiceNotAvailableError,
+  TemporaryFailureError,
+} from "couchbase";
 import DataLoader from "dataloader";
 import { getCluster } from "$lib/clusterProvider";
 import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
-import {
-  DocumentNotFoundError,
-  CouchbaseError,
-  TimeoutError,
-  TemporaryFailureError,
-  ServiceNotAvailableError,
-  AuthenticationFailureError,
-  RateLimitedError,
-  AmbiguousTimeoutError,
-  DocumentLockedError
-} from 'couchbase';
 import { debug, error as err, log } from "../telemetry/logger";
 
 // Key type for identifying documents
@@ -55,7 +54,7 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
       if (!keysByCollection.has(collectionId)) {
         keysByCollection.set(collectionId, []);
       }
-      keysByCollection.get(collectionId)!.push(key);
+      keysByCollection.get(collectionId)?.push(key);
     }
 
     log("DataLoader batch operation", {
@@ -127,7 +126,7 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
               err("Authentication/Permission error in DataLoader", {
                 errorType: error.constructor.name,
                 keyInfo,
-                classification
+                classification,
               });
               return {
                 bucket: keyInfo.bucket,
@@ -142,7 +141,7 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
               err("Ambiguous timeout in DataLoader - manual investigation required", {
                 keyInfo,
                 errorMessage: error.message,
-                requiresInvestigation: true
+                requiresInvestigation: true,
               });
               return {
                 bucket: keyInfo.bucket,
@@ -152,14 +151,16 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
                 timeTaken,
                 error: `Ambiguous timeout: ${error.message}`,
               };
-            } else if (error instanceof TemporaryFailureError || 
-                       error instanceof ServiceNotAvailableError ||
-                       error instanceof RateLimitedError) {
+            } else if (
+              error instanceof TemporaryFailureError ||
+              error instanceof ServiceNotAvailableError ||
+              error instanceof RateLimitedError
+            ) {
               // These errors are retryable but may have failed after retries
               debug("Retryable error occurred in DataLoader", {
                 errorType: error.constructor.name,
                 keyInfo,
-                classification
+                classification,
               });
               return {
                 bucket: keyInfo.bucket,
@@ -192,7 +193,7 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
               err("Unexpected error in DataLoader", {
                 error: error.message,
                 keyInfo,
-                errorType: error.constructor.name
+                errorType: error.constructor.name,
               });
               return {
                 bucket: keyInfo.bucket,

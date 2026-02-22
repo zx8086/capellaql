@@ -1,6 +1,6 @@
 /* tests/integration/workflows/circuitBreaker.test.ts */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { CircuitBreaker } from "../../../src/utils/bunUtils";
 
 describe("Circuit Breaker Integration Workflow", () => {
@@ -30,7 +30,7 @@ describe("Circuit Breaker Integration Workflow", () => {
       await circuitBreaker.execute(async () => {
         throw new Error("Database connection failed");
       });
-    } catch (error) {
+    } catch (_error) {
       // Expected failure
     }
 
@@ -38,7 +38,7 @@ describe("Circuit Breaker Integration Workflow", () => {
       await circuitBreaker.execute(async () => {
         throw new Error("Database connection failed");
       });
-    } catch (error) {
+    } catch (_error) {
       // Expected failure
     }
 
@@ -46,7 +46,7 @@ describe("Circuit Breaker Integration Workflow", () => {
       await circuitBreaker.execute(async () => {
         throw new Error("Database connection failed");
       });
-    } catch (error) {
+    } catch (_error) {
       // Expected failure - should open circuit
     }
 
@@ -154,7 +154,7 @@ describe("Circuit Breaker Integration Workflow", () => {
           throw new Error("Slow operation failed");
         });
       });
-    } catch (error) {
+    } catch (_error) {
       // Expected
     }
 

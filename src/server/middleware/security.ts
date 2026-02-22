@@ -1,11 +1,10 @@
 /* src/server/middleware/security.ts */
 
-import type { Middleware, RequestContext } from "../types";
 import config from "../../config";
+import type { Middleware, RequestContext } from "../types";
 
 const IS_DEVELOPMENT =
-  config.telemetry.DEPLOYMENT_ENVIRONMENT === "development" ||
-  config.runtime.NODE_ENV === "development";
+  config.telemetry.DEPLOYMENT_ENVIRONMENT === "development" || config.runtime.NODE_ENV === "development";
 
 /**
  * Build Content-Security-Policy header value

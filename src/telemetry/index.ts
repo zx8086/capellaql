@@ -14,7 +14,7 @@ export {
 // Health monitoring exports
 export { getTelemetryHealth, telemetryHealthMonitor } from "./health/telemetryHealth";
 // Main telemetry exports and initialization
-export { getTelemetrySDK, initializeTelemetry, shutdownTelemetry } from "./instrumentation";
+export { getSimpleSmartSampler, getTelemetrySDK, initializeTelemetry, shutdownTelemetry } from "./instrumentation";
 // Logging exports
 export { debug, err, error, log, telemetryLogger, warn } from "./logger";
 export {
@@ -33,17 +33,16 @@ export {
   recordHttpRequest,
   recordHttpResponseTime,
 } from "./metrics/httpMetrics";
-// Sampling exports
-export { SmartSampler, type SmartSamplingConfig } from "./sampling/SmartSampler";
-export { 
-  SimpleSmartSampler, 
-  type SimpleSmartSamplingConfig, 
-  type SimpleSamplingDecision,
+export {
   createCostOptimizedSampler,
   createHighFidelitySampler,
-  estimateCostImpact
+  estimateCostImpact,
+  type SimpleSamplingDecision,
+  SimpleSmartSampler,
+  type SimpleSmartSamplingConfig,
 } from "./sampling/SimpleSmartSampler";
-export { getSimpleSmartSampler } from "./instrumentation";
+// Sampling exports
+export { SmartSampler, type SmartSamplingConfig } from "./sampling/SmartSampler";
 // Tracing exports
 export {
   createCouchbaseGetSpan,

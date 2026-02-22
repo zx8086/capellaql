@@ -1,14 +1,11 @@
 /* src/server/handlers/health.ts */
 
-import type { RequestContext, RouteHandler } from "../types";
-import { createHealthcheck } from "../../utils/bunUtils";
-import { err, getTelemetryHealth } from "../../telemetry";
+import { getGraphQLPerformanceStats, getRecentGraphQLPerformance } from "../../lib/graphqlPerformanceTracker";
+import { getPerformanceHistory, getPerformanceMetrics, getPerformanceTrends } from "../../lib/performanceMonitor";
 import { getSystemHealth, getSystemHealthSummary } from "../../lib/systemHealth";
-import {
-  getPerformanceHistory,
-  getPerformanceMetrics,
-  getPerformanceTrends,
-} from "../../lib/performanceMonitor";
+import { err, getTelemetryHealth } from "../../telemetry";
+import { createHealthcheck } from "../../utils/bunUtils";
+import type { RouteHandler } from "../types";
 
 // JSON response helper
 function jsonResponse(data: any, status = 200): Response {
@@ -160,7 +157,7 @@ export const performanceHistoryHandler: RouteHandler = async (request, _context)
   try {
     const url = new URL(request.url);
     const countParam = url.searchParams.get("count");
-    const count = countParam ? parseInt(countParam) : 10;
+    const count = countParam ? parseInt(countParam, 10) : 10;
     const performanceHistory = getPerformanceHistory(Math.min(count, 50));
 
     return jsonResponse({
@@ -269,11 +266,9 @@ export const telemetryDetailedHandler: RouteHandler = async (_request, _context)
               : 0,
           dataLossRate:
             statistics.totalSpansExported > 0
-              ? (
-                  (statistics.dataDropCount /
-                    (statistics.totalSpansExported + statistics.dataDropCount)) *
-                  100
-                ).toFixed(2)
+              ? ((statistics.dataDropCount / (statistics.totalSpansExported + statistics.dataDropCount)) * 100).toFixed(
+                  2
+                )
               : 0,
         },
       },
@@ -337,20 +332,13 @@ export const comprehensiveHealthHandler: RouteHandler = async (_request, _contex
         cacheResponse.status === "fulfilled"
           ? {
               ...cacheResponse.value,
-              status:
-                cacheResponse.value.hitRate > 50
-                  ? "optimal"
-                  : cacheResponse.value.hitRate > 20
-                    ? "good"
-                    : "poor",
+              status: cacheResponse.value.hitRate > 50 ? "optimal" : cacheResponse.value.hitRate > 20 ? "good" : "poor",
             }
           : { error: cacheResponse.reason?.message, status: "unknown" },
 
       telemetry: {
         exporters:
-          telemetryHealth.status === "fulfilled"
-            ? telemetryHealth.value
-            : { error: telemetryHealth.reason?.message },
+          telemetryHealth.status === "fulfilled" ? telemetryHealth.value : { error: telemetryHealth.reason?.message },
         batchCoordinator:
           detailedTelemetry.status === "fulfilled"
             ? {
@@ -367,12 +355,7 @@ export const comprehensiveHealthHandler: RouteHandler = async (_request, _contex
 
       overall: {
         status: assessOverallHealth([systemHealth, telemetryHealth, performanceMetrics, cacheResponse]),
-        criticalIssues: extractCriticalIssues([
-          systemHealth,
-          telemetryHealth,
-          performanceMetrics,
-          cacheResponse,
-        ]),
+        criticalIssues: extractCriticalIssues([systemHealth, telemetryHealth, performanceMetrics, cacheResponse]),
         recommendations: generateOverallRecommendations([
           systemHealth,
           telemetryHealth,
@@ -390,12 +373,91 @@ export const comprehensiveHealthHandler: RouteHandler = async (_request, _contex
         overall: {
           status: "unhealthy",
           criticalIssues: ["Health check system failure"],
-          recommendations: [
-            "Investigate health check system",
-            "Check system resources",
-            "Review error logs",
-          ],
+          recommendations: ["Investigate health check system", "Check system resources", "Review error logs"],
         },
+      },
+      500
+    );
+  }
+};
+
+/**
+ * /health/graphql - GraphQL resolver performance metrics
+ */
+export const graphqlPerformanceHandler: RouteHandler = async (request, _context) => {
+  try {
+    const url = new URL(request.url);
+    const limitParam = url.searchParams.get("limit");
+    const limit = limitParam ? parseInt(limitParam, 10) : 50;
+
+    const stats = getGraphQLPerformanceStats();
+    const recentOps = getRecentGraphQLPerformance().slice(-Math.min(limit, 100));
+
+    // Group operations by resolver for comparison
+    const byResolver: Record<string, { durations: number[]; cacheHits: number; dbFetches: number }> = {};
+
+    for (const op of recentOps) {
+      const key = `${op.operationName}.${op.fieldName}`;
+      if (!byResolver[key]) {
+        byResolver[key] = { durations: [], cacheHits: 0, dbFetches: 0 };
+      }
+      byResolver[key].durations.push(op.duration);
+      // Cache hits are typically < 10ms, DB fetches > 50ms
+      if (op.duration < 10) {
+        byResolver[key].cacheHits++;
+      } else {
+        byResolver[key].dbFetches++;
+      }
+    }
+
+    // Calculate per-resolver stats
+    const resolverStats = Object.entries(byResolver).map(([resolver, data]) => {
+      const sorted = [...data.durations].sort((a, b) => a - b);
+      return {
+        resolver,
+        count: data.durations.length,
+        cacheHits: data.cacheHits,
+        dbFetches: data.dbFetches,
+        cacheHitRate: data.durations.length > 0 ? ((data.cacheHits / data.durations.length) * 100).toFixed(1) : "0.0",
+        avgDurationMs:
+          data.durations.length > 0
+            ? (data.durations.reduce((a, b) => a + b, 0) / data.durations.length).toFixed(2)
+            : 0,
+        minDurationMs: sorted[0] || 0,
+        maxDurationMs: sorted[sorted.length - 1] || 0,
+        p50DurationMs: sorted[Math.floor(sorted.length * 0.5)] || 0,
+        p95DurationMs: sorted[Math.floor(sorted.length * 0.95)] || 0,
+      };
+    });
+
+    return jsonResponse({
+      timestamp: new Date().toISOString(),
+      summary: stats,
+      resolvers: resolverStats,
+      recentOperations: recentOps.slice(-20).map((op) => ({
+        ...op,
+        source: op.duration < 10 ? "cache" : "database",
+      })),
+      insights: {
+        cacheEffectiveness: resolverStats.filter((r) => parseFloat(r.cacheHitRate) > 50).length,
+        slowResolvers: resolverStats.filter((r) => parseFloat(r.avgDurationMs as string) > 100),
+        fastestResolver:
+          resolverStats.sort((a, b) => parseFloat(a.avgDurationMs as string) - parseFloat(b.avgDurationMs as string))[0]
+            ?.resolver || "N/A",
+        slowestResolver:
+          resolverStats.sort((a, b) => parseFloat(b.avgDurationMs as string) - parseFloat(a.avgDurationMs as string))[0]
+            ?.resolver || "N/A",
+      },
+    });
+  } catch (error) {
+    err("GraphQL performance metrics collection failed", error);
+    return jsonResponse(
+      {
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+        summary: { totalOperations: 0, averageDuration: 0, errorRate: 0, slowOperations: 0 },
+        resolvers: [],
+        recentOperations: [],
       },
       500
     );
@@ -437,9 +499,7 @@ function assessOverallHealth(results: PromiseSettledResult<any>[]): string {
     if (result.status === "fulfilled") {
       if (
         result.value &&
-        (result.value.status === "healthy" ||
-          result.value.overall === "healthy" ||
-          result.value.state === "healthy")
+        (result.value.status === "healthy" || result.value.overall === "healthy" || result.value.state === "healthy")
       ) {
         healthyCount++;
       }
@@ -495,4 +555,5 @@ export const healthHandlers = {
   cache: cacheHealthHandler,
   telemetryDetailed: telemetryDetailedHandler,
   comprehensive: comprehensiveHealthHandler,
+  graphql: graphqlPerformanceHandler,
 };

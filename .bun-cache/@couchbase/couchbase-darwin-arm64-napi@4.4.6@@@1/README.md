@@ -1,1 +1,0 @@
-Couchbase Node.js SDK platform specific binary for napi runtime on darwin OS with arm64 architecture and boringssl.

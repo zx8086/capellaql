@@ -1,6 +1,5 @@
 // Bun-optimized OTLP Trace Exporter
 
-import type { ExportResult } from "@opentelemetry/core";
 import { hrTimeToMicroseconds } from "@opentelemetry/core";
 import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
 import { BunOTLPExporter, type BunOTLPExporterConfig } from "./BunOTLPExporter";

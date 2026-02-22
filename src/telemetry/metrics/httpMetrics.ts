@@ -45,13 +45,13 @@ export function recordHttpRequest(method: string, route: string, statusCode?: nu
   const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const metricName = "http_requests_total";
-    const attributes = { 
-      metric_category: "technical", 
+    const attributes = {
+      metric_category: "technical",
       method: method.toUpperCase(),
       route,
       ...(statusCode && { status_code: statusCode.toString() }),
     };
-    
+
     const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
     if (!decision.shouldSample) {
       return; // Skip this metric based on sampling decision
@@ -88,13 +88,13 @@ export function recordHttpResponseTime(durationMs: number, method?: string, rout
   const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
     const metricName = "http_response_time_seconds";
-    const attributes = { 
+    const attributes = {
       metric_category: "technical",
       ...(method && { method: method.toUpperCase() }),
       ...(route && { route }),
       ...(statusCode && { status_code: statusCode.toString() }),
     };
-    
+
     const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
     if (!decision.shouldSample) {
       return; // Skip this metric based on sampling decision
@@ -135,21 +135,21 @@ export function recordGraphQLRequest(operationName: string, operationType: strin
   // Apply unified sampling decision - GraphQL operations might be business metrics
   const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
-    const isBusinessOperation = operationType === "query" && (
-      operationName.toLowerCase().includes("revenue") ||
-      operationName.toLowerCase().includes("order") ||
-      operationName.toLowerCase().includes("conversion")
-    );
-    
+    const isBusinessOperation =
+      operationType === "query" &&
+      (operationName.toLowerCase().includes("revenue") ||
+        operationName.toLowerCase().includes("order") ||
+        operationName.toLowerCase().includes("conversion"));
+
     const metricName = "graphql_requests_total";
-    const attributes = { 
+    const attributes = {
       metric_category: isBusinessOperation ? "business" : "technical",
       method: "POST",
       route: "/graphql",
       operation_name: operationName,
       operation_type: operationType,
     };
-    
+
     const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
     if (!decision.shouldSample) {
       return; // Skip this metric based on sampling decision
@@ -181,14 +181,14 @@ export function recordGraphQLResponseTime(
   // Apply unified sampling decision - GraphQL operations might be business metrics
   const samplingCoordinator = getSimpleSmartSampler();
   if (samplingCoordinator) {
-    const isBusinessOperation = operationType === "query" && (
-      operationName.toLowerCase().includes("revenue") ||
-      operationName.toLowerCase().includes("order") ||
-      operationName.toLowerCase().includes("conversion")
-    );
-    
+    const isBusinessOperation =
+      operationType === "query" &&
+      (operationName.toLowerCase().includes("revenue") ||
+        operationName.toLowerCase().includes("order") ||
+        operationName.toLowerCase().includes("conversion"));
+
     const metricName = "graphql_response_time_seconds";
-    const attributes = { 
+    const attributes = {
       metric_category: isBusinessOperation ? "business" : "technical",
       method: "POST",
       route: "/graphql",
@@ -196,7 +196,7 @@ export function recordGraphQLResponseTime(
       operation_type: operationType,
       has_errors: hasErrors.toString(),
     };
-    
+
     const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
     if (!decision.shouldSample) {
       return; // Skip this metric based on sampling decision

@@ -293,7 +293,7 @@ class PerformanceMonitor {
     };
   }
 
-  private calculateCorrelations(dbMetrics: any, runtimeMetrics: any, telemetryMetrics: any, graphqlMetrics: any) {
+  private calculateCorrelations(dbMetrics: any, runtimeMetrics: any, _telemetryMetrics: any, _graphqlMetrics: any) {
     // Calculate correlation between database latency and memory usage
     const databaseToMemory = this.calculateCorrelation(
       this.recentMetrics.map((m) => m.database.latency),
@@ -353,7 +353,7 @@ class PerformanceMonitor {
     return denominator === 0 ? 0 : numerator / denominator;
   }
 
-  private calculateBusinessMetrics(dbMetrics: any, runtimeMetrics: any, telemetryMetrics: any, graphqlMetrics: any) {
+  private calculateBusinessMetrics(dbMetrics: any, _runtimeMetrics: any, _telemetryMetrics: any, graphqlMetrics: any) {
     // Calculate telemetry cost efficiency (logs per dollar estimation)
     const estimatedLogsPerMinute = 100; // Base estimation - would be tracked from actual usage
     const samplingReduction = 1 - (0.1 + 0.5 + 0.9 + 1.0) / 4; // Average sampling reduction

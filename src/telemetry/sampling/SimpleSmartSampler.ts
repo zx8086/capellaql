@@ -8,28 +8,27 @@ import {
   SamplingDecision,
   type SamplingResult,
   type SpanKind,
-  trace,
 } from "@opentelemetry/api";
 
 // Simple 3-tier sampling configuration
 export interface SimpleSmartSamplingConfig {
   // Core signal sampling rates (0.0 to 1.0)
-  traces: number;   // Distributed tracing sampling rate
-  metrics: number;  // Metrics collection sampling rate  
-  logs: number;     // Log entries sampling rate
-  
+  traces: number; // Distributed tracing sampling rate
+  metrics: number; // Metrics collection sampling rate
+  logs: number; // Log entries sampling rate
+
   // Error preservation (always 1.0 for critical observability)
   preserveErrors: boolean;
-  
+
   // Optional configuration
   costOptimizationMode: boolean; // Enable aggressive cost optimization
-  healthCheckSampling: number;   // Special rate for health endpoints (typically lower)
+  healthCheckSampling: number; // Special rate for health endpoints (typically lower)
 }
 
 // Sampling decision metadata
 export interface SimpleSamplingDecision {
   shouldSample: boolean;
-  signalType: 'trace' | 'metric' | 'log';
+  signalType: "trace" | "metric" | "log";
   samplingRate: number;
   reason: string;
   costSavings?: number; // Estimated percentage savings
@@ -37,13 +36,13 @@ export interface SimpleSamplingDecision {
 
 // Default configuration optimized for cost-effectiveness
 export const DEFAULT_SIMPLE_SAMPLING_CONFIG: SimpleSmartSamplingConfig = {
-  traces: 0.15,    // 15% trace sampling - captures patterns while reducing costs
-  metrics: 0.20,   // 20% metrics sampling - higher for performance monitoring
-  logs: 0.25,      // 25% log sampling - balance between visibility and storage
-  
-  preserveErrors: true,        // Always preserve errors for debugging
-  costOptimizationMode: true,  // Enable cost optimization by default
-  healthCheckSampling: 0.05,   // 5% health check sampling - reduce noise
+  traces: 0.15, // 15% trace sampling - captures patterns while reducing costs
+  metrics: 0.2, // 20% metrics sampling - higher for performance monitoring
+  logs: 0.25, // 25% log sampling - balance between visibility and storage
+
+  preserveErrors: true, // Always preserve errors for debugging
+  costOptimizationMode: true, // Enable cost optimization by default
+  healthCheckSampling: 0.05, // 5% health check sampling - reduce noise
 };
 
 export class SimpleSmartSampler implements Sampler {
@@ -73,12 +72,14 @@ export class SimpleSmartSampler implements Sampler {
 
     return {
       decision: decision.shouldSample ? SamplingDecision.RECORD_AND_SAMPLED : SamplingDecision.NOT_RECORD,
-      attributes: decision.shouldSample ? {
-        "sampling.signal_type": decision.signalType,
-        "sampling.rate": decision.samplingRate,
-        "sampling.reason": decision.reason,
-        "sampling.cost_optimized": this.config.costOptimizationMode,
-      } : undefined,
+      attributes: decision.shouldSample
+        ? {
+            "sampling.signal_type": decision.signalType,
+            "sampling.rate": decision.samplingRate,
+            "sampling.reason": decision.reason,
+            "sampling.cost_optimized": this.config.costOptimizationMode,
+          }
+        : undefined,
     };
   }
 
@@ -88,9 +89,9 @@ export class SimpleSmartSampler implements Sampler {
     if (this.config.preserveErrors && this.isErrorTrace(attributes)) {
       return {
         shouldSample: true,
-        signalType: 'trace',
+        signalType: "trace",
         samplingRate: 1.0,
-        reason: 'error_preservation',
+        reason: "error_preservation",
         costSavings: 0, // No savings for errors - they must be preserved
       };
     }
@@ -100,9 +101,9 @@ export class SimpleSmartSampler implements Sampler {
       const shouldSample = Math.random() < this.config.healthCheckSampling;
       return {
         shouldSample,
-        signalType: 'trace',
+        signalType: "trace",
         samplingRate: this.config.healthCheckSampling,
-        reason: 'health_check_sampling',
+        reason: "health_check_sampling",
         costSavings: shouldSample ? 0 : this.calculateCostSavings(this.config.traces),
       };
     }
@@ -111,9 +112,9 @@ export class SimpleSmartSampler implements Sampler {
     const shouldSample = Math.random() < this.config.traces;
     return {
       shouldSample,
-      signalType: 'trace',
+      signalType: "trace",
       samplingRate: this.config.traces,
-      reason: 'standard_trace_sampling',
+      reason: "standard_trace_sampling",
       costSavings: shouldSample ? 0 : this.calculateCostSavings(this.config.traces),
     };
   }
@@ -124,9 +125,9 @@ export class SimpleSmartSampler implements Sampler {
     if (this.config.preserveErrors && this.isErrorMetric(metricName, attributes)) {
       return {
         shouldSample: true,
-        signalType: 'metric',
+        signalType: "metric",
         samplingRate: 1.0,
-        reason: 'error_metric_preservation',
+        reason: "error_metric_preservation",
         costSavings: 0,
       };
     }
@@ -135,9 +136,9 @@ export class SimpleSmartSampler implements Sampler {
     const shouldSample = Math.random() < this.config.metrics;
     return {
       shouldSample,
-      signalType: 'metric',
+      signalType: "metric",
       samplingRate: this.config.metrics,
-      reason: 'standard_metric_sampling',
+      reason: "standard_metric_sampling",
       costSavings: shouldSample ? 0 : this.calculateCostSavings(this.config.metrics),
     };
   }
@@ -148,9 +149,9 @@ export class SimpleSmartSampler implements Sampler {
     if (this.config.preserveErrors && this.isErrorLog(level, message, attributes)) {
       return {
         shouldSample: true,
-        signalType: 'log',
+        signalType: "log",
         samplingRate: 1.0,
-        reason: 'error_log_preservation',
+        reason: "error_log_preservation",
         costSavings: 0,
       };
     }
@@ -159,9 +160,9 @@ export class SimpleSmartSampler implements Sampler {
     const shouldSample = Math.random() < this.config.logs;
     return {
       shouldSample,
-      signalType: 'log',
+      signalType: "log",
       samplingRate: this.config.logs,
-      reason: 'standard_log_sampling',
+      reason: "standard_log_sampling",
       costSavings: shouldSample ? 0 : this.calculateCostSavings(this.config.logs),
     };
   }
@@ -183,13 +184,13 @@ export class SimpleSmartSampler implements Sampler {
       logs: number;
     };
   } {
-    const samplingRate = this.samplingStats.totalDecisions > 0 
-      ? this.samplingStats.sampledCount / this.samplingStats.totalDecisions 
-      : 0;
+    const samplingRate =
+      this.samplingStats.totalDecisions > 0 ? this.samplingStats.sampledCount / this.samplingStats.totalDecisions : 0;
 
-    const errorPreservationRate = this.samplingStats.totalDecisions > 0 
-      ? this.samplingStats.errorPreservedCount / this.samplingStats.totalDecisions 
-      : 0;
+    const errorPreservationRate =
+      this.samplingStats.totalDecisions > 0
+        ? this.samplingStats.errorPreservedCount / this.samplingStats.totalDecisions
+        : 0;
 
     return {
       totalDecisions: this.samplingStats.totalDecisions,
@@ -217,8 +218,8 @@ export class SimpleSmartSampler implements Sampler {
 
   private validateAndNormalizeConfig(config: SimpleSmartSamplingConfig): SimpleSmartSamplingConfig {
     // Validate sampling rates
-    const rates = ['traces', 'metrics', 'logs'] as const;
-    rates.forEach(rate => {
+    const rates = ["traces", "metrics", "logs"] as const;
+    rates.forEach((rate) => {
       if (config[rate] < 0 || config[rate] > 1) {
         throw new Error(`${rate} sampling rate must be between 0 and 1, got: ${config[rate]}`);
       }
@@ -237,28 +238,26 @@ export class SimpleSmartSampler implements Sampler {
 
   private isErrorTrace(attributes?: Attributes): boolean {
     if (!attributes) return false;
-    
+
     // Check common error indicators in trace attributes
-    const httpStatusCode = attributes['http.status_code'];
+    const httpStatusCode = attributes["http.status_code"];
     const hasError = attributes.error === true;
-    const errorMessage = attributes['error.message'];
-    
-    return hasError || 
-           (httpStatusCode && Number(httpStatusCode) >= 400) ||
-           (errorMessage !== undefined);
+    const errorMessage = attributes["error.message"];
+
+    return hasError || (httpStatusCode && Number(httpStatusCode) >= 400) || errorMessage !== undefined;
   }
 
   private isHealthCheckTrace(spanName: string, attributes?: Attributes): boolean {
-    const healthIndicators = ['/health', 'health-check', 'healthz', 'liveness', 'readiness'];
-    
+    const healthIndicators = ["/health", "health-check", "healthz", "liveness", "readiness"];
+
     // Check span name
-    if (healthIndicators.some(indicator => spanName.toLowerCase().includes(indicator))) {
+    if (healthIndicators.some((indicator) => spanName.toLowerCase().includes(indicator))) {
       return true;
     }
 
     // Check HTTP attributes
-    const httpRoute = attributes?.['http.route'] || attributes?.['http.target'];
-    if (httpRoute && healthIndicators.some(indicator => String(httpRoute).toLowerCase().includes(indicator))) {
+    const httpRoute = attributes?.["http.route"] || attributes?.["http.target"];
+    if (httpRoute && healthIndicators.some((indicator) => String(httpRoute).toLowerCase().includes(indicator))) {
       return true;
     }
 
@@ -267,14 +266,14 @@ export class SimpleSmartSampler implements Sampler {
 
   private isErrorMetric(metricName: string, attributes?: Attributes): boolean {
     // Check metric name for error indicators
-    const errorKeywords = ['error', 'exception', 'failure', 'fault', '4xx', '5xx', 'timeout'];
-    if (errorKeywords.some(keyword => metricName.toLowerCase().includes(keyword))) {
+    const errorKeywords = ["error", "exception", "failure", "fault", "4xx", "5xx", "timeout"];
+    if (errorKeywords.some((keyword) => metricName.toLowerCase().includes(keyword))) {
       return true;
     }
 
     // Check attributes for error indicators
     if (attributes) {
-      const statusCode = attributes['http.status_code'];
+      const statusCode = attributes["http.status_code"];
       if (statusCode && Number(statusCode) >= 400) {
         return true;
       }
@@ -285,14 +284,14 @@ export class SimpleSmartSampler implements Sampler {
 
   private isErrorLog(level: string, message?: string, attributes?: Attributes): boolean {
     // Error level logs
-    if (level.toLowerCase() === 'error') {
+    if (level.toLowerCase() === "error") {
       return true;
     }
 
     // Check message for error indicators
     if (message) {
-      const errorKeywords = ['error', 'exception', 'failed', 'failure', 'fatal', 'critical'];
-      if (errorKeywords.some(keyword => message.toLowerCase().includes(keyword))) {
+      const errorKeywords = ["error", "exception", "failed", "failure", "fatal", "critical"];
+      if (errorKeywords.some((keyword) => message.toLowerCase().includes(keyword))) {
         return true;
       }
     }
@@ -300,7 +299,7 @@ export class SimpleSmartSampler implements Sampler {
     // Check attributes for error indicators
     if (attributes) {
       const hasError = attributes.error === true;
-      const errorMessage = attributes['error.message'];
+      const errorMessage = attributes["error.message"];
       if (hasError || errorMessage) {
         return true;
       }
@@ -316,11 +315,11 @@ export class SimpleSmartSampler implements Sampler {
 
   private updateStats(decision: SimpleSamplingDecision): void {
     this.samplingStats.totalDecisions++;
-    
+
     if (decision.shouldSample) {
       this.samplingStats.sampledCount++;
-      
-      if (decision.reason.includes('error')) {
+
+      if (decision.reason.includes("error")) {
         this.samplingStats.errorPreservedCount++;
       }
     } else {
@@ -333,14 +332,14 @@ export class SimpleSmartSampler implements Sampler {
 // Utility function to create a pre-configured cost-optimized sampler
 export function createCostOptimizedSampler(customRates?: Partial<SimpleSmartSamplingConfig>): SimpleSmartSampler {
   const costOptimizedConfig: SimpleSmartSamplingConfig = {
-    traces: 0.10,    // 10% - aggressive cost reduction for traces
-    metrics: 0.15,   // 15% - moderate reduction for metrics
-    logs: 0.20,      // 20% - conservative reduction for logs
-    
-    preserveErrors: true,        // Never compromise on error visibility
+    traces: 0.1, // 10% - aggressive cost reduction for traces
+    metrics: 0.15, // 15% - moderate reduction for metrics
+    logs: 0.2, // 20% - conservative reduction for logs
+
+    preserveErrors: true, // Never compromise on error visibility
     costOptimizationMode: true,
-    healthCheckSampling: 0.02,   // 2% - minimal health check noise
-    
+    healthCheckSampling: 0.02, // 2% - minimal health check noise
+
     ...customRates, // Allow customization
   };
 
@@ -350,13 +349,13 @@ export function createCostOptimizedSampler(customRates?: Partial<SimpleSmartSamp
 // Utility function to create a high-fidelity sampler for debugging
 export function createHighFidelitySampler(): SimpleSmartSampler {
   return new SimpleSmartSampler({
-    traces: 0.50,    // 50% - high trace coverage
-    metrics: 0.75,   // 75% - comprehensive metrics
-    logs: 0.60,      // 60% - detailed logging
-    
+    traces: 0.5, // 50% - high trace coverage
+    metrics: 0.75, // 75% - comprehensive metrics
+    logs: 0.6, // 60% - detailed logging
+
     preserveErrors: true,
     costOptimizationMode: false,
-    healthCheckSampling: 0.10, // 10% - more health check visibility
+    healthCheckSampling: 0.1, // 10% - more health check visibility
   });
 }
 
@@ -368,19 +367,17 @@ export function estimateCostImpact(config: SimpleSmartSamplingConfig): {
 } {
   // Calculate weighted average reduction (traces are typically most expensive)
   const weights = { traces: 0.6, metrics: 0.25, logs: 0.15 };
-  const weightedReduction = 
-    (1 - config.traces) * weights.traces +
-    (1 - config.metrics) * weights.metrics +
-    (1 - config.logs) * weights.logs;
+  const weightedReduction =
+    (1 - config.traces) * weights.traces + (1 - config.metrics) * weights.metrics + (1 - config.logs) * weights.logs;
 
   const estimatedReduction = Math.round(weightedReduction * 100);
   const preservationRate = config.preserveErrors ? 100 : 0;
 
   const recommendedFor: string[] = [];
-  if (estimatedReduction >= 70) recommendedFor.push('production cost optimization');
-  if (estimatedReduction >= 50) recommendedFor.push('staging environments');
-  if (estimatedReduction < 30) recommendedFor.push('development debugging');
-  if (config.preserveErrors) recommendedFor.push('error-sensitive applications');
+  if (estimatedReduction >= 70) recommendedFor.push("production cost optimization");
+  if (estimatedReduction >= 50) recommendedFor.push("staging environments");
+  if (estimatedReduction < 30) recommendedFor.push("development debugging");
+  if (config.preserveErrors) recommendedFor.push("error-sensitive applications");
 
   return {
     estimatedReduction,

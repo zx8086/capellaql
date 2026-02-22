@@ -3,7 +3,6 @@
 import type { ExportResult } from "@opentelemetry/core";
 import { hrTimeToMicroseconds } from "@opentelemetry/core";
 import type { LogRecordExporter, ReadableLogRecord } from "@opentelemetry/sdk-logs";
-import { telemetryHealthMonitor } from "../health/telemetryHealth";
 import { BunOTLPExporter, type BunOTLPExporterConfig } from "./BunOTLPExporter";
 
 /**
@@ -19,7 +18,6 @@ export class BunLogExporter extends BunOTLPExporter<ReadableLogRecord> implement
   // Advanced filtering state
   private recentLogHashes = new Map<string, number>(); // hash -> timestamp
   private readonly deduplicationWindow = 60000; // 1 minute
-  private readonly maxDuplicates = 5; // Max identical logs per window
 
   constructor(config: BunOTLPExporterConfig) {
     super("logs", config);

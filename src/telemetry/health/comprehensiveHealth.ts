@@ -173,7 +173,7 @@ function generateBusinessMetrics(telemetryHealth: TelemetryHealthData, memoryUsa
   const costPerLogMB = 0.5; // USD per MB-month
   const avgLogSize = 0.001; // MB per log
   const monthlyLogVolume = estimatedDailyLogs * 30 * avgLogSize;
-  const baseCost = monthlyLogVolume * baseRetentionDays * costPerLogMB;
+  const _baseCost = monthlyLogVolume * baseRetentionDays * costPerLogMB;
   const optimizedCost = monthlyLogVolume * smartRetention * costPerLogMB;
   const estimatedMonthlyCost = optimizedCost;
 

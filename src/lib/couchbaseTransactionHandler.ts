@@ -1,18 +1,15 @@
 import {
-  Transactions,
-  TransactionFailedError,
-  TransactionCommitAmbiguousError,
-  TransactionExpiredError,
-  TransactionAttempt,
-  type TransactionResult,
-  type TransactionGetResult,
+  CasMismatchError,
   DocumentExistsError,
   DocumentNotFoundError,
-  CasMismatchError
-} from 'couchbase';
-import { CouchbaseErrorHandler, type OperationContext } from '$lib/couchbaseErrorHandler';
-import { recordQuery } from '$lib/couchbaseMetrics';
-import { error as err, warn, log as info } from '../telemetry/logger';
+  type TransactionAttempt,
+  TransactionCommitAmbiguousError,
+  type TransactionGetResult,
+  Transactions,
+} from "couchbase";
+import { CouchbaseErrorHandler, type OperationContext } from "$lib/couchbaseErrorHandler";
+import { recordQuery } from "$lib/couchbaseMetrics";
+import { error as err, log as info, warn } from "../telemetry/logger";
 
 export interface TransactionOperationContext extends OperationContext {
   transactionId?: string;
@@ -21,7 +18,7 @@ export interface TransactionOperationContext extends OperationContext {
 }
 
 export interface TransactionConfig {
-  durabilityLevel?: 'none' | 'majority' | 'majorityAndPersistActive' | 'persistToMajority';
+  durabilityLevel?: "none" | "majority" | "majorityAndPersistActive" | "persistToMajority";
   timeout?: number; // milliseconds
   cleanupLostAttempts?: boolean;
   cleanupClientAttempts?: boolean;
@@ -29,10 +26,10 @@ export interface TransactionConfig {
 
 export class CouchbaseTransactionHandler {
   private static readonly DEFAULT_CONFIG: TransactionConfig = {
-    durabilityLevel: 'majority',
+    durabilityLevel: "majority",
     timeout: 15000, // 15 seconds
     cleanupLostAttempts: true,
-    cleanupClientAttempts: true
+    cleanupClientAttempts: true,
   };
 
   static async executeTransaction<T>(
@@ -40,60 +37,60 @@ export class CouchbaseTransactionHandler {
     context: TransactionOperationContext,
     config: TransactionConfig = {}
   ): Promise<T> {
-    const finalConfig = { ...this.DEFAULT_CONFIG, ...config };
+    const finalConfig = { ...CouchbaseTransactionHandler.DEFAULT_CONFIG, ...config };
     const startTime = Date.now();
     const transactionId = context.transactionId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     let attemptCount = 0;
-    let lastError: Error | null = null;
+    let _lastError: Error | null = null;
 
     try {
       const result = await CouchbaseErrorHandler.executeWithRetry(
         async () => {
           attemptCount++;
-          
+
           const enhancedContext: TransactionOperationContext = {
             ...context,
             transactionId,
             attemptNumber: attemptCount,
-            operationType: `transaction_${context.operationType}`
+            operationType: `transaction_${context.operationType}`,
           };
 
-          info('Starting transaction', {
+          info("Starting transaction", {
             transactionId,
             attemptNumber: attemptCount,
             operationType: context.operationType,
             requestId: context.requestId,
-            config: finalConfig
+            config: finalConfig,
           });
 
           // Execute transaction with comprehensive error handling
           const transactions = Transactions.create();
-          
+
           const txnResult = await transactions.run(
             async (ctx: TransactionAttempt) => {
               try {
                 return await transactionLogic(ctx);
               } catch (error) {
                 // Handle transaction-specific errors within the transaction
-                this.handleInTransactionError(error, enhancedContext);
+                CouchbaseTransactionHandler.handleInTransactionError(error, enhancedContext);
                 throw error;
               }
             },
             {
               durabilityLevel: finalConfig.durabilityLevel,
-              timeout: finalConfig.timeout
+              timeout: finalConfig.timeout,
             }
           );
 
           const duration = Date.now() - startTime;
-          
-          info('Transaction completed successfully', {
+
+          info("Transaction completed successfully", {
             transactionId,
             totalAttempts: attemptCount,
             duration,
             operationType: context.operationType,
-            requestId: context.requestId
+            requestId: context.requestId,
           });
 
           // Record successful transaction metrics
@@ -101,7 +98,7 @@ export class CouchbaseTransactionHandler {
             requestId: context.requestId,
             bucket: context.bucket,
             scope: context.scope,
-            collection: context.collection
+            collection: context.collection,
           });
 
           return txnResult;
@@ -109,19 +106,18 @@ export class CouchbaseTransactionHandler {
         {
           ...context,
           operationType: `transaction_${context.operationType}`,
-          transactionId
+          transactionId,
         },
         3 // Maximum transaction retries
       );
 
       return result;
-
     } catch (error) {
-      lastError = error as Error;
+      _lastError = error as Error;
       const duration = Date.now() - startTime;
-      const classification = this.classifyTransactionError(error);
+      const classification = CouchbaseTransactionHandler.classifyTransactionError(error);
 
-      err('Transaction failed', {
+      err("Transaction failed", {
         transactionId,
         totalAttempts: attemptCount,
         duration,
@@ -130,7 +126,7 @@ export class CouchbaseTransactionHandler {
         operationType: context.operationType,
         requestId: context.requestId,
         isRetryable: classification.retryable,
-        requiresInvestigation: classification.requiresInvestigation
+        requiresInvestigation: classification.requiresInvestigation,
       });
 
       // Record failed transaction metrics
@@ -139,12 +135,12 @@ export class CouchbaseTransactionHandler {
         requestId: context.requestId,
         bucket: context.bucket,
         scope: context.scope,
-        collection: context.collection
+        collection: context.collection,
       });
 
       // Handle specific transaction failure scenarios
       if (error instanceof TransactionCommitAmbiguousError) {
-        await this.handleAmbiguousTransaction(error, { ...context, transactionId });
+        await CouchbaseTransactionHandler.handleAmbiguousTransaction(error, { ...context, transactionId });
       }
 
       throw error;
@@ -164,15 +160,15 @@ export class CouchbaseTransactionHandler {
         // Document not found is expected in many scenarios
         return null;
       }
-      
+
       // Log other errors but let them propagate
-      warn('Transaction get operation failed', {
+      warn("Transaction get operation failed", {
         error: error.constructor.name,
         key,
         transactionId: operationContext.transactionId,
-        requestId: operationContext.requestId
+        requestId: operationContext.requestId,
       });
-      
+
       throw error;
     }
   }
@@ -188,11 +184,11 @@ export class CouchbaseTransactionHandler {
       return await ctx.insert(collection, key, content);
     } catch (error) {
       if (error instanceof DocumentExistsError) {
-        err('Document already exists in transaction', {
+        err("Document already exists in transaction", {
           key,
           transactionId: operationContext.transactionId,
           requestId: operationContext.requestId,
-          suggestion: 'Consider using upsert or checking existence first'
+          suggestion: "Consider using upsert or checking existence first",
         });
       }
       throw error;
@@ -209,10 +205,10 @@ export class CouchbaseTransactionHandler {
       return await ctx.replace(doc, content);
     } catch (error) {
       if (error instanceof CasMismatchError) {
-        warn('CAS mismatch in transaction replace', {
+        warn("CAS mismatch in transaction replace", {
           transactionId: operationContext.transactionId,
           requestId: operationContext.requestId,
-          suggestion: 'Document was modified by another transaction'
+          suggestion: "Document was modified by another transaction",
         });
       }
       throw error;
@@ -221,78 +217,80 @@ export class CouchbaseTransactionHandler {
 
   private static classifyTransactionError(error: any): {
     retryable: boolean;
-    severity: 'info' | 'warning' | 'critical';
+    severity: "info" | "warning" | "critical";
     requiresInvestigation: boolean;
-    category: 'transient' | 'permanent' | 'ambiguous' | 'configuration';
+    category: "transient" | "permanent" | "ambiguous" | "configuration";
   } {
     const errorType = error.constructor.name;
 
     const classifications = {
-      TransactionFailedError: { 
-        retryable: true, 
-        severity: 'warning' as const, 
-        requiresInvestigation: false, 
-        category: 'transient' as const 
+      TransactionFailedError: {
+        retryable: true,
+        severity: "warning" as const,
+        requiresInvestigation: false,
+        category: "transient" as const,
       },
-      TransactionCommitAmbiguousError: { 
-        retryable: false, 
-        severity: 'critical' as const, 
-        requiresInvestigation: true, 
-        category: 'ambiguous' as const 
+      TransactionCommitAmbiguousError: {
+        retryable: false,
+        severity: "critical" as const,
+        requiresInvestigation: true,
+        category: "ambiguous" as const,
       },
-      TransactionExpiredError: { 
-        retryable: true, 
-        severity: 'warning' as const, 
-        requiresInvestigation: false, 
-        category: 'transient' as const 
+      TransactionExpiredError: {
+        retryable: true,
+        severity: "warning" as const,
+        requiresInvestigation: false,
+        category: "transient" as const,
       },
-      DocumentExistsError: { 
-        retryable: false, 
-        severity: 'info' as const, 
-        requiresInvestigation: false, 
-        category: 'permanent' as const 
+      DocumentExistsError: {
+        retryable: false,
+        severity: "info" as const,
+        requiresInvestigation: false,
+        category: "permanent" as const,
       },
-      DocumentNotFoundError: { 
-        retryable: false, 
-        severity: 'info' as const, 
-        requiresInvestigation: false, 
-        category: 'permanent' as const 
+      DocumentNotFoundError: {
+        retryable: false,
+        severity: "info" as const,
+        requiresInvestigation: false,
+        category: "permanent" as const,
       },
-      CasMismatchError: { 
-        retryable: true, 
-        severity: 'info' as const, 
-        requiresInvestigation: false, 
-        category: 'transient' as const 
-      }
+      CasMismatchError: {
+        retryable: true,
+        severity: "info" as const,
+        requiresInvestigation: false,
+        category: "transient" as const,
+      },
     };
 
-    return classifications[errorType] || {
-      retryable: false,
-      severity: 'critical',
-      requiresInvestigation: true,
-      category: 'permanent'
-    };
+    return (
+      classifications[errorType] || {
+        retryable: false,
+        severity: "critical",
+        requiresInvestigation: true,
+        category: "permanent",
+      }
+    );
   }
 
   private static handleInTransactionError(error: any, context: TransactionOperationContext): void {
-    const classification = this.classifyTransactionError(error);
+    const classification = CouchbaseTransactionHandler.classifyTransactionError(error);
 
-    if (classification.severity === 'critical') {
-      err('Critical error within transaction', {
+    if (classification.severity === "critical") {
+      err("Critical error within transaction", {
         errorType: error.constructor.name,
         message: error.message,
         transactionId: context.transactionId,
         attemptNumber: context.attemptNumber,
         requestId: context.requestId,
-        classification
+        classification,
       });
-    } else if (classification.severity === 'warning') {
-      warn('Warning within transaction', {
+    } else if (classification.severity === "warning") {
+      warn("Warning within transaction", {
         errorType: error.constructor.name,
         message: error.message,
         transactionId: context.transactionId,
         attemptNumber: context.attemptNumber,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
     }
   }
@@ -309,31 +307,31 @@ export class CouchbaseTransactionHandler {
         bucket: context.bucket,
         scope: context.scope,
         collection: context.collection,
-        requestId: context.requestId
+        requestId: context.requestId,
       },
       timestamp: new Date().toISOString(),
       requiresManualInvestigation: true,
       investigationNotes: [
-        'Transaction commit state is ambiguous - changes may or may not have been applied',
-        'Manual verification of data state required',
-        'Consider implementing idempotent operations to handle duplicate execution',
-        'Check cluster logs for transaction commit confirmation'
-      ]
+        "Transaction commit state is ambiguous - changes may or may not have been applied",
+        "Manual verification of data state required",
+        "Consider implementing idempotent operations to handle duplicate execution",
+        "Check cluster logs for transaction commit confirmation",
+      ],
     };
 
-    err('AMBIGUOUS_TRANSACTION_COMMIT', ambiguousLogData);
+    err("AMBIGUOUS_TRANSACTION_COMMIT", ambiguousLogData);
 
     // Store for investigation dashboard
     try {
       // This could be enhanced to store in a dedicated investigation collection
-      info('Stored ambiguous transaction for investigation', { 
+      info("Stored ambiguous transaction for investigation", {
         transactionId: context.transactionId,
-        operationType: context.operationType 
+        operationType: context.operationType,
       });
     } catch (storeError) {
-      err('Failed to store ambiguous transaction data', { 
-        error: storeError, 
-        originalTransactionId: context.transactionId 
+      err("Failed to store ambiguous transaction data", {
+        error: storeError,
+        originalTransactionId: context.transactionId,
       });
     }
   }
@@ -350,7 +348,7 @@ export class CouchbaseTransactionHandler {
       requestId,
       bucket,
       scope,
-      collection
+      collection,
     };
   }
 
@@ -362,10 +360,10 @@ export class CouchbaseTransactionHandler {
     context: TransactionOperationContext,
     config?: TransactionConfig
   ): Promise<T> {
-    return await this.executeTransaction(
+    return await CouchbaseTransactionHandler.executeTransaction(
       async (ctx) => {
         // Get current document
-        const currentDoc = await this.safeGet(ctx, collection, key, context);
+        const currentDoc = await CouchbaseTransactionHandler.safeGet(ctx, collection, key, context);
         const currentValue = currentDoc ? currentDoc.content : null;
 
         // Apply update function
@@ -373,9 +371,9 @@ export class CouchbaseTransactionHandler {
 
         // Upsert the new value
         if (currentDoc) {
-          await this.safeReplace(ctx, currentDoc, newValue, context);
+          await CouchbaseTransactionHandler.safeReplace(ctx, currentDoc, newValue, context);
         } else {
-          await this.safeInsert(ctx, collection, key, newValue, context);
+          await CouchbaseTransactionHandler.safeInsert(ctx, collection, key, newValue, context);
         }
 
         return newValue;
@@ -391,20 +389,20 @@ export class CouchbaseTransactionHandler {
     context: TransactionOperationContext,
     config?: TransactionConfig
   ): Promise<T[]> {
-    return await this.executeTransaction(
+    return await CouchbaseTransactionHandler.executeTransaction(
       async (ctx) => {
         const results: T[] = [];
-        
+
         for (let i = 0; i < operations.length; i++) {
           try {
             const result = await operations[i](ctx);
             results.push(result);
           } catch (error) {
-            err('Batch operation failed', {
+            err("Batch operation failed", {
               operationIndex: i,
               totalOperations: operations.length,
               transactionId: context.transactionId,
-              error: error.constructor.name
+              error: error.constructor.name,
             });
             throw error;
           }
@@ -414,7 +412,7 @@ export class CouchbaseTransactionHandler {
       },
       {
         ...context,
-        totalOperations: operations.length
+        totalOperations: operations.length,
       },
       config
     );

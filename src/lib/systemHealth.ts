@@ -53,7 +53,7 @@ export interface SystemHealthStatus {
 }
 
 export async function getSystemHealth(): Promise<SystemHealthStatus> {
-  const startTime = Date.now();
+  const _startTime = Date.now();
 
   try {
     // Run health checks in parallel for better performance
@@ -127,7 +127,7 @@ export async function getSystemHealth(): Promise<SystemHealthStatus> {
     };
 
     return result;
-  } catch (error) {
+  } catch (_error) {
     // Fallback health status if system health check fails
     return {
       overall: "unhealthy",

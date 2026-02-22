@@ -1,7 +1,7 @@
 /* test/k6/data/test-data-loader.ts */
 
 import { SharedArray } from "k6/data";
-import { createRandomSelector, generateQueryVariables } from "../utils/graphql-helpers.ts";
+import { createRandomSelector } from "../utils/graphql-helpers.ts";
 
 // Load test data using SharedArray for memory efficiency
 export const brands = new SharedArray("brands", () => JSON.parse(open("./brands.json")));

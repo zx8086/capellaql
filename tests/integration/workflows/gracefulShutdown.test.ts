@@ -1,6 +1,6 @@
 /* tests/integration/workflows/gracefulShutdown.test.ts */
 
-import { afterAll, beforeAll, describe, expect, mock, spyOn, test } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { type Subprocess, spawn } from "bun";
 
 describe("Graceful Shutdown Workflow Integration", () => {
@@ -31,7 +31,7 @@ describe("Graceful Shutdown Workflow Integration", () => {
           serverReady = true;
           break;
         }
-      } catch (error) {
+      } catch (_error) {
         // Server not ready yet
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -95,7 +95,7 @@ describe("Graceful Shutdown Workflow Integration", () => {
           ready = true;
           break;
         }
-      } catch (error) {
+      } catch (_error) {
         // Server not ready yet
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -142,7 +142,7 @@ describe("Graceful Shutdown Workflow Integration", () => {
             break;
           }
         }
-      } catch (error) {
+      } catch (_error) {
         // Server not ready yet
       }
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -161,7 +161,7 @@ describe("Graceful Shutdown Workflow Integration", () => {
 
     // Collect stdout/stderr to verify proper shutdown logging
     const stdout = await new Response(testServerProcess.stdout).text();
-    const stderr = await new Response(testServerProcess.stderr).text();
+    const _stderr = await new Response(testServerProcess.stderr).text();
 
     const exitCode = await testServerProcess.exited;
     expect(exitCode).toBe(0);

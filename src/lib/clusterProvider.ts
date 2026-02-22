@@ -1,6 +1,6 @@
 /* src/lib/clusterProvider.ts */
 
-import { err, log, warn } from "../telemetry/logger";
+import { err, warn } from "../telemetry/logger";
 import { type capellaConn, clusterConn } from "./couchbaseConnector";
 
 let connection: capellaConn | null = null;
@@ -11,7 +11,7 @@ export const getCluster = async (): Promise<capellaConn> => {
       const startTime = Date.now();
       connection = await clusterConn();
       const connectionTime = Date.now() - startTime;
-      
+
       // Only log slow connections
       if (connectionTime > 2000) {
         warn("Slow Couchbase connection established", {

@@ -13,7 +13,7 @@ const looksUrlCheckResolver = withValidation(
   async (_: unknown, args: LooksUrlCheckArgs, context: GraphQLContext): Promise<any> => {
     try {
       const { divisions, season } = args;
-      
+
       const cacheKey = SQLiteCacheKeys.looksUrlCheck(divisions, season);
 
       log("Looks URL check query initiated", {
@@ -21,7 +21,7 @@ const looksUrlCheckResolver = withValidation(
         divisions: divisions.slice(0, 5), // Show first 5 for logging
         divisionsCount: divisions.length,
         season,
-        user: context.user?.id
+        user: context.user?.id,
       });
 
       // Use SQLite cache with 2-minute TTL for URL checks
@@ -41,18 +41,18 @@ const looksUrlCheckResolver = withValidation(
             },
           };
 
-          log("Executing looks URL check query (cache miss)", { 
-            query, 
+          log("Executing looks URL check query (cache miss)", {
+            query,
             queryOptions,
-            requestId: context.requestId
+            requestId: context.requestId,
           });
 
           const result = await cluster.cluster.query(query, queryOptions);
-          
+
           debug("Looks URL check query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2)
+            result: JSON.stringify(result.rows[0], null, 2),
           });
 
           return result.rows[0];
@@ -60,10 +60,10 @@ const looksUrlCheckResolver = withValidation(
         2 * 60 * 1000 // 2-minute TTL
       );
     } catch (error) {
-      err("Error in looks URL check resolver:", { 
-        error, 
+      err("Error in looks URL check resolver:", {
+        error,
         requestId: context.requestId,
-        args
+        args,
       });
       throw error;
     }

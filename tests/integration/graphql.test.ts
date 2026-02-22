@@ -1,6 +1,6 @@
 /* tests/integration/graphql.test.ts - GraphQL Resolver Integration Tests */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, mock, test } from "bun:test";
 
 // Mock Couchbase connection before importing resolvers
 const mockQueryResult = {
@@ -78,16 +78,16 @@ mock.module("../../src/telemetry", () => ({
   measureDatabaseOperation: mock(async (operation: () => Promise<any>) => {
     return await operation();
   }),
-  createCouchbaseGetSpan: mock(async (bucket: string, key: string, operation: () => Promise<any>) => {
+  createCouchbaseGetSpan: mock(async (_bucket: string, _key: string, operation: () => Promise<any>) => {
     return await operation();
   }),
-  createCouchbaseQuerySpan: mock(async (bucket: string, query: string, operation: () => Promise<any>) => {
+  createCouchbaseQuerySpan: mock(async (_bucket: string, _query: string, operation: () => Promise<any>) => {
     return await operation();
   }),
-  createCouchbaseSearchSpan: mock(async (bucket: string, query: string, operation: () => Promise<any>) => {
+  createCouchbaseSearchSpan: mock(async (_bucket: string, _query: string, operation: () => Promise<any>) => {
     return await operation();
   }),
-  createDatabaseSpan: mock(async (options: any, operation: () => Promise<any>) => {
+  createDatabaseSpan: mock(async (_options: any, operation: () => Promise<any>) => {
     return await operation();
   }),
 }));
@@ -296,7 +296,7 @@ describe("GraphQL Resolvers Integration", () => {
     });
 
     test("should validate division parameter", async () => {
-      const validDivisions = ["WOMEN", "MEN", "KIDS"];
+      const _validDivisions = ["WOMEN", "MEN", "KIDS"];
       const invalidDivision = "INVALID_DIVISION";
 
       const args = {

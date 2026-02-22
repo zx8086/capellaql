@@ -1,5 +1,3 @@
-// Telemetry Batch Coordinator for unified exports
-import { logs, metrics, trace } from "@opentelemetry/api";
 import type { LogRecord } from "@opentelemetry/api-logs";
 import type { MetricData } from "@opentelemetry/sdk-metrics";
 import type { SpanData } from "@opentelemetry/sdk-trace-base";
@@ -296,7 +294,7 @@ export class TelemetryBatchCoordinator {
       let allSuccessful = true;
       const errors: string[] = [];
 
-      (results as PromiseSettledResult<ExportResult>[]).forEach((result, index) => {
+      (results as PromiseSettledResult<ExportResult>[]).forEach((result, _index) => {
         if (result.status === "fulfilled") {
           if (result.value.success) {
             totalExported += result.value.exportedCount;
@@ -603,9 +601,9 @@ export class TelemetryBatchCoordinator {
   private handleCriticalMemoryPressure(): void {
     console.error("CRITICAL: Telemetry memory pressure - dropping oldest data to prevent OOM");
 
-    const initialTraceCount = this.traceBuffer.length;
-    const initialMetricCount = this.metricBuffer.length;
-    const initialLogCount = this.logBuffer.length;
+    const _initialTraceCount = this.traceBuffer.length;
+    const _initialMetricCount = this.metricBuffer.length;
+    const _initialLogCount = this.logBuffer.length;
 
     // Drop 50% of oldest data from each buffer
     const tracesToDrop = Math.floor(this.traceBuffer.length * 0.5);

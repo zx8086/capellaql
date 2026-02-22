@@ -3,7 +3,6 @@
 import { check, sleep } from "k6";
 import type { Options } from "k6/options";
 import { getAllOperations, getQueryWithVariables } from "../data/test-data-loader.ts";
-import { getConfig } from "../utils/config.ts";
 import { executeGraphQLQuery } from "../utils/graphql-helpers.ts";
 import { dbConnectionErrors, dbConnections, dbQueryDuration } from "../utils/metrics.ts";
 
@@ -60,7 +59,7 @@ console.log(`Database Connection Stress Test:
 - Thresholds: <100 concurrent connections, <1s P95 query time`);
 
 export default function databaseConnectionStressTest(): void {
-  const testStart = Date.now();
+  const _testStart = Date.now();
   const currentConnections = Math.floor(Math.random() * 20) + __VU; // Simulate connection usage
 
   // Track simulated concurrent connections

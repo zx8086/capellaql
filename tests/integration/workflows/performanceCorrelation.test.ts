@@ -1,6 +1,6 @@
 /* tests/integration/workflows/performanceCorrelation.test.ts */
 
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import {
   clearPerformanceData,
   getGraphQLPerformanceStats,
@@ -43,7 +43,7 @@ describe("Performance Correlation Integration Workflow", () => {
     for (let i = 0; i < 5; i++) {
       try {
         await flakyResolver({ id: i });
-      } catch (error) {
+      } catch (_error) {
         // Expected failures
       }
     }
@@ -84,7 +84,7 @@ describe("Performance Correlation Integration Workflow", () => {
   test("should correlate GraphQL performance with simulated database latency", async () => {
     let simulatedDatabaseLatency = 100; // Start with 100ms
 
-    const databaseDependentResolver = withPerformanceTracking("Query", "databaseQuery", async (args: any) => {
+    const databaseDependentResolver = withPerformanceTracking("Query", "databaseQuery", async (_args: any) => {
       // Simulate database operation
       await new Promise((resolve) => setTimeout(resolve, simulatedDatabaseLatency));
 

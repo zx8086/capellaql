@@ -1,37 +1,13 @@
-import {
-  DocumentNotFoundError,
-  CouchbaseError,
-  TimeoutError,
-  UnambiguousTimeoutError,
-  AmbiguousTimeoutError,
-  ServiceNotAvailableError,
-  TemporaryFailureError,
-  AuthenticationFailureError,
-  RateLimitedError,
-  CasMismatchError,
-  DocumentLockedError,
-  DurabilityLevelNotAvailableError,
-  DurabilityAmbiguousError,
-  DurabilityImpossibleError,
-  FeatureNotAvailableError,
-  BucketNotFoundError,
-  ScopeNotFoundError,
-  CollectionNotFoundError,
-  IndexNotFoundError,
-  QueryError,
-  AnalyticsError,
-  ViewError,
-  SearchError
-} from 'couchbase';
-import { retryWithBackoff } from '$utils/bunUtils';
-import { error as err, warn, log as info } from '../telemetry/logger';
-import { recordHttpResponseTime } from '../telemetry/metrics/httpMetrics';
-import { recordQuery } from '$lib/couchbaseMetrics';
+import { AmbiguousTimeoutError, CouchbaseError } from "couchbase";
+import { recordQuery } from "$lib/couchbaseMetrics";
+import { retryWithBackoff } from "$utils/bunUtils";
+import { error as err, log as info, warn } from "../telemetry/logger";
+import { recordHttpResponseTime } from "../telemetry/metrics/httpMetrics";
 
 export interface ErrorClassification {
   retryable: boolean;
-  severity: 'info' | 'warning' | 'critical';
-  category: 'client' | 'network' | 'server' | 'application';
+  severity: "info" | "warning" | "critical";
+  category: "client" | "network" | "server" | "application";
   shouldLog: boolean;
   shouldAlert: boolean;
   maxRetries?: number;
@@ -60,42 +36,115 @@ export interface ErrorMetrics {
 export class CouchbaseErrorHandler {
   private static readonly ERROR_CLASSIFICATIONS = new Map<string, ErrorClassification>([
     // Document/Key Errors - Not retryable, expected in normal operations
-    ['DocumentNotFoundError', { retryable: false, severity: 'info', category: 'application', shouldLog: false, shouldAlert: false }],
-    ['CasMismatchError', { retryable: false, severity: 'info', category: 'application', shouldLog: true, shouldAlert: false }],
-    ['DocumentLockedError', { retryable: true, severity: 'warning', category: 'application', shouldLog: true, shouldAlert: false, maxRetries: 3 }],
-    
+    [
+      "DocumentNotFoundError",
+      { retryable: false, severity: "info", category: "application", shouldLog: false, shouldAlert: false },
+    ],
+    [
+      "CasMismatchError",
+      { retryable: false, severity: "info", category: "application", shouldLog: true, shouldAlert: false },
+    ],
+    [
+      "DocumentLockedError",
+      {
+        retryable: true,
+        severity: "warning",
+        category: "application",
+        shouldLog: true,
+        shouldAlert: false,
+        maxRetries: 3,
+      },
+    ],
+
     // Authentication/Authorization - Critical, not retryable
-    ['AuthenticationFailureError', { retryable: false, severity: 'critical', category: 'client', shouldLog: true, shouldAlert: true }],
-    
+    [
+      "AuthenticationFailureError",
+      { retryable: false, severity: "critical", category: "client", shouldLog: true, shouldAlert: true },
+    ],
+
     // Network/Timeout Errors - Retryable with different strategies
-    ['TimeoutError', { retryable: true, severity: 'warning', category: 'network', shouldLog: true, shouldAlert: false, maxRetries: 3 }],
-    ['UnambiguousTimeoutError', { retryable: true, severity: 'warning', category: 'network', shouldLog: true, shouldAlert: false, maxRetries: 2 }],
-    ['AmbiguousTimeoutError', { retryable: false, severity: 'critical', category: 'network', shouldLog: true, shouldAlert: true }],
-    
+    [
+      "TimeoutError",
+      { retryable: true, severity: "warning", category: "network", shouldLog: true, shouldAlert: false, maxRetries: 3 },
+    ],
+    [
+      "UnambiguousTimeoutError",
+      { retryable: true, severity: "warning", category: "network", shouldLog: true, shouldAlert: false, maxRetries: 2 },
+    ],
+    [
+      "AmbiguousTimeoutError",
+      { retryable: false, severity: "critical", category: "network", shouldLog: true, shouldAlert: true },
+    ],
+
     // Service Availability - Retryable, indicates system issues
-    ['ServiceNotAvailableError', { retryable: true, severity: 'critical', category: 'server', shouldLog: true, shouldAlert: true, maxRetries: 5 }],
-    ['TemporaryFailureError', { retryable: true, severity: 'warning', category: 'server', shouldLog: true, shouldAlert: false, maxRetries: 3 }],
-    ['RateLimitedError', { retryable: true, severity: 'warning', category: 'server', shouldLog: true, shouldAlert: false, maxRetries: 2 }],
-    
+    [
+      "ServiceNotAvailableError",
+      { retryable: true, severity: "critical", category: "server", shouldLog: true, shouldAlert: true, maxRetries: 5 },
+    ],
+    [
+      "TemporaryFailureError",
+      { retryable: true, severity: "warning", category: "server", shouldLog: true, shouldAlert: false, maxRetries: 3 },
+    ],
+    [
+      "RateLimitedError",
+      { retryable: true, severity: "warning", category: "server", shouldLog: true, shouldAlert: false, maxRetries: 2 },
+    ],
+
     // Resource Not Found - Not retryable, configuration issues
-    ['BucketNotFoundError', { retryable: false, severity: 'critical', category: 'client', shouldLog: true, shouldAlert: true }],
-    ['ScopeNotFoundError', { retryable: false, severity: 'critical', category: 'client', shouldLog: true, shouldAlert: true }],
-    ['CollectionNotFoundError', { retryable: false, severity: 'critical', category: 'client', shouldLog: true, shouldAlert: true }],
-    ['IndexNotFoundError', { retryable: false, severity: 'warning', category: 'client', shouldLog: true, shouldAlert: false }],
-    
+    [
+      "BucketNotFoundError",
+      { retryable: false, severity: "critical", category: "client", shouldLog: true, shouldAlert: true },
+    ],
+    [
+      "ScopeNotFoundError",
+      { retryable: false, severity: "critical", category: "client", shouldLog: true, shouldAlert: true },
+    ],
+    [
+      "CollectionNotFoundError",
+      { retryable: false, severity: "critical", category: "client", shouldLog: true, shouldAlert: true },
+    ],
+    [
+      "IndexNotFoundError",
+      { retryable: false, severity: "warning", category: "client", shouldLog: true, shouldAlert: false },
+    ],
+
     // Query/Service Specific Errors - Mixed retry strategies
-    ['QueryError', { retryable: false, severity: 'warning', category: 'application', shouldLog: true, shouldAlert: false }],
-    ['AnalyticsError', { retryable: false, severity: 'warning', category: 'application', shouldLog: true, shouldAlert: false }],
-    ['ViewError', { retryable: false, severity: 'warning', category: 'application', shouldLog: true, shouldAlert: false }],
-    ['SearchError', { retryable: false, severity: 'warning', category: 'application', shouldLog: true, shouldAlert: false }],
-    
+    [
+      "QueryError",
+      { retryable: false, severity: "warning", category: "application", shouldLog: true, shouldAlert: false },
+    ],
+    [
+      "AnalyticsError",
+      { retryable: false, severity: "warning", category: "application", shouldLog: true, shouldAlert: false },
+    ],
+    [
+      "ViewError",
+      { retryable: false, severity: "warning", category: "application", shouldLog: true, shouldAlert: false },
+    ],
+    [
+      "SearchError",
+      { retryable: false, severity: "warning", category: "application", shouldLog: true, shouldAlert: false },
+    ],
+
     // Durability Errors - Mixed strategies
-    ['DurabilityLevelNotAvailableError', { retryable: false, severity: 'warning', category: 'server', shouldLog: true, shouldAlert: false }],
-    ['DurabilityAmbiguousError', { retryable: false, severity: 'critical', category: 'server', shouldLog: true, shouldAlert: true }],
-    ['DurabilityImpossibleError', { retryable: false, severity: 'critical', category: 'server', shouldLog: true, shouldAlert: true }],
-    
+    [
+      "DurabilityLevelNotAvailableError",
+      { retryable: false, severity: "warning", category: "server", shouldLog: true, shouldAlert: false },
+    ],
+    [
+      "DurabilityAmbiguousError",
+      { retryable: false, severity: "critical", category: "server", shouldLog: true, shouldAlert: true },
+    ],
+    [
+      "DurabilityImpossibleError",
+      { retryable: false, severity: "critical", category: "server", shouldLog: true, shouldAlert: true },
+    ],
+
     // Feature Availability
-    ['FeatureNotAvailableError', { retryable: false, severity: 'warning', category: 'server', shouldLog: true, shouldAlert: false }],
+    [
+      "FeatureNotAvailableError",
+      { retryable: false, severity: "warning", category: "server", shouldLog: true, shouldAlert: false },
+    ],
   ]);
 
   static async executeWithRetry<T>(
@@ -104,19 +153,20 @@ export class CouchbaseErrorHandler {
     maxRetries?: number
   ): Promise<T> {
     const startTime = Date.now();
-    let lastError: Error | null = null;
+    let _lastError: Error | null = null;
     let retryCount = 0;
-    
-    const operationId = context.operationId || `${context.operationType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
+    const operationId =
+      context.operationId || `${context.operationType}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     try {
       return await retryWithBackoff(
         async () => {
           try {
             const result = await operation();
-            
+
             // Record successful operation metrics
-            recordHttpResponseTime(Date.now() - startTime, 'COUCHBASE', context.operationType, 200);
+            recordHttpResponseTime(Date.now() - startTime, "COUCHBASE", context.operationType, 200);
 
             // Record query metrics for performance tracking
             recordQuery(context.operationType, Date.now() - startTime, true, {
@@ -125,38 +175,38 @@ export class CouchbaseErrorHandler {
               bucket: context.bucket,
               scope: context.scope,
               collection: context.collection,
-              requestId: context.requestId
+              requestId: context.requestId,
             });
-            
+
             return result;
           } catch (error) {
             retryCount++;
-            lastError = error as Error;
-            
-            const classification = this.classifyError(error);
-            
+            _lastError = error as Error;
+
+            const classification = CouchbaseErrorHandler.classifyError(error);
+
             // Handle ambiguous operations - NEVER retry, always log
             if (error instanceof AmbiguousTimeoutError) {
-              await this.handleAmbiguousOperation(error, { ...context, operationId });
+              await CouchbaseErrorHandler.handleAmbiguousOperation(error, { ...context, operationId });
               throw error;
             }
-            
+
             // Log error based on classification
             if (classification.shouldLog) {
-              this.logError(error, context, retryCount, classification);
+              CouchbaseErrorHandler.logError(error, context, retryCount, classification);
             }
-            
+
             // Check if error is retryable
             if (!classification.retryable) {
               throw error;
             }
-            
+
             // Check retry limits
             const effectiveMaxRetries = maxRetries ?? classification.maxRetries ?? 3;
             if (retryCount >= effectiveMaxRetries) {
               throw error;
             }
-            
+
             throw error; // Let retry logic handle the delay
           }
         },
@@ -166,7 +216,7 @@ export class CouchbaseErrorHandler {
       );
     } catch (error) {
       // Record failed operation metrics
-      recordHttpResponseTime(Date.now() - startTime, 'COUCHBASE', context.operationType, 500);
+      recordHttpResponseTime(Date.now() - startTime, "COUCHBASE", context.operationType, 500);
 
       // Record failed query metrics
       recordQuery(context.operationType, Date.now() - startTime, false, {
@@ -176,39 +226,39 @@ export class CouchbaseErrorHandler {
         bucket: context.bucket,
         scope: context.scope,
         collection: context.collection,
-        requestId: context.requestId
+        requestId: context.requestId,
       });
-      
+
       throw error;
     }
   }
 
   static classifyError(error: any): ErrorClassification {
     const errorType = error.constructor.name;
-    const classification = this.ERROR_CLASSIFICATIONS.get(errorType);
-    
+    const classification = CouchbaseErrorHandler.ERROR_CLASSIFICATIONS.get(errorType);
+
     if (classification) {
       return classification;
     }
-    
+
     // Default classification for unknown Couchbase errors
     if (error instanceof CouchbaseError) {
       return {
         retryable: false,
-        severity: 'warning',
-        category: 'server',
+        severity: "warning",
+        category: "server",
         shouldLog: true,
-        shouldAlert: false
+        shouldAlert: false,
       };
     }
-    
+
     // Default for non-Couchbase errors
     return {
       retryable: false,
-      severity: 'critical',
-      category: 'application',
+      severity: "critical",
+      category: "application",
       shouldLog: true,
-      shouldAlert: true
+      shouldAlert: true,
     };
   }
 
@@ -226,19 +276,19 @@ export class CouchbaseErrorHandler {
       classification: {
         severity: classification.severity,
         category: classification.category,
-        retryable: classification.retryable
+        retryable: classification.retryable,
       },
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     switch (classification.severity) {
-      case 'critical':
+      case "critical":
         err(`Couchbase ${classification.category} error`, logData);
         break;
-      case 'warning':
+      case "warning":
         warn(`Couchbase ${classification.category} error`, logData);
         break;
-      case 'info':
+      case "info":
         info(`Couchbase ${classification.category} error`, logData);
         break;
     }
@@ -257,30 +307,29 @@ export class CouchbaseErrorHandler {
         scope: context.scope,
         collection: context.collection,
         documentKey: context.documentKey,
-        query: context.query ? context.query.substring(0, 200) + '...' : undefined,
-        requestId: context.requestId
+        query: context.query ? `${context.query.substring(0, 200)}...` : undefined,
+        requestId: context.requestId,
       },
       timestamp: new Date().toISOString(),
       requiresManualInvestigation: true,
-      investigationNotes: 'Operation may have succeeded on server but client timed out. Manual verification required.'
+      investigationNotes: "Operation may have succeeded on server but client timed out. Manual verification required.",
     };
 
-    err('AMBIGUOUS_TIMEOUT_OPERATION', ambiguousLogData);
-    
+    err("AMBIGUOUS_TIMEOUT_OPERATION", ambiguousLogData);
+
     // Store ambiguous operations for investigation dashboard
-    await this.storeAmbiguousOperation(ambiguousLogData);
+    await CouchbaseErrorHandler.storeAmbiguousOperation(ambiguousLogData);
   }
 
   private static async storeAmbiguousOperation(logData: any): Promise<void> {
     try {
       // This could be enhanced to store in a dedicated collection for investigation
       // For now, we rely on structured logging for investigation
-      info('Stored ambiguous operation for investigation', { operationId: logData.operationId });
+      info("Stored ambiguous operation for investigation", { operationId: logData.operationId });
     } catch (storeError) {
-      err('Failed to store ambiguous operation', { error: storeError, originalLogData: logData });
+      err("Failed to store ambiguous operation", { error: storeError, originalLogData: logData });
     }
   }
-
 
   static createDocumentOperationContext(
     operationType: string,
@@ -296,7 +345,7 @@ export class CouchbaseErrorHandler {
       scope,
       collection,
       documentKey,
-      requestId
+      requestId,
     };
   }
 
@@ -310,17 +359,14 @@ export class CouchbaseErrorHandler {
       operationType,
       query,
       requestId,
-      bucket
+      bucket,
     };
   }
 
-  static createConnectionOperationContext(
-    operationType: string,
-    requestId?: string
-  ): OperationContext {
+  static createConnectionOperationContext(operationType: string, requestId?: string): OperationContext {
     return {
       operationType,
-      requestId
+      requestId,
     };
   }
 
@@ -336,7 +382,7 @@ export class CouchbaseErrorHandler {
       totalErrors: 0,
       errorsByType: {},
       errorsByCategory: {},
-      retrySuccessRate: 0
+      retrySuccessRate: 0,
     };
   }
 }

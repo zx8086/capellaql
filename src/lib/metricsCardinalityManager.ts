@@ -220,7 +220,7 @@ class MetricsCardinalityManager {
 
       // Truncate very long values
       if (sanitizedValue.length > 100) {
-        sanitizedValue = sanitizedValue.substring(0, 100) + "...";
+        sanitizedValue = `${sanitizedValue.substring(0, 100)}...`;
       }
 
       // Replace problematic characters

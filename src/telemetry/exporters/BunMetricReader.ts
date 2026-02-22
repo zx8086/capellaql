@@ -1,7 +1,6 @@
 // Custom metric reader for Bun that uses our BunMetricExporter directly
 
-import type { ResourceMetrics } from "@opentelemetry/sdk-metrics";
-import { MeterProvider, MetricReader } from "@opentelemetry/sdk-metrics";
+import { MetricReader } from "@opentelemetry/sdk-metrics";
 import { BunMetricExporter, type BunOTLPExporterConfig } from "./BunMetricExporter";
 
 /**

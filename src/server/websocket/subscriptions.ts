@@ -1,9 +1,9 @@
 /* src/server/websocket/subscriptions.ts */
 
 import type { ServerWebSocket } from "bun";
-import type { WebSocketData } from "../types";
-import { activeConnections } from "../middleware/logging";
 import { debug, err } from "../../telemetry";
+import { activeConnections } from "../middleware/logging";
+import type { WebSocketData } from "../types";
 
 /**
  * WebSocket handlers for GraphQL subscriptions.
@@ -90,8 +90,5 @@ export function shouldUpgradeWebSocket(request: Request): boolean {
   const upgrade = request.headers.get("upgrade");
   const url = new URL(request.url);
 
-  return (
-    upgrade?.toLowerCase() === "websocket" &&
-    url.pathname === "/graphql"
-  );
+  return upgrade?.toLowerCase() === "websocket" && url.pathname === "/graphql";
 }

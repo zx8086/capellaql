@@ -180,7 +180,7 @@ class ConfigurationHotReload extends EventEmitter {
       const numericVars = ["COUCHBASE_KV_TIMEOUT", "COUCHBASE_QUERY_TIMEOUT", "APPLICATION_PORT"];
 
       for (const numericVar of numericVars) {
-        if (envVars[numericVar] && isNaN(Number(envVars[numericVar]))) {
+        if (envVars[numericVar] && Number.isNaN(Number(envVars[numericVar]))) {
           errors.push(`${numericVar} must be a valid number`);
         }
       }

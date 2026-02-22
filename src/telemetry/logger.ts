@@ -3,8 +3,8 @@
 import { context, type SpanContext, trace } from "@opentelemetry/api";
 import * as api from "@opentelemetry/api-logs";
 import config from "$config";
-import { getSimpleSmartSampler } from "./instrumentation";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
+import { getSimpleSmartSampler } from "./instrumentation";
 
 export enum LogLevel {
   DEBUG = "debug",
@@ -117,10 +117,10 @@ class TelemetryLogger {
       // Add correlation ID from span attributes if available
       if (span) {
         const attributes = span.attributes;
-        if (attributes && attributes["correlation.id"]) {
+        if (attributes?.["correlation.id"]) {
           baseContext.requestId = String(attributes["correlation.id"]);
         }
-        if (attributes && attributes["user.id"]) {
+        if (attributes?.["user.id"]) {
           baseContext.userId = String(attributes["user.id"]);
         }
       }
@@ -253,15 +253,11 @@ class TelemetryLogger {
    */
   private shouldSampleLog(logData: StructuredLogData): boolean {
     const samplingCoordinator = getSimpleSmartSampler();
-    
+
     if (samplingCoordinator) {
       // Use unified sampling coordinator for consistent decisions
-      const decision = samplingCoordinator.shouldSampleLog(
-        logData.level,
-        logData.message,
-        logData.context?.traceId
-      );
-      
+      const decision = samplingCoordinator.shouldSampleLog(logData.level, logData.message, logData.context?.traceId);
+
       return decision.shouldSample;
     }
 

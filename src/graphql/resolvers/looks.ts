@@ -1,9 +1,10 @@
 /* src/graphql/resolvers/looks.ts */
 
-import { SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
+import { cacheEntities, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
 import { getCluster } from "$lib/clusterProvider";
 import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
+import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
 import type { GraphQLContext } from "../context";
 import { type LooksArgs, LooksArgsSchema, withValidation } from "../validation/schemas";
@@ -14,7 +15,12 @@ const looksResolver = withValidation(
   async (_: unknown, args: LooksArgs, context: GraphQLContext): Promise<any> => {
     try {
       const { brand, season, division } = args;
-      const cacheKey = SQLiteCacheKeys.looks(brand, season, division);
+
+      // Use QueryFingerprintBuilder for SIMD-accelerated cache key generation
+      const cacheKey = QueryFingerprintBuilder.for("looks")
+        .withVariables({ brand, season, division })
+        .withPrefix("gql")
+        .build();
 
       log("GraphQL looks query initiated", {
         requestId: context.requestId,
@@ -53,7 +59,7 @@ const looksResolver = withValidation(
 
           const queryEndTime = Date.now();
           const queryDuration = queryEndTime - (context.startTime || queryEndTime);
-          
+
           log("GraphQL looks query completed", {
             requestId: context.requestId,
             operationName: "looks",
@@ -62,13 +68,22 @@ const looksResolver = withValidation(
             performanceCategory: queryDuration > 1000 ? "slow" : queryDuration > 500 ? "moderate" : "fast",
             cacheStatus: "populated",
           });
-          
+
           debug("Looks query result details", {
             requestId: context.requestId,
             resultSample: JSON.stringify(result.rows[0], null, 2),
           });
 
-          return result.rows[0];
+          const data = result.rows[0];
+
+          // Cache individual look entities for lookDetails reuse
+          cacheEntities(data, (look: any) => (look.documentKey ? SQLiteCacheKeys.entityLook(look.documentKey) : null), {
+            requiredFields: ["documentKey", "divisionCode", "lookType", "assetUrl", "title"],
+            ttlMs: 10 * 60 * 1000,
+            userScoped: false,
+          });
+
+          return data;
         },
         5 * 60 * 1000 // 5-minute TTL
       );
