@@ -30,7 +30,7 @@ export interface CapellaConfig {
 export interface RuntimeConfig {
   NODE_ENV: string;
   CN_ROOT: string;
-  CN_CXXCBC_CACHE_DIR: string;
+  CN_CXXCBC_CACHE_DIR?: string;
   SOURCE_MAP_SUPPORT: boolean;
   PRESERVE_SOURCE_MAPS: boolean;
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: number;
@@ -62,14 +62,13 @@ export interface TelemetryConfig {
   SAMPLING_RATE: number;
   CIRCUIT_BREAKER_THRESHOLD: number;
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
-  
+
   // Simplified 3-tier sampling (NEW)
   TRACES_SAMPLING_RATE: number;
   METRICS_SAMPLING_RATE: number;
   LOGS_SAMPLING_RATE: number;
   COST_OPTIMIZATION_MODE: boolean;
   HEALTH_CHECK_SAMPLING_RATE: number;
-  
 }
 
 export interface Config {
@@ -226,7 +225,7 @@ const TelemetryConfigSchema = z.object({
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
     .default(60000), // 1 minute
-  
+
   // Simplified 3-tier sampling configuration (NEW)
   TRACES_SAMPLING_RATE: z.coerce
     .number()
@@ -242,14 +241,13 @@ const TelemetryConfigSchema = z.object({
     .number()
     .min(0.0, "LOGS_SAMPLING_RATE must be at least 0%")
     .max(1.0, "LOGS_SAMPLING_RATE cannot exceed 100%")
-    .default(0.30), // 30% logs - balance visibility and storage costs
+    .default(0.3), // 30% logs - balance visibility and storage costs
   COST_OPTIMIZATION_MODE: z.coerce.boolean().default(true), // Enable cost optimization features
   HEALTH_CHECK_SAMPLING_RATE: z.coerce
     .number()
     .min(0.0, "HEALTH_CHECK_SAMPLING_RATE must be at least 0%")
     .max(1.0, "HEALTH_CHECK_SAMPLING_RATE cannot exceed 100%")
     .default(0.05), // 5% health checks - reduce noise
-  
 });
 
 // Configuration schema with production security checks

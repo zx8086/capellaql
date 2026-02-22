@@ -33,7 +33,7 @@ import { BunSpanProcessor } from "./exporters/BunSpanProcessor";
 import { BunTraceExporter } from "./exporters/BunTraceExporter";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 import { log, telemetryLogger, warn } from "./logger";
-import { DEFAULT_SIMPLE_SAMPLING_CONFIG, SimpleSmartSampler, type SimpleSmartSamplingConfig } from "./sampling/SimpleSmartSampler";
+import { SimpleSmartSampler, type SimpleSmartSamplingConfig } from "./sampling/SimpleSmartSampler";
 
 let sdk: NodeSDK | undefined;
 let isInitialized = false;
@@ -121,7 +121,7 @@ export async function initializeTelemetry(): Promise<void> {
     });
 
     // Create metric reader - use custom Bun reader when running under Bun
-    let metricReader;
+    let metricReader: BunMetricReader | PeriodicExportingMetricReader;
     if (typeof Bun !== "undefined") {
       if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
         console.debug("Using Bun-optimized metric reader (bypasses PeriodicExportingMetricReader)");
@@ -149,15 +149,23 @@ export async function initializeTelemetry(): Promise<void> {
     const simpleSamplingConfig: SimpleSmartSamplingConfig = {
       // Use new simplified rates or fall back to derived values for backward compatibility
       traces: config.TRACES_SAMPLING_RATE || config.SAMPLING_RATE,
-      metrics: config.METRICS_SAMPLING_RATE || 
-               ((config.METRIC_SAMPLING_BUSINESS + config.METRIC_SAMPLING_TECHNICAL + 
-                 config.METRIC_SAMPLING_INFRASTRUCTURE + config.METRIC_SAMPLING_DEBUG) / 4),
-      logs: config.LOGS_SAMPLING_RATE || 
-            ((config.LOG_SAMPLING_DEBUG + config.LOG_SAMPLING_INFO + 
-              config.LOG_SAMPLING_WARN + config.LOG_SAMPLING_ERROR) / 4),
-      
-      preserveErrors: true,        // Always preserve errors
-      costOptimizationMode: config.COST_OPTIMIZATION_MODE !== undefined ? config.COST_OPTIMIZATION_MODE : config.DEPLOYMENT_ENVIRONMENT === 'production',
+      metrics:
+        config.METRICS_SAMPLING_RATE ||
+        (config.METRIC_SAMPLING_BUSINESS +
+          config.METRIC_SAMPLING_TECHNICAL +
+          config.METRIC_SAMPLING_INFRASTRUCTURE +
+          config.METRIC_SAMPLING_DEBUG) /
+          4,
+      logs:
+        config.LOGS_SAMPLING_RATE ||
+        (config.LOG_SAMPLING_DEBUG + config.LOG_SAMPLING_INFO + config.LOG_SAMPLING_WARN + config.LOG_SAMPLING_ERROR) /
+          4,
+
+      preserveErrors: true, // Always preserve errors
+      costOptimizationMode:
+        config.COST_OPTIMIZATION_MODE !== undefined
+          ? config.COST_OPTIMIZATION_MODE
+          : config.DEPLOYMENT_ENVIRONMENT === "production",
       healthCheckSampling: config.HEALTH_CHECK_SAMPLING_RATE || 0.05,
     };
 
@@ -422,7 +430,7 @@ export function getSimpleSmartSampler(): SimpleSmartSampler | undefined {
 
 // Backward compatibility
 export function getUnifiedSamplingCoordinator(): SimpleSmartSampler | undefined {
-  console.warn('getUnifiedSamplingCoordinator() is deprecated - use getSimpleSmartSampler() instead');
+  console.warn("getUnifiedSamplingCoordinator() is deprecated - use getSimpleSmartSampler() instead");
   return simpleSmartSampler;
 }
 

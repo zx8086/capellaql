@@ -1,6 +1,6 @@
 // Enhanced Bun utilities test suite with modern testing patterns
 
-import { afterAll, beforeAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
+import { beforeAll, beforeEach, describe, expect, mock, spyOn, test } from "bun:test";
 import { tmpdir } from "os";
 import { join } from "path";
 import {
@@ -98,9 +98,10 @@ describe("BunUtils - Core Functionality", () => {
       const reader = stream.getReader();
 
       let receivedData = "";
-      let chunk;
-      while (!(chunk = await reader.read()).done) {
-        receivedData += new TextDecoder().decode(chunk.value);
+      let result = await reader.read();
+      while (!result.done) {
+        receivedData += new TextDecoder().decode(result.value);
+        result = await reader.read();
       }
 
       expect(receivedData).toBe(content);
@@ -179,7 +180,7 @@ describe("BunUtils - Core Functionality", () => {
       // Test with a known environment variable
       const path = BunEnv.get("PATH");
       expect(typeof path).toBe("string");
-      expect(path!.length).toBeGreaterThan(0);
+      expect(path?.length).toBeGreaterThan(0);
 
       // Test with non-existent variable
       const nonExistent = BunEnv.get("NON_EXISTENT_VAR_12345");
@@ -356,11 +357,11 @@ describe("BunUtils - Resilience Patterns", () => {
         return Promise.resolve();
       });
 
-      let attempts = 0;
+      let _attempts = 0;
       await expect(
         retryWithBackoff(
           async () => {
-            attempts++;
+            _attempts++;
             throw new Error("Always fails");
           },
           3,
@@ -464,8 +465,8 @@ describe("BunUtils - Performance Benchmarks", () => {
     // For comparison - using standard fs operations
     const fsTime = await BunPerf.measure(async () => {
       const fs = await import("fs/promises");
-      await fs.writeFile(testFile + ".fs", testContent);
-      return await fs.readFile(testFile + ".fs", "utf8");
+      await fs.writeFile(`${testFile}.fs`, testContent);
+      return await fs.readFile(`${testFile}.fs`, "utf8");
     }, "Standard fs operations");
 
     console.log(`Bun operations: ${bunTime.duration.toFixed(2)}ms`);

@@ -1,3 +1,4 @@
+---
 # .github/workflows/docker-ci-cd.yml
 
 name: Docker CI/CD with Bun and Snyk

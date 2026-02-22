@@ -213,11 +213,11 @@ const defaultConfig: Config = {
     CIRCUIT_BREAKER_THRESHOLD: 5,
     CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
     // Simplified 3-tier sampling configuration (NEW) - 2025 unified sampling approach
-    TRACES_SAMPLING_RATE: 0.15,   // 15% traces - cost-effective distributed tracing
-    METRICS_SAMPLING_RATE: 0.25,  // 25% metrics - higher for performance monitoring
-    LOGS_SAMPLING_RATE: 0.30,     // 30% logs - balance visibility and storage costs
-    COST_OPTIMIZATION_MODE: true,        // Enable smart cost optimization features
-    HEALTH_CHECK_SAMPLING_RATE: 0.05,    // 5% health checks - reduce noise
+    TRACES_SAMPLING_RATE: 0.15, // 15% traces - cost-effective distributed tracing
+    METRICS_SAMPLING_RATE: 0.25, // 25% metrics - higher for performance monitoring
+    LOGS_SAMPLING_RATE: 0.3, // 30% logs - balance visibility and storage costs
+    COST_OPTIMIZATION_MODE: true, // Enable smart cost optimization features
+    HEALTH_CHECK_SAMPLING_RATE: 0.05, // 5% health checks - reduce noise
   },
 };
 
@@ -579,11 +579,8 @@ function loadConfigFromEnv(): Partial<Config> {
       ) as number) ?? defaultConfig.telemetry.METRICS_SAMPLING_RATE,
 
     LOGS_SAMPLING_RATE:
-      (parseEnvVar(
-        getEnvVar(envVarMapping.telemetry.LOGS_SAMPLING_RATE),
-        "number",
-        "LOGS_SAMPLING_RATE"
-      ) as number) ?? defaultConfig.telemetry.LOGS_SAMPLING_RATE,
+      (parseEnvVar(getEnvVar(envVarMapping.telemetry.LOGS_SAMPLING_RATE), "number", "LOGS_SAMPLING_RATE") as number) ??
+      defaultConfig.telemetry.LOGS_SAMPLING_RATE,
 
     COST_OPTIMIZATION_MODE:
       (parseEnvVar(
@@ -598,7 +595,6 @@ function loadConfigFromEnv(): Partial<Config> {
         "number",
         "HEALTH_CHECK_SAMPLING_RATE"
       ) as number) ?? defaultConfig.telemetry.HEALTH_CHECK_SAMPLING_RATE,
-
   };
 
   return config;
@@ -746,14 +742,14 @@ try {
   // Log configuration consolidation success
   process.stderr.write("Unified configuration system active - ALL environment variables consolidated\n");
   process.stderr.write(`Configuration sections loaded: application, capella, runtime, deployment, telemetry\n`);
-  process.stderr.write(
-    `Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`
-  );
-  
+  process.stderr.write(`Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`);
+
   // Log simplified sampling configuration status
   if (config.telemetry.COST_OPTIMIZATION_MODE) {
     process.stderr.write(`💰 Cost optimization mode: ENABLED (3-tier sampling)\n`);
-    process.stderr.write(`📉 Simplified sampling rates: Traces=${config.telemetry.TRACES_SAMPLING_RATE}, Metrics=${config.telemetry.METRICS_SAMPLING_RATE}, Logs=${config.telemetry.LOGS_SAMPLING_RATE}\n`);
+    process.stderr.write(
+      `📉 Simplified sampling rates: Traces=${config.telemetry.TRACES_SAMPLING_RATE}, Metrics=${config.telemetry.METRICS_SAMPLING_RATE}, Logs=${config.telemetry.LOGS_SAMPLING_RATE}\n`
+    );
   } else {
     process.stderr.write(`Legacy sampling mode: ACTIVE (detailed category-based sampling)\n`);
   }
@@ -766,9 +762,7 @@ try {
     // Already handled above with detailed error reporting
     process.exit(1);
   } else {
-    process.stderr.write(
-      `Unexpected configuration error: ${error instanceof Error ? error.message : String(error)}\n`
-    );
+    process.stderr.write(`Unexpected configuration error: ${error instanceof Error ? error.message : String(error)}\n`);
     process.stderr.write("\n=== CONFIGURATION SYSTEM FAILURE ===\n");
     process.stderr.write("The unified configuration system encountered a critical error.\n");
     process.stderr.write(

@@ -188,7 +188,7 @@ try {
   const isProduction =
     config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
-  const allWarnings: string[] = [
+  const _allWarnings: string[] = [
     ...validateApplicationConfig(config.application, isProduction),
     ...validateCouchbaseConfig(config.capella, isProduction),
     ...validateTelemetryConfig(config.telemetry, isProduction),
@@ -228,9 +228,7 @@ try {
   // Log modular configuration success
   process.stderr.write("Modular configuration system active - Domain-separated validation\n");
   process.stderr.write(`Configuration domains loaded: application, capella, runtime, deployment, telemetry\n`);
-  process.stderr.write(
-    `Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`
-  );
+  process.stderr.write(`Telemetry configuration: ${config.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`);
 
   // Log runtime detection
   process.stderr.write(`Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);
@@ -329,7 +327,6 @@ export function loadTelemetryConfigFromEnv() {
 export {
   loadApplicationConfigFromEnv,
   loadCouchbaseConfigFromEnv,
-  loadTelemetryConfigFromEnv,
   loadRuntimeConfigFromEnv,
   loadDeploymentConfigFromEnv,
 };

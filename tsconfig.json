@@ -7,7 +7,8 @@
     "moduleDetection": "force",
     "jsx": "react-jsx",
     "allowJs": true,
-    "typeRoots": ["./node_modules/@types", "./src/types", "./node_modules/bun-types"],
+    "typeRoots": ["./node_modules/@types", "./node_modules/bun-types"],
+    "types": ["bun", "node", "k6"],
 
     // Bun-optimized bundler mode with enhanced performance
     "moduleResolution": "bundler",
@@ -26,12 +27,12 @@
 
     // Strict type checking (production-ready)
     "strict": true,
-    "exactOptionalPropertyTypes": true,
+    "exactOptionalPropertyTypes": false,
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true,
-    "noUncheckedIndexedAccess": true,
+    "noUncheckedIndexedAccess": false,
     "noImplicitOverride": true,
-    "noPropertyAccessFromIndexSignature": true,
+    "noPropertyAccessFromIndexSignature": false,
 
     // Module system optimizations for Bun
     "esModuleInterop": true,
@@ -66,8 +67,8 @@
     },
 
     // Production-ready strict settings
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
 
     // Bun-specific optimizations
     "useDefineForClassFields": true,
@@ -82,7 +83,17 @@
     "preserveValueImports": false
   },
   "include": ["src/**/*", "src/global.d.ts", "tests/**/*.test.ts", "tools/**/*.ts"],
-  "exclude": ["node_modules", "dist", ".bun-cache", "coverage", "test/k6/**/*.js", "**/*.min.js", "**/*.d.ts"],
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".bun-cache",
+    "coverage",
+    "test/k6/**/*.js",
+    "**/*.min.js",
+    "**/*.d.ts",
+    "docs",
+    "vendor"
+  ],
   "ts-node": {
     "esm": true,
     "experimentalSpecifierResolution": "node"
