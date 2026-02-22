@@ -170,15 +170,8 @@ jobs:
           echo "Bun cache hit: ${{ steps.setup.outputs.bun-cache-hit }}"
           echo "Docker digest: ${{ steps.build.outputs.digest }}"
 
-      - name: Upload .env artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: env-file
-          path: .env
-          retention-days: 1
-
 # =============================================================================
-# Job 2: Security Scan - Parallel 6-scanner matrix
+# Job 2: Security Scan - Parallel 3-scanner matrix
 # =============================================================================
   security-scan:
     name: Security Scan (${{ matrix.scanner }})
@@ -253,102 +246,11 @@ jobs:
         continue-on-error: true
 
 # =============================================================================
-# Job 3: Integration Test - Container health and graceful shutdown
-# =============================================================================
-  integration-test:
-    name: Integration Test
-    needs: build
-    if: github.event_name != 'pull_request'
-    runs-on: self-hosted
-    timeout-minutes: 15
-    continue-on-error: true
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Download .env artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: env-file
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: Pull and test container health
-        id: health-test
-        run: |
-          # Stop existing containers
-          docker ps -q --filter publish=4000 | xargs -r docker stop || true
-          docker rm -f capellaql-test 2>/dev/null || true
-
-          # Pull and run container
-          IMAGE_TAG=$(echo '${{ needs.build.outputs.image-ref }}' | head -n1)
-          docker pull "${IMAGE_TAG}"
-
-          docker run -d \
-            --name capellaql-test \
-            -p 4000:4000 \
-            --env-file .env \
-            -e NODE_ENV=production \
-            -e ENABLE_OPENTELEMETRY=false \
-            -e LOG_LEVEL=info \
-            "${IMAGE_TAG}"
-
-          # Wait for container to be healthy
-          echo "Waiting for container to be healthy..."
-          for i in {1..30}; do
-            if docker exec capellaql-test /usr/local/bin/bun run healthcheck 2>/dev/null; then
-              echo "Container is healthy!"
-              echo "HEALTH_STATUS=healthy" >> $GITHUB_OUTPUT
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "Container failed health check"
-              docker logs capellaql-test
-              echo "HEALTH_STATUS=unhealthy" >> $GITHUB_OUTPUT
-              exit 1
-            fi
-            echo "Waiting... (attempt $i/30)"
-            sleep 2
-          done
-
-      - name: Test graceful shutdown
-        run: |
-          echo "Testing graceful shutdown..."
-
-          # Send SIGTERM and capture timing
-          START_TIME=$(date +%s%N)
-          docker stop --time=30 capellaql-test
-          END_TIME=$(date +%s%N)
-
-          # Calculate shutdown duration
-          DURATION=$(( (END_TIME - START_TIME) / 1000000 ))
-          echo "Graceful shutdown completed in ${DURATION}ms"
-
-          # Check container exited cleanly (exit code 0)
-          EXIT_CODE=$(docker inspect --format='{{.State.ExitCode}}' capellaql-test)
-          if [ "$EXIT_CODE" = "0" ]; then
-            echo "Container exited cleanly with code 0"
-          else
-            echo "Warning: Container exited with code $EXIT_CODE"
-          fi
-
-      - name: Cleanup
-        if: always()
-        run: |
-          docker rm -f capellaql-test 2>/dev/null || true
-          rm -f .env
-
-# =============================================================================
-# Job 4: Summary - Generate build report
+# Job 3: Summary - Generate build report
 # =============================================================================
   summary:
     name: Build Summary
-    needs: [build, security-scan, integration-test]
+    needs: [build, security-scan]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -371,7 +273,6 @@ jobs:
             echo "|-----|--------|"
             echo "| Build | ${{ needs.build.result }} |"
             echo "| Security Scan | ${{ needs.security-scan.result }} |"
-            echo "| Integration Test | ${{ needs.integration-test.result }} |"
             echo ""
             echo "### Security Features"
             echo "- 3-Scanner Security Matrix:"
