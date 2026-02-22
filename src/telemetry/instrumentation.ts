@@ -150,7 +150,7 @@ export async function initializeTelemetry(): Promise<void> {
 
     const periodicReader = new PeriodicExportingMetricReader({
       exporter: metricExporter,
-      exportIntervalMillis: 10000,
+      exportIntervalMillis: config.METRIC_READER_INTERVAL, // Use config value (default 60000ms)
     });
     metricReader = periodicReader;
 
@@ -454,12 +454,5 @@ export function createPerformanceTimer(label: string) {
   return BunPerf.createTimer(label);
 }
 
-// Initialize telemetry on module load
-if (typeof Bun !== "undefined" || process.env.NODE_ENV !== "test") {
-  initializeTelemetry().catch((err) => {
-    console.error("Critical: Failed to initialize OpenTelemetry:", err);
-    if (config?.DEPLOYMENT_ENVIRONMENT === "production") {
-      process.exit(1);
-    }
-  });
-}
+// Note: Telemetry is initialized explicitly via createServer() in src/index.ts
+// Do NOT auto-initialize here to avoid duplicate registration errors

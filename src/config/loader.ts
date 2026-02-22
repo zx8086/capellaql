@@ -208,7 +208,7 @@ export function initializeConfig(): Config {
   if (!result.success) {
     const configError = new ModularConfigurationError("Modular configuration validation failed", result.error, mergedConfig);
 
-    // Enhanced error reporting
+    // Enhanced error reporting (always show errors)
     process.stderr.write(`\n=== MODULAR CONFIGURATION VALIDATION FAILED ===\n`);
     process.stderr.write(`${configError.toDetailedString()}\n`);
 
@@ -239,7 +239,7 @@ export function initializeConfig(): Config {
   // Perform comprehensive health check
   const healthCheck = validateConfigHealth(validatedConfig);
   if (!healthCheck.healthy || healthCheck.warnings.length > 0) {
-    // Generate and log full health report
+    // Generate and log full health report (warnings always shown)
     const healthReport = generateConfigHealthReport(validatedConfig);
     process.stderr.write(healthReport);
 
@@ -252,26 +252,20 @@ export function initializeConfig(): Config {
     }
   }
 
-  // Log successful configuration load (with sensitive data redacted)
-  const sanitizedConfig = sanitizeConfigForLogging(validatedConfig);
-  process.stderr.write("\n=== MODULAR CONFIGURATION LOADED SUCCESSFULLY ===\n");
-  process.stderr.write(`${JSON.stringify(sanitizedConfig, null, 2)}\n`);
+  // Only log verbose config when LOG_LEVEL is debug
+  const isDebugLevel = validatedConfig.application.LOG_LEVEL === "debug";
 
-  // Environment-specific logging
-  if (isProduction) {
-    process.stderr.write("Production mode: All security validations passed\n");
-  } else {
-    process.stderr.write("Development mode: Using development defaults where applicable\n");
+  if (isDebugLevel) {
+    const sanitizedConfig = sanitizeConfigForLogging(validatedConfig);
+    process.stderr.write("\n=== MODULAR CONFIGURATION LOADED SUCCESSFULLY ===\n");
+    process.stderr.write(`${JSON.stringify(sanitizedConfig, null, 2)}\n`);
+    process.stderr.write(isProduction ? "Production mode: All security validations passed\n" : "Development mode: Using development defaults where applicable\n");
+    process.stderr.write("Modular configuration system active - Domain-separated validation\n");
+    process.stderr.write(`Configuration domains loaded: application, capella, runtime, deployment, telemetry\n`);
+    process.stderr.write(`Telemetry configuration: ${validatedConfig.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`);
+    process.stderr.write(`Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);
+    process.stderr.write("=== MODULAR CONFIGURATION INITIALIZATION COMPLETE ===\n\n");
   }
-
-  // Log modular configuration success
-  process.stderr.write("Modular configuration system active - Domain-separated validation\n");
-  process.stderr.write(`Configuration domains loaded: application, capella, runtime, deployment, telemetry\n`);
-  process.stderr.write(`Telemetry configuration: ${validatedConfig.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`);
-
-  // Log runtime detection
-  process.stderr.write(`Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);
-  process.stderr.write("=== MODULAR CONFIGURATION INITIALIZATION COMPLETE ===\n\n");
 
   return validatedConfig;
 }
