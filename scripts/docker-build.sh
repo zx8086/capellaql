@@ -48,16 +48,21 @@ echo "=============================================="
 
 # -----------------------------------------------------------------------------
 # Detect CI/CD environment and set cache strategy
-# Registry cache is used everywhere for consistency and reliability
+# CI uses GHA + Registry dual cache, local uses registry read-only
 # -----------------------------------------------------------------------------
-CACHE_FROM="--cache-from type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache"
-
-if [ -n "${GITHUB_ACTIONS}" ] || [ -n "${CI}" ]; then
-  # CI: Write to registry cache
+if [ -n "${GITHUB_ACTIONS}" ]; then
+  # GitHub Actions: Use GHA + registry dual cache
+  CACHE_FROM="--cache-from type=gha --cache-from type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache"
+  CACHE_TO="--cache-to type=gha,mode=max --cache-to type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache,mode=max"
+  echo "Cache: GHA + Registry (GitHub Actions)"
+elif [ -n "${CI}" ]; then
+  # Other CI: Registry cache only
+  CACHE_FROM="--cache-from type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache"
   CACHE_TO="--cache-to type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache,mode=max"
   echo "Cache: Registry (CI)"
 else
   # Local: Read-only cache (don't pollute registry cache with local builds)
+  CACHE_FROM="--cache-from type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache"
   CACHE_TO=""
   echo "Cache: Registry (local, read-only)"
 fi

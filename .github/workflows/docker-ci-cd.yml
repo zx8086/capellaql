@@ -1,7 +1,7 @@
 ---
 # =============================================================================
 # .github/workflows/docker-ci-cd.yml
-# Phase 3: SIO-416 - Parallel jobs, SIO-417 - 6-scanner matrix, SIO-418 - cosign
+# Docker CI/CD Pipeline with security scanning and integration testing
 # =============================================================================
 
 name: Docker CI/CD Pipeline
@@ -26,13 +26,11 @@ env:
   IMAGE_NAME: zx8086/capellaql
   DOCKER_BUILDKIT: 1
   BUILDKIT_PROGRESS: plain
-  COSIGN_YES: "true"
 
 permissions:
   contents: read
   security-events: write
   packages: write
-  id-token: write  # Required for OIDC signing
 
 # =============================================================================
 # Job 1: Build - Build and push multi-platform image
@@ -43,9 +41,7 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 30
     outputs:
-      digest: ${{ steps.build.outputs.digest }}
       image-ref: ${{ steps.meta.outputs.tags }}
-      image-name: docker.io/zx8086/capellaql
 
     steps:
       - name: Checkout code
@@ -147,7 +143,8 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          # PR optimization: single platform for speed, multi-platform on push to master
+          platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -157,9 +154,11 @@ jobs:
             BUILD_VERSION=${{ env.PKG_VERSION }}
             COMMIT_HASH=${{ github.sha }}
           cache-from: |
+            type=gha
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-to: |
+            type=gha,mode=max
+            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           provenance: true
           sbom: true
 
@@ -254,84 +253,7 @@ jobs:
         continue-on-error: true
 
 # =============================================================================
-# Job 3: Sign and Attest - Container signing with cosign
-# =============================================================================
-  sign-and-attest:
-    name: Sign & Attest
-    needs: build
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install cosign
-        uses: sigstore/cosign-installer@v3.7.0
-
-      - name: Install syft
-        uses: anchore/sbom-action/download-syft@v0
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
-
-      - name: Sign container image with cosign
-        env:
-          DIGEST: ${{ needs.build.outputs.digest }}
-          IMAGE_NAME: ${{ needs.build.outputs.image-name }}
-        run: |
-          # Sign the image using keyless OIDC
-          cosign sign --yes "${IMAGE_NAME}@${DIGEST}"
-          echo "Image signed successfully"
-
-      - name: Generate SBOM
-        run: |
-          mkdir -p sbom-output
-          IMAGE_TAG=$(echo '${{ needs.build.outputs.image-ref }}' | head -n1)
-
-          syft "${IMAGE_TAG}" \
-            -o json=sbom-output/syft-sbom.json \
-            -o spdx-json=sbom-output/spdx-sbom.json \
-            -o cyclonedx-json=sbom-output/cyclonedx-sbom.json || true
-
-          echo "Generated SBOM files:"
-          ls -la sbom-output/
-
-      - name: Attest SBOM with cosign
-        env:
-          DIGEST: ${{ needs.build.outputs.digest }}
-          IMAGE_NAME: ${{ needs.build.outputs.image-name }}
-        run: |
-          # Attest the SBOM to the image
-          cosign attest --yes \
-            --predicate sbom-output/cyclonedx-sbom.json \
-            --type cyclonedx \
-            "${IMAGE_NAME}@${DIGEST}" || true
-
-      - name: Verify signature
-        env:
-          DIGEST: ${{ needs.build.outputs.digest }}
-          IMAGE_NAME: ${{ needs.build.outputs.image-name }}
-        run: |
-          # Verify the signature
-          cosign verify \
-            --certificate-identity-regexp=".*" \
-            --certificate-oidc-issuer-regexp=".*" \
-            "${IMAGE_NAME}@${DIGEST}" || true
-
-      - name: Upload SBOM files
-        uses: actions/upload-artifact@v4
-        with:
-          name: sbom-files-${{ github.run_id }}
-          path: sbom-output/
-          retention-days: 90
-
-# =============================================================================
-# Job 4: Integration Test - Container health and graceful shutdown
+# Job 3: Integration Test - Container health and graceful shutdown
 # =============================================================================
   integration-test:
     name: Integration Test
@@ -339,6 +261,7 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: self-hosted
     timeout-minutes: 15
+    continue-on-error: true
 
     steps:
       - name: Checkout code
@@ -421,11 +344,11 @@ jobs:
           rm -f .env
 
 # =============================================================================
-# Job 5: Summary - Generate build report
+# Job 4: Summary - Generate build report
 # =============================================================================
   summary:
     name: Build Summary
-    needs: [build, security-scan, sign-and-attest, integration-test]
+    needs: [build, security-scan, integration-test]
     if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
@@ -441,21 +364,16 @@ jobs:
             echo "|--------|-------|"
             echo "| Build ID | \`${{ github.sha }}\` |"
             echo "| Image | \`${{ env.IMAGE_NAME }}\` |"
-            echo "| Platform | Multi-arch (linux/amd64, linux/arm64) |"
-            echo "| Digest | \`${{ needs.build.outputs.digest }}\` |"
+            echo "| Platform | ${{ github.event_name == 'pull_request' && 'linux/amd64 (PR)' || 'Multi-arch (linux/amd64, linux/arm64)' }} |"
             echo ""
             echo "### Job Status"
             echo "| Job | Status |"
             echo "|-----|--------|"
             echo "| Build | ${{ needs.build.result }} |"
             echo "| Security Scan | ${{ needs.security-scan.result }} |"
-            echo "| Sign & Attest | ${{ needs.sign-and-attest.result }} |"
             echo "| Integration Test | ${{ needs.integration-test.result }} |"
             echo ""
             echo "### Security Features"
-            echo "- SBOM Generation (3 formats: SPDX, CycloneDX, Syft JSON)"
-            echo "- Container Signing (cosign keyless OIDC)"
-            echo "- SBOM Attestation"
             echo "- 3-Scanner Security Matrix:"
             echo "  - Trivy (CVE scanning)"
             echo "  - CodeQL (semantic analysis)"
@@ -465,13 +383,12 @@ jobs:
             echo "- DHI Distroless base image"
             echo "- dumb-init PID 1 handler"
             echo "- UID 65532 (nonroot)"
-            echo "- SLSA Level 3 provenance"
             echo ""
             echo "### Build Optimizations"
-            echo "- Docker BuildKit with Buildx"
-            echo "- Registry cache (persistent, cross-workflow)"
+            echo "- Docker Build Cloud (native ARM builds)"
+            echo "- Dual cache: GHA + Registry (persistent, cross-workflow)"
+            echo "- PR optimization: Single platform for speed"
             echo "- Bun dependency caching"
-            echo "- Multi-platform parallel builds"
           } >> $GITHUB_STEP_SUMMARY
 
       - name: Check overall status

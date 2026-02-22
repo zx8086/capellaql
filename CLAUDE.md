@@ -246,6 +246,15 @@ tests/
 - `bun test tests/e2e` - Run only end-to-end tests
 - `bun test --coverage` - Run tests with coverage report
 
+## Critical Rules
+
+### Git Operations - MANDATORY USER APPROVAL
+**NEVER commit or push without explicit user approval.**
+- Do NOT run `git commit` unless the user explicitly asks to commit
+- Do NOT run `git push` unless the user explicitly asks to push
+- Always show the user what will be committed and wait for confirmation
+- The `/commit-push` command still requires user to initiate it, but Claude must ask for confirmation before executing
+
 ## Important Notes
 
 - This codebase extensively uses Bun-specific features and APIs

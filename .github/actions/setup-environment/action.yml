@@ -11,14 +11,6 @@ inputs:
     description: "Enable Bun dependency caching"
     required: false
     default: "true"
-  enable-docker-cloud:
-    description: "Enable Docker Buildx cloud driver (requires DOCKER_BUILD_CLOUD_TOKEN)"
-    required: false
-    default: "false"
-  docker-cloud-token:
-    description: "Docker Build Cloud token for cloud builder"
-    required: false
-    default: ""
 
 outputs:
   bun-cache-hit:
@@ -32,22 +24,14 @@ runs:
   using: "composite"
   steps:
     # -------------------------------------------------------------------------
-    # Step 1: Docker multi-platform setup
+    # Step 1: Docker Build Cloud setup (native ARM builds, no QEMU needed)
     # -------------------------------------------------------------------------
-    - name: Set up QEMU
-      uses: docker/setup-qemu-action@v3
-      with:
-        platforms: linux/amd64,linux/arm64
-
-    - name: Set up Docker Buildx
+    - name: Set up Docker Buildx with Build Cloud
       id: buildx
       uses: docker/setup-buildx-action@v3
       with:
-        platforms: linux/amd64,linux/arm64
-        driver-opts: |
-          image=moby/buildkit:latest
-          network=host
-        buildkitd-flags: --debug
+        driver: cloud
+        endpoint: zx8086/cldbuild
         install: true
 
     # -------------------------------------------------------------------------
@@ -96,56 +80,19 @@ runs:
         echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
         echo "COMPOSE_DOCKER_CLI_BUILD=1" >> $GITHUB_ENV
         echo "BUILDX_NO_DEFAULT_LOAD=true" >> $GITHUB_ENV
-        echo "BUILDKIT_INLINE_CACHE=1" >> $GITHUB_ENV
         echo "BUILDKIT_PROGRESS=plain" >> $GITHUB_ENV
 
         # Builder name for reference
         echo "BUILDX_BUILDER=${{ steps.buildx.outputs.name }}" >> $GITHUB_ENV
 
     # -------------------------------------------------------------------------
-    # Step 4: Install verification tools (cosign, syft)
-    # -------------------------------------------------------------------------
-    - name: Install verification tools
-      shell: bash
-      run: |
-        # Create directories
-        mkdir -p "${GITHUB_WORKSPACE}/bin"
-
-        # Detect architecture
-        ARCH=$(uname -m)
-        case $ARCH in
-          x86_64) ARCH_SUFFIX="amd64" ;;
-          aarch64|arm64) ARCH_SUFFIX="arm64" ;;
-          *) echo "Unsupported architecture: $ARCH"; exit 1 ;;
-        esac
-
-        # Install cosign
-        curl -Lo "${GITHUB_WORKSPACE}/bin/cosign" "https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-${ARCH_SUFFIX}"
-        chmod +x "${GITHUB_WORKSPACE}/bin/cosign"
-
-        # Install syft
-        SYFT_RELEASE=$(curl -s https://api.github.com/repos/anchore/syft/releases/latest | grep -o '"tag_name": ".*"' | cut -d'"' -f4)
-        SYFT_VERSION_NO_V=$(echo "${SYFT_RELEASE}" | sed 's/^v//')
-        curl -Lo syft.tar.gz "https://github.com/anchore/syft/releases/download/${SYFT_RELEASE}/syft_${SYFT_VERSION_NO_V}_linux_${ARCH_SUFFIX}.tar.gz"
-        tar xzf syft.tar.gz syft
-        mv syft "${GITHUB_WORKSPACE}/bin/"
-        rm syft.tar.gz
-
-        # Add to PATH
-        echo "${GITHUB_WORKSPACE}/bin" >> $GITHUB_PATH
-
-        # Verify installations
-        "${GITHUB_WORKSPACE}/bin/cosign" version || true
-        "${GITHUB_WORKSPACE}/bin/syft" --version || true
-
-    # -------------------------------------------------------------------------
-    # Step 5: Summary
+    # Step 4: Summary
     # -------------------------------------------------------------------------
     - name: Setup Summary
       shell: bash
       run: |
         echo "Environment setup complete:"
         echo "  - Bun: $(bun --version)"
-        echo "  - Buildx: ${{ steps.buildx.outputs.name }}"
+        echo "  - Buildx: ${{ steps.buildx.outputs.name }} (Docker Build Cloud)"
         echo "  - Bun cache: ${{ steps.bun-cache.outputs.cache-hit == 'true' && 'restored' || 'miss' }}"
-        echo "  - Platforms: linux/amd64, linux/arm64"
+        echo "  - Platforms: linux/amd64, linux/arm64 (native)"
