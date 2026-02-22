@@ -54,7 +54,15 @@ jobs:
           fetch-depth: 0
 
       - name: Setup Environment
+        id: setup
         uses: ./.github/actions/setup-environment
+        with:
+          bun-version: "1.3"
+          enable-bun-cache: "true"
+
+      - name: Install dependencies
+        if: steps.setup.outputs.bun-cache-hit != 'true'
+        run: bun install --frozen-lockfile
 
       - name: Extract package.json metadata
         id: pkg
@@ -149,12 +157,23 @@ jobs:
             BUILD_VERSION=${{ env.PKG_VERSION }}
             COMMIT_HASH=${{ github.sha }}
           cache-from: |
+            type=gha,scope=${{ github.workflow }}-${{ github.ref_name }}
+            type=gha,scope=${{ github.workflow }}-master
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           cache-to: |
+            type=gha,scope=${{ github.workflow }}-${{ github.ref_name }},mode=max
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           provenance: true
           sbom: true
+
+      - name: Build metrics
+        run: |
+          BUILD_END_TIME=$(date +%s)
+          BUILD_DURATION=$((BUILD_END_TIME - ${{ env.BUILD_START_TIME }}))
+          echo "Build completed in ${BUILD_DURATION}s"
+          echo "Bun cache hit: ${{ steps.setup.outputs.bun-cache-hit }}"
+          echo "Docker digest: ${{ steps.build.outputs.digest }}"
 
       - name: Upload .env artifact
         uses: actions/upload-artifact@v4
@@ -527,6 +546,14 @@ jobs:
             echo "- dumb-init PID 1 handler"
             echo "- UID 65532 (nonroot)"
             echo "- SLSA Level 3 provenance"
+            echo ""
+            echo "### Build Optimizations"
+            echo "- Docker BuildKit with Buildx"
+            echo "- Dual-layer caching:"
+            echo "  - GHA cache (fast, GitHub-native)"
+            echo "  - Registry cache (cross-workflow)"
+            echo "- Bun dependency caching"
+            echo "- Multi-platform parallel builds"
           } >> $GITHUB_STEP_SUMMARY
 
       - name: Check overall status

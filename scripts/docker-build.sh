@@ -50,17 +50,23 @@ echo "=============================================="
 # Detect CI/CD environment and set cache strategy
 # -----------------------------------------------------------------------------
 if [ -n "${GITHUB_ACTIONS}" ]; then
-  CACHE_FROM="--cache-from type=gha"
-  CACHE_TO="--cache-to type=gha,mode=max"
-  echo "Cache: GitHub Actions"
+  # GitHub Actions: Use dual-layer caching (GHA + registry)
+  CACHE_FROM="--cache-from type=gha,scope=docker-ci-cd-${GITHUB_REF_NAME:-master}"
+  CACHE_FROM="${CACHE_FROM} --cache-from type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache"
+  CACHE_TO="--cache-to type=gha,scope=docker-ci-cd-${GITHUB_REF_NAME:-master},mode=max"
+  CACHE_TO="${CACHE_TO} --cache-to type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache,mode=max"
+  echo "Cache: GitHub Actions (GHA + Registry dual-layer)"
 elif [ -n "${CI}" ]; then
+  # Generic CI: Use local + registry cache
   CACHE_FROM="--cache-from type=local,src=/tmp/docker-cache"
+  CACHE_FROM="${CACHE_FROM} --cache-from type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache"
   CACHE_TO="--cache-to type=local,dest=/tmp/docker-cache,mode=max"
-  echo "Cache: Local (CI)"
+  echo "Cache: Local + Registry (CI)"
 else
-  CACHE_FROM=""
+  # Local development: Use registry cache only (persists between builds)
+  CACHE_FROM="--cache-from type=registry,ref=${REGISTRY}/${IMAGE_NAME}:buildcache"
   CACHE_TO=""
-  echo "Cache: None (local build)"
+  echo "Cache: Registry (local build, read-only)"
 fi
 
 # -----------------------------------------------------------------------------

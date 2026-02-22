@@ -1,16 +1,46 @@
 ---
 name: "Setup Environment"
-description: "Sets up common actions and environment"
+description: "Sets up common actions and environment with caching optimizations"
+
+inputs:
+  bun-version:
+    description: "Bun version to install"
+    required: false
+    default: "latest"
+  enable-bun-cache:
+    description: "Enable Bun dependency caching"
+    required: false
+    default: "true"
+  enable-docker-cloud:
+    description: "Enable Docker Buildx cloud driver (requires DOCKER_BUILD_CLOUD_TOKEN)"
+    required: false
+    default: "false"
+  docker-cloud-token:
+    description: "Docker Build Cloud token for cloud builder"
+    required: false
+    default: ""
+
+outputs:
+  bun-cache-hit:
+    description: "Whether Bun cache was restored"
+    value: ${{ steps.bun-cache.outputs.cache-hit }}
+  buildx-name:
+    description: "Name of the Buildx builder"
+    value: ${{ steps.buildx.outputs.name }}
 
 runs:
   using: "composite"
   steps:
+    # -------------------------------------------------------------------------
+    # Step 1: Docker multi-platform setup
+    # -------------------------------------------------------------------------
     - name: Set up QEMU
       uses: docker/setup-qemu-action@v3
       with:
         platforms: linux/amd64,linux/arm64
 
     - name: Set up Docker Buildx
+      id: buildx
       uses: docker/setup-buildx-action@v3
       with:
         platforms: linux/amd64,linux/arm64
@@ -18,21 +48,63 @@ runs:
           image=moby/buildkit:latest
           network=host
         buildkitd-flags: --debug
+        install: true
 
+    # -------------------------------------------------------------------------
+    # Step 2: Bun setup with dependency caching
+    # -------------------------------------------------------------------------
     - name: Set up Bun
       uses: oven-sh/setup-bun@v2
       with:
-        bun-version: latest
+        bun-version: ${{ inputs.bun-version }}
 
+    - name: Get Bun cache directory
+      id: bun-cache-dir
+      shell: bash
+      run: |
+        # Bun stores its cache in ~/.bun/install/cache
+        echo "dir=${HOME}/.bun/install/cache" >> $GITHUB_OUTPUT
+
+    - name: Restore Bun dependency cache
+      id: bun-cache
+      if: inputs.enable-bun-cache == 'true'
+      uses: actions/cache@v4
+      with:
+        path: |
+          ${{ steps.bun-cache-dir.outputs.dir }}
+          node_modules
+        key: bun-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('bun.lockb', 'package.json') }}
+        restore-keys: |
+          bun-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: Log cache status
+      shell: bash
+      run: |
+        if [ "${{ steps.bun-cache.outputs.cache-hit }}" == "true" ]; then
+          echo "Bun cache restored successfully"
+        else
+          echo "Bun cache miss - dependencies will be downloaded"
+        fi
+
+    # -------------------------------------------------------------------------
+    # Step 3: Environment variables for BuildKit optimization
+    # -------------------------------------------------------------------------
     - name: Set Environment Variables
       shell: bash
       run: |
+        # BuildKit settings
         echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
         echo "COMPOSE_DOCKER_CLI_BUILD=1" >> $GITHUB_ENV
         echo "BUILDX_NO_DEFAULT_LOAD=true" >> $GITHUB_ENV
         echo "BUILDKIT_INLINE_CACHE=1" >> $GITHUB_ENV
         echo "BUILDKIT_PROGRESS=plain" >> $GITHUB_ENV
 
+        # Builder name for reference
+        echo "BUILDX_BUILDER=${{ steps.buildx.outputs.name }}" >> $GITHUB_ENV
+
+    # -------------------------------------------------------------------------
+    # Step 4: Install verification tools (cosign, syft)
+    # -------------------------------------------------------------------------
     - name: Install verification tools
       shell: bash
       run: |
@@ -65,3 +137,15 @@ runs:
         # Verify installations
         "${GITHUB_WORKSPACE}/bin/cosign" version || true
         "${GITHUB_WORKSPACE}/bin/syft" --version || true
+
+    # -------------------------------------------------------------------------
+    # Step 5: Summary
+    # -------------------------------------------------------------------------
+    - name: Setup Summary
+      shell: bash
+      run: |
+        echo "Environment setup complete:"
+        echo "  - Bun: $(bun --version)"
+        echo "  - Buildx: ${{ steps.buildx.outputs.name }}"
+        echo "  - Bun cache: ${{ steps.bun-cache.outputs.cache-hit == 'true' && 'restored' || 'miss' }}"
+        echo "  - Platforms: linux/amd64, linux/arm64"
