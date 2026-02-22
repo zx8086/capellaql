@@ -150,7 +150,7 @@ export function summarizeCacheKey(key: string, maxLength = 50): string {
  * Helper function to mask sensitive information in URLs
  */
 export function maskSensitiveUrl(url: string): string {
-  return url.replace(/:\\/\\/.*@/, "://***@");
+  return url.replace(/:\/\/.*@/, "://***@");
 }
 
 /**

@@ -108,6 +108,29 @@ export namespace BunFile {
   }
 }
 
+// Error types that should NOT be retried (expected application errors)
+const NON_RETRYABLE_ERROR_TYPES = new Set([
+  'DocumentNotFoundError',      // Document doesn't exist - won't change on retry
+  'DocumentExistsError',        // Document already exists - won't change on retry
+  'CasMismatchError',           // CAS conflict - requires app-level handling
+  'AuthenticationFailureError', // Credentials wrong - won't change on retry
+  'BucketNotFoundError',        // Config error - won't change on retry
+  'ScopeNotFoundError',         // Config error - won't change on retry
+  'CollectionNotFoundError',    // Config error - won't change on retry
+  'IndexNotFoundError',         // Index missing - won't change on retry
+  'QueryError',                 // Query syntax/semantic error - won't change on retry
+  'ValidationError',            // Input validation - won't change on retry
+  'AmbiguousTimeoutError',      // NEVER retry ambiguous operations
+]);
+
+/**
+ * Check if an error is retryable based on its type
+ */
+function isRetryableError(error: unknown): boolean {
+  const errorType = error?.constructor?.name || 'UnknownError';
+  return !NON_RETRYABLE_ERROR_TYPES.has(errorType);
+}
+
 // Retry with exponential backoff
 export async function retryWithBackoff<T>(
   operation: () => Promise<T>,
@@ -119,6 +142,11 @@ export async function retryWithBackoff<T>(
     try {
       return await operation();
     } catch (error) {
+      // Don't retry non-retryable errors - throw immediately
+      if (!isRetryableError(error)) {
+        throw error;
+      }
+
       if (attempt === maxRetries) {
         throw error;
       }
@@ -127,7 +155,9 @@ export async function retryWithBackoff<T>(
       const jitter = Math.random() * 0.1; // 10% jitter
       const delay = Math.min(baseDelay * 2 ** (attempt - 1) * (1 + jitter), maxDelay);
 
-      console.warn(`Operation failed (attempt ${attempt}/${maxRetries}), retrying in ${delay.toFixed(0)}ms...`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorType = error?.constructor?.name || 'UnknownError';
+      console.warn(`Operation failed (attempt ${attempt}/${maxRetries}): [${errorType}] ${errorMessage.substring(0, 200)}. Retrying in ${delay.toFixed(0)}ms...`);
       await sleep(delay);
     }
   }
