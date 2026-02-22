@@ -39,7 +39,6 @@ import {
   wrapSpanExporter,
 } from "./export-stats-tracker";
 import { log, warn, winstonTelemetryLogger } from "./winston-logger";
-import { SimpleSmartSampler, type SimpleSmartSamplingConfig } from "./sampling/SimpleSmartSampler";
 
 // ============================================================================
 // Module-level state (per migrate/telemetry/instrumentation.ts)
@@ -58,7 +57,6 @@ let metricExporter: PushMetricExporter | undefined;
 let metricReader: MetricReaderLike | undefined;
 let isInitialized = false;
 let config: TelemetryConfig;
-let simpleSmartSampler: SimpleSmartSampler | undefined;
 
 // Export stats trackers (per migrate/telemetry/instrumentation.ts lines 57-59)
 const traceExportStats = createExportStatsTracker();
@@ -106,7 +104,6 @@ export async function initializeTelemetry(): Promise<void> {
         serviceName: config.SERVICE_NAME,
         serviceVersion: config.SERVICE_VERSION,
         environment: config.DEPLOYMENT_ENVIRONMENT,
-        samplingRate: config.SAMPLING_RATE,
         exportTimeout: config.EXPORT_TIMEOUT_MS,
       });
     }
@@ -169,31 +166,6 @@ export async function initializeTelemetry(): Promise<void> {
     });
     logs.setGlobalLoggerProvider(loggerProvider);
 
-    // Create simple 3-tier sampling strategy (streamlined approach)
-    const simpleSamplingConfig: SimpleSmartSamplingConfig = {
-      traces: config.TRACES_SAMPLING_RATE || config.SAMPLING_RATE,
-      metrics:
-        config.METRICS_SAMPLING_RATE ||
-        (config.METRIC_SAMPLING_BUSINESS +
-          config.METRIC_SAMPLING_TECHNICAL +
-          config.METRIC_SAMPLING_INFRASTRUCTURE +
-          config.METRIC_SAMPLING_DEBUG) /
-          4,
-      logs:
-        config.LOGS_SAMPLING_RATE ||
-        (config.LOG_SAMPLING_DEBUG + config.LOG_SAMPLING_INFO + config.LOG_SAMPLING_WARN + config.LOG_SAMPLING_ERROR) /
-          4,
-      preserveErrors: true,
-      costOptimizationMode:
-        config.COST_OPTIMIZATION_MODE !== undefined
-          ? config.COST_OPTIMIZATION_MODE
-          : config.DEPLOYMENT_ENVIRONMENT === "production",
-      healthCheckSampling: config.HEALTH_CHECK_SAMPLING_RATE || 0.05,
-    };
-
-    const sampler = new SimpleSmartSampler(simpleSamplingConfig);
-    simpleSmartSampler = sampler;
-
     // Create propagator with W3C standards
     const propagator = new CompositePropagator({
       propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
@@ -243,7 +215,6 @@ export async function initializeTelemetry(): Promise<void> {
     sdk = new NodeSDK({
       resource,
       autoDetectResources: false,
-      sampler,
       textMapPropagator: propagator,
       spanProcessors: [traceProcessor],
       metricReaders: [periodicReader],
@@ -270,7 +241,6 @@ export async function initializeTelemetry(): Promise<void> {
         tracesEndpoint: config.TRACES_ENDPOINT,
         metricsEndpoint: config.METRICS_ENDPOINT,
         logsEndpoint: config.LOGS_ENDPOINT,
-        samplingRate: `${config.SAMPLING_RATE * 100}%`,
         batchSize: config.BATCH_SIZE,
         exportTimeoutMs: config.EXPORT_TIMEOUT_MS,
       });
@@ -425,16 +395,6 @@ export function getTelemetrySDK(): NodeSDK | undefined {
 
 export function isTelemetryInitialized(): boolean {
   return isInitialized;
-}
-
-export function getSimpleSmartSampler(): SimpleSmartSampler | undefined {
-  return simpleSmartSampler;
-}
-
-// Backward compatibility aliases
-export function getUnifiedSamplingCoordinator(): SimpleSmartSampler | undefined {
-  console.warn("getUnifiedSamplingCoordinator() is deprecated - use getSimpleSmartSampler() instead");
-  return simpleSmartSampler;
 }
 
 export const initializeBunFullTelemetry = initializeTelemetry;

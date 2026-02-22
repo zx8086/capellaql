@@ -44,12 +44,6 @@ export interface ComprehensiveHealthReport {
   business_metrics: {
     telemetry_cost_efficiency: number;
     operation_impact_score: number;
-    log_sampling_effectiveness: {
-      debug_reduction_percent: number;
-      info_reduction_percent: number;
-      warn_reduction_percent: number;
-      error_retention_percent: number;
-    };
     retention_optimization: {
       storage_savings_percent: number;
       estimated_monthly_cost_usd: number;
@@ -143,21 +137,6 @@ export async function generateComprehensiveHealthReport(): Promise<Comprehensive
 }
 
 function generateBusinessMetrics(telemetryHealth: TelemetryHealthData, memoryUsagePercent: number) {
-  // Calculate sampling effectiveness
-  const samplingRates = {
-    debug: config.telemetry.LOG_SAMPLING_DEBUG,
-    info: config.telemetry.LOG_SAMPLING_INFO,
-    warn: config.telemetry.LOG_SAMPLING_WARN,
-    error: config.telemetry.LOG_SAMPLING_ERROR,
-  };
-
-  const logSamplingEffectiveness = {
-    debug_reduction_percent: (1 - samplingRates.debug) * 100,
-    info_reduction_percent: (1 - samplingRates.info) * 100,
-    warn_reduction_percent: (1 - samplingRates.warn) * 100,
-    error_retention_percent: samplingRates.error * 100,
-  };
-
   // Calculate retention optimization savings
   const baseRetentionDays = 30; // Industry baseline
   const smartRetention =
@@ -196,7 +175,6 @@ function generateBusinessMetrics(telemetryHealth: TelemetryHealthData, memoryUsa
   return {
     telemetry_cost_efficiency: Math.round(telemetryCostEfficiency * 100) / 100,
     operation_impact_score: Math.round(operationImpactScore * 100) / 100,
-    log_sampling_effectiveness: logSamplingEffectiveness,
     retention_optimization: {
       storage_savings_percent: Math.round(storageSavingsPercent * 100) / 100,
       estimated_monthly_cost_usd: Math.round(estimatedMonthlyCost * 100) / 100,

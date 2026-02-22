@@ -58,19 +58,8 @@ export interface TelemetryConfig {
   EXPORT_TIMEOUT_MS: number;
   BATCH_SIZE: number;
   MAX_QUEUE_SIZE: number;
-  SAMPLING_RATE: number;
   CIRCUIT_BREAKER_THRESHOLD: number;
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
-  // Log-level specific sampling rates
-  LOG_SAMPLING_DEBUG: number;
-  LOG_SAMPLING_INFO: number;
-  LOG_SAMPLING_WARN: number;
-  LOG_SAMPLING_ERROR: number;
-  // Metric sampling rates by category (2025 standard)
-  METRIC_SAMPLING_BUSINESS: number;
-  METRIC_SAMPLING_TECHNICAL: number;
-  METRIC_SAMPLING_INFRASTRUCTURE: number;
-  METRIC_SAMPLING_DEBUG: number;
   // Log retention policy (days)
   LOG_RETENTION_DEBUG_DAYS: number;
   LOG_RETENTION_INFO_DAYS: number;

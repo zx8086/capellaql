@@ -144,23 +144,10 @@ function loadTelemetryConfigFromEnv(): Partial<TelemetryConfig> {
     EXPORT_TIMEOUT_MS: (parseEnvVar(getEnvVar(mapping.EXPORT_TIMEOUT_MS), "number", "EXPORT_TIMEOUT_MS") as number) || undefined,
     BATCH_SIZE: (parseEnvVar(getEnvVar(mapping.BATCH_SIZE), "number", "BATCH_SIZE") as number) || undefined,
     MAX_QUEUE_SIZE: (parseEnvVar(getEnvVar(mapping.MAX_QUEUE_SIZE), "number", "MAX_QUEUE_SIZE") as number) || undefined,
-    SAMPLING_RATE: (parseEnvVar(getEnvVar(mapping.SAMPLING_RATE), "number", "SAMPLING_RATE") as number) || undefined,
     CIRCUIT_BREAKER_THRESHOLD:
       (parseEnvVar(getEnvVar(mapping.CIRCUIT_BREAKER_THRESHOLD), "number", "CIRCUIT_BREAKER_THRESHOLD") as number) || undefined,
     CIRCUIT_BREAKER_TIMEOUT_MS:
       (parseEnvVar(getEnvVar(mapping.CIRCUIT_BREAKER_TIMEOUT_MS), "number", "CIRCUIT_BREAKER_TIMEOUT_MS") as number) || undefined,
-    LOG_SAMPLING_DEBUG: (parseEnvVar(getEnvVar(mapping.LOG_SAMPLING_DEBUG), "number", "LOG_SAMPLING_DEBUG") as number) || undefined,
-    LOG_SAMPLING_INFO: (parseEnvVar(getEnvVar(mapping.LOG_SAMPLING_INFO), "number", "LOG_SAMPLING_INFO") as number) || undefined,
-    LOG_SAMPLING_WARN: (parseEnvVar(getEnvVar(mapping.LOG_SAMPLING_WARN), "number", "LOG_SAMPLING_WARN") as number) || undefined,
-    LOG_SAMPLING_ERROR: (parseEnvVar(getEnvVar(mapping.LOG_SAMPLING_ERROR), "number", "LOG_SAMPLING_ERROR") as number) || undefined,
-    METRIC_SAMPLING_BUSINESS:
-      (parseEnvVar(getEnvVar(mapping.METRIC_SAMPLING_BUSINESS), "number", "METRIC_SAMPLING_BUSINESS") as number) || undefined,
-    METRIC_SAMPLING_TECHNICAL:
-      (parseEnvVar(getEnvVar(mapping.METRIC_SAMPLING_TECHNICAL), "number", "METRIC_SAMPLING_TECHNICAL") as number) || undefined,
-    METRIC_SAMPLING_INFRASTRUCTURE:
-      (parseEnvVar(getEnvVar(mapping.METRIC_SAMPLING_INFRASTRUCTURE), "number", "METRIC_SAMPLING_INFRASTRUCTURE") as number) || undefined,
-    METRIC_SAMPLING_DEBUG:
-      (parseEnvVar(getEnvVar(mapping.METRIC_SAMPLING_DEBUG), "number", "METRIC_SAMPLING_DEBUG") as number) || undefined,
     LOG_RETENTION_DEBUG_DAYS:
       (parseEnvVar(getEnvVar(mapping.LOG_RETENTION_DEBUG_DAYS), "number", "LOG_RETENTION_DEBUG_DAYS") as number) || undefined,
     LOG_RETENTION_INFO_DAYS:

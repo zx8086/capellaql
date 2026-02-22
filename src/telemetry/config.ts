@@ -16,7 +16,6 @@ export interface TelemetryConfig {
   EXPORT_TIMEOUT_MS: number;
   BATCH_SIZE: number;
   MAX_QUEUE_SIZE: number;
-  SAMPLING_RATE: number;
   CIRCUIT_BREAKER_THRESHOLD: number;
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
 }
@@ -56,11 +55,6 @@ const TelemetryConfigSchema = z.object({
     .min(100, "MAX_QUEUE_SIZE must be at least 100")
     .max(20000, "MAX_QUEUE_SIZE should not exceed 20000")
     .default(10000), // 2025 standard
-  SAMPLING_RATE: z
-    .number()
-    .min(0.01, "SAMPLING_RATE must be at least 1%")
-    .max(1.0, "SAMPLING_RATE cannot exceed 100%")
-    .default(0.15), // 15% (2025 standard)
   CIRCUIT_BREAKER_THRESHOLD: z
     .number()
     .min(1, "CIRCUIT_BREAKER_THRESHOLD must be at least 1")
@@ -137,11 +131,6 @@ function validateBusinessRules(config: TelemetryConfig): void {
   // Ensure batch sizes are optimal
   if (config.BATCH_SIZE < 1024 && config.DEPLOYMENT_ENVIRONMENT === "production") {
     console.warn("BATCH_SIZE is below recommended 1024 for production environments");
-  }
-
-  // Ensure sampling rate is appropriate for environment
-  if (config.SAMPLING_RATE > 0.5 && config.DEPLOYMENT_ENVIRONMENT === "production") {
-    console.warn("SAMPLING_RATE above 50% may impact performance in production");
   }
 
   // Note: Different hosts for telemetry endpoints is valid (separate collectors per signal)

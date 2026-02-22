@@ -59,16 +59,8 @@ export interface TelemetryConfig {
   EXPORT_TIMEOUT_MS: number;
   BATCH_SIZE: number;
   MAX_QUEUE_SIZE: number;
-  SAMPLING_RATE: number;
   CIRCUIT_BREAKER_THRESHOLD: number;
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
-
-  // Simplified 3-tier sampling (NEW)
-  TRACES_SAMPLING_RATE: number;
-  METRICS_SAMPLING_RATE: number;
-  LOGS_SAMPLING_RATE: number;
-  COST_OPTIMIZATION_MODE: boolean;
-  HEALTH_CHECK_SAMPLING_RATE: number;
 }
 
 export interface Config {
@@ -210,11 +202,6 @@ const TelemetryConfigSchema = z.object({
     .min(100, "MAX_QUEUE_SIZE must be at least 100")
     .max(20000, "MAX_QUEUE_SIZE should not exceed 20000")
     .default(10000), // 2025 standard
-  SAMPLING_RATE: z.coerce
-    .number()
-    .min(0.01, "SAMPLING_RATE must be at least 1%")
-    .max(1.0, "SAMPLING_RATE cannot exceed 100%")
-    .default(0.15), // 15% (2025 standard)
   CIRCUIT_BREAKER_THRESHOLD: z.coerce
     .number()
     .min(1, "CIRCUIT_BREAKER_THRESHOLD must be at least 1")
@@ -225,29 +212,6 @@ const TelemetryConfigSchema = z.object({
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
     .default(60000), // 1 minute
-
-  // Simplified 3-tier sampling configuration (NEW)
-  TRACES_SAMPLING_RATE: z.coerce
-    .number()
-    .min(0.0, "TRACES_SAMPLING_RATE must be at least 0%")
-    .max(1.0, "TRACES_SAMPLING_RATE cannot exceed 100%")
-    .default(0.15), // 15% traces - cost-effective distributed tracing
-  METRICS_SAMPLING_RATE: z.coerce
-    .number()
-    .min(0.0, "METRICS_SAMPLING_RATE must be at least 0%")
-    .max(1.0, "METRICS_SAMPLING_RATE cannot exceed 100%")
-    .default(0.25), // 25% metrics - higher for performance monitoring
-  LOGS_SAMPLING_RATE: z.coerce
-    .number()
-    .min(0.0, "LOGS_SAMPLING_RATE must be at least 0%")
-    .max(1.0, "LOGS_SAMPLING_RATE cannot exceed 100%")
-    .default(0.3), // 30% logs - balance visibility and storage costs
-  COST_OPTIMIZATION_MODE: z.coerce.boolean().default(true), // Enable cost optimization features
-  HEALTH_CHECK_SAMPLING_RATE: z.coerce
-    .number()
-    .min(0.0, "HEALTH_CHECK_SAMPLING_RATE must be at least 0%")
-    .max(1.0, "HEALTH_CHECK_SAMPLING_RATE cannot exceed 100%")
-    .default(0.05), // 5% health checks - reduce noise
 });
 
 // Configuration schema with production security checks
@@ -290,15 +254,6 @@ const ConfigSchema = z
           code: z.ZodIssueCode.custom,
           message: "Production CORS origins should not include localhost or wildcards",
           path: ["application", "ALLOWED_ORIGINS"],
-        });
-      }
-
-      // Validate telemetry sampling rate for production
-      if (data.telemetry.SAMPLING_RATE > 0.5) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "SAMPLING_RATE above 50% may impact performance in production",
-          path: ["telemetry", "SAMPLING_RATE"],
         });
       }
 
@@ -411,10 +366,6 @@ export function validateConfig(config: Config): { healthy: boolean; issues: stri
 
   if (config.telemetry.BATCH_SIZE > 4096) {
     warnings.push("BATCH_SIZE exceeds recommended 4096 - may impact memory usage");
-  }
-
-  if (config.telemetry.SAMPLING_RATE > 0.5 && isProduction) {
-    warnings.push("SAMPLING_RATE above 50% may impact production performance");
   }
 
   // DEPLOYMENT SECTION VALIDATION

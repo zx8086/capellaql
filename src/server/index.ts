@@ -254,7 +254,6 @@ export async function createServer(): Promise<Server> {
       tracesEndpoint: config.telemetry.TRACES_ENDPOINT,
       metricsEndpoint: config.telemetry.METRICS_ENDPOINT,
       logsEndpoint: config.telemetry.LOGS_ENDPOINT,
-      samplingRate: config.telemetry.SAMPLING_RATE,
     },
     runtime: {
       name: "bun",

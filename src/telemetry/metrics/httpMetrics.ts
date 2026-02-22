@@ -1,7 +1,6 @@
 /* src/telemetry/metrics/httpMetrics.ts */
 
 import { type Counter, context, type Histogram, metrics, trace } from "@opentelemetry/api";
-import { getSimpleSmartSampler } from "../instrumentation";
 
 let httpRequestCounter: Counter | undefined;
 let httpResponseTimeHistogram: Histogram | undefined;
@@ -29,7 +28,6 @@ export function initializeHttpMetrics(): void {
     });
 
     isInitialized = true;
-    // HTTP metrics initialized successfully (silent init)
   } catch (error) {
     console.error("Error initializing HTTP metrics:", error);
   }
@@ -39,30 +37,6 @@ export function recordHttpRequest(method: string, route: string, statusCode?: nu
   if (!isInitialized || !httpRequestCounter) {
     console.warn("HTTP metrics not initialized, skipping request recording");
     return;
-  }
-
-  // Apply unified sampling decision
-  const samplingCoordinator = getSimpleSmartSampler();
-  if (samplingCoordinator) {
-    const metricName = "http_requests_total";
-    const attributes = {
-      metric_category: "technical",
-      method: method.toUpperCase(),
-      route,
-      ...(statusCode && { status_code: statusCode.toString() }),
-    };
-
-    const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
-    if (!decision.shouldSample) {
-      return; // Skip this metric based on sampling decision
-    }
-
-    // Add sampling metadata to attributes
-    attributes.sampling_reason = decision.reason;
-    attributes.sampling_rate = (decision.samplingRate ?? 0).toString();
-    if (decision.correlationId) {
-      attributes.correlation_id = decision.correlationId;
-    }
   }
 
   try {
@@ -82,23 +56,6 @@ export function recordHttpResponseTime(durationMs: number, method?: string, rout
   if (!isInitialized || !httpResponseTimeHistogram) {
     console.warn("HTTP metrics not initialized, skipping response time recording");
     return;
-  }
-
-  // Apply unified sampling decision
-  const samplingCoordinator = getSimpleSmartSampler();
-  if (samplingCoordinator) {
-    const metricName = "http_response_time_seconds";
-    const attributes = {
-      metric_category: "technical",
-      ...(method && { method: method.toUpperCase() }),
-      ...(route && { route }),
-      ...(statusCode && { status_code: statusCode.toString() }),
-    };
-
-    const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
-    if (!decision.shouldSample) {
-      return; // Skip this metric based on sampling decision
-    }
   }
 
   try {
@@ -132,30 +89,6 @@ export function recordGraphQLRequest(operationName: string, operationType: strin
     return;
   }
 
-  // Apply unified sampling decision - GraphQL operations might be business metrics
-  const samplingCoordinator = getSimpleSmartSampler();
-  if (samplingCoordinator) {
-    const isBusinessOperation =
-      operationType === "query" &&
-      (operationName.toLowerCase().includes("revenue") ||
-        operationName.toLowerCase().includes("order") ||
-        operationName.toLowerCase().includes("conversion"));
-
-    const metricName = "graphql_requests_total";
-    const attributes = {
-      metric_category: isBusinessOperation ? "business" : "technical",
-      method: "POST",
-      route: "/graphql",
-      operation_name: operationName,
-      operation_type: operationType,
-    };
-
-    const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
-    if (!decision.shouldSample) {
-      return; // Skip this metric based on sampling decision
-    }
-  }
-
   try {
     httpRequestCounter.add(1, {
       method: "POST",
@@ -176,31 +109,6 @@ export function recordGraphQLResponseTime(
 ): void {
   if (!isInitialized || !httpResponseTimeHistogram) {
     return;
-  }
-
-  // Apply unified sampling decision - GraphQL operations might be business metrics
-  const samplingCoordinator = getSimpleSmartSampler();
-  if (samplingCoordinator) {
-    const isBusinessOperation =
-      operationType === "query" &&
-      (operationName.toLowerCase().includes("revenue") ||
-        operationName.toLowerCase().includes("order") ||
-        operationName.toLowerCase().includes("conversion"));
-
-    const metricName = "graphql_response_time_seconds";
-    const attributes = {
-      metric_category: isBusinessOperation ? "business" : "technical",
-      method: "POST",
-      route: "/graphql",
-      operation_name: operationName,
-      operation_type: operationType,
-      has_errors: hasErrors.toString(),
-    };
-
-    const decision = samplingCoordinator.shouldSampleMetric(metricName, attributes);
-    if (!decision.shouldSample) {
-      return; // Skip this metric based on sampling decision
-    }
   }
 
   try {

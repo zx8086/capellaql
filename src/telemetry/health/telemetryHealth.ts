@@ -25,7 +25,6 @@ export interface TelemetryHealthData {
   configuration: {
     serviceName: string;
     serviceVersion: string;
-    samplingRate: number;
     exportTimeoutMs: number;
     batchSize: number;
     maxQueueSize: number;
@@ -131,7 +130,6 @@ class TelemetryHealthMonitor {
       configuration: {
         serviceName: telemetryCfg.SERVICE_NAME,
         serviceVersion: telemetryCfg.SERVICE_VERSION,
-        samplingRate: telemetryCfg.SAMPLING_RATE,
         exportTimeoutMs: telemetryCfg.EXPORT_TIMEOUT_MS,
         batchSize: telemetryCfg.BATCH_SIZE,
         maxQueueSize: telemetryCfg.MAX_QUEUE_SIZE,

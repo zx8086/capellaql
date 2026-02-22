@@ -7,3 +7,7 @@ export * from "./config";
 
 // Re-export all from schemas (includes types, Zod schemas, SchemaRegistry)
 export * from "./schemas";
+
+// Default export for backward compatibility
+import { config } from "./config";
+export default config;

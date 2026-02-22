@@ -26,7 +26,6 @@ export interface PerformanceMetrics {
     exportLatency: number;
     droppedSpans: number;
     batchSize: number;
-    samplingRate: number;
     circuitBreakerState: string;
   };
   graphql: {
@@ -255,7 +254,6 @@ class PerformanceMonitor {
       exportLatency,
       droppedSpans: 0, // Would need to be tracked from actual telemetry
       batchSize: 2048, // From config
-      samplingRate: 0.15, // From config
       circuitBreakerState: telemetryHealth.circuitBreaker?.state || "unknown",
     };
   }
@@ -359,10 +357,8 @@ class PerformanceMonitor {
   private calculateBusinessMetrics(dbMetrics: any, _runtimeMetrics: any, _telemetryMetrics: any, graphqlMetrics: any) {
     // Calculate telemetry cost efficiency (logs per dollar estimation)
     const estimatedLogsPerMinute = 100; // Base estimation - would be tracked from actual usage
-    const samplingReduction = 1 - (0.1 + 0.5 + 0.9 + 1.0) / 4; // Average sampling reduction
-    const actualLogsPerMinute = estimatedLogsPerMinute * (1 - samplingReduction);
     const costPerMillionLogs = 10; // Estimated cost per million logs
-    const telemetryCostEfficiency = (actualLogsPerMinute * 60 * 24) / costPerMillionLogs;
+    const telemetryCostEfficiency = (estimatedLogsPerMinute * 60 * 24) / costPerMillionLogs;
 
     // Calculate operation impact score based on latency and error rates
     const latencyImpact = Math.max(0, 1 - dbMetrics.latency / 1000); // Normalized 0-1
@@ -388,8 +384,8 @@ class PerformanceMonitor {
       critical: 15, // 15% critical tier (error)
     };
 
-    // Estimate total log volume based on sampling
-    const totalLogVolume = actualLogsPerMinute * 60 * 24 * 30; // Monthly volume
+    // Estimate total log volume
+    const totalLogVolume = estimatedLogsPerMinute * 60 * 24 * 30; // Monthly volume
 
     return {
       telemetryCostEfficiency,

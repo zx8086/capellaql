@@ -135,7 +135,6 @@ export const performanceHandler: RouteHandler = async (_request, _context) => {
           exportLatency: -1,
           droppedSpans: -1,
           batchSize: -1,
-          samplingRate: -1,
           circuitBreakerState: "unknown",
         },
         correlations: {

@@ -20,19 +20,8 @@ export const telemetryEnvMapping = {
   EXPORT_TIMEOUT_MS: "EXPORT_TIMEOUT_MS",
   BATCH_SIZE: "BATCH_SIZE",
   MAX_QUEUE_SIZE: "MAX_QUEUE_SIZE",
-  SAMPLING_RATE: "SAMPLING_RATE",
   CIRCUIT_BREAKER_THRESHOLD: "CIRCUIT_BREAKER_THRESHOLD",
   CIRCUIT_BREAKER_TIMEOUT_MS: "CIRCUIT_BREAKER_TIMEOUT_MS",
-  // Log-level specific sampling rates
-  LOG_SAMPLING_DEBUG: "LOG_SAMPLING_DEBUG",
-  LOG_SAMPLING_INFO: "LOG_SAMPLING_INFO",
-  LOG_SAMPLING_WARN: "LOG_SAMPLING_WARN",
-  LOG_SAMPLING_ERROR: "LOG_SAMPLING_ERROR",
-  // Metric sampling rates by category (2025 standard)
-  METRIC_SAMPLING_BUSINESS: "METRIC_SAMPLING_BUSINESS",
-  METRIC_SAMPLING_TECHNICAL: "METRIC_SAMPLING_TECHNICAL",
-  METRIC_SAMPLING_INFRASTRUCTURE: "METRIC_SAMPLING_INFRASTRUCTURE",
-  METRIC_SAMPLING_DEBUG: "METRIC_SAMPLING_DEBUG",
   // Log retention policy
   LOG_RETENTION_DEBUG_DAYS: "LOG_RETENTION_DEBUG_DAYS",
   LOG_RETENTION_INFO_DAYS: "LOG_RETENTION_INFO_DAYS",
@@ -55,19 +44,8 @@ export const telemetryDefaults: TelemetryConfig = {
   EXPORT_TIMEOUT_MS: 30000,
   BATCH_SIZE: 2048,
   MAX_QUEUE_SIZE: 10000,
-  SAMPLING_RATE: 0.15,
   CIRCUIT_BREAKER_THRESHOLD: 5,
   CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
-  // Log-level specific sampling rates (optimize cost while maintaining visibility)
-  LOG_SAMPLING_DEBUG: 0.1, // 10% - reduce debug noise
-  LOG_SAMPLING_INFO: 0.5, // 50% - balanced info logging
-  LOG_SAMPLING_WARN: 0.9, // 90% - high warn visibility
-  LOG_SAMPLING_ERROR: 1.0, // 100% - never drop errors
-  // Metric sampling rates by category (2025 standard)
-  METRIC_SAMPLING_BUSINESS: 1.0, // 100% - never drop business metrics
-  METRIC_SAMPLING_TECHNICAL: 0.75, // 75% - most technical metrics
-  METRIC_SAMPLING_INFRASTRUCTURE: 0.5, // 50% - infrastructure monitoring
-  METRIC_SAMPLING_DEBUG: 0.25, // 25% - development metrics
   // Log retention policy (days) - balance compliance and cost
   LOG_RETENTION_DEBUG_DAYS: 1, // Debug logs: 1 day
   LOG_RETENTION_INFO_DAYS: 7, // Info logs: 7 days
@@ -112,11 +90,6 @@ export const TelemetryConfigSchema = z.object({
     .min(100, "MAX_QUEUE_SIZE must be at least 100")
     .max(20000, "MAX_QUEUE_SIZE should not exceed 20000")
     .default(10000), // 2025 standard
-  SAMPLING_RATE: z.coerce
-    .number()
-    .min(0.01, "SAMPLING_RATE must be at least 1%")
-    .max(1.0, "SAMPLING_RATE cannot exceed 100%")
-    .default(0.15), // 15% (2025 standard)
   CIRCUIT_BREAKER_THRESHOLD: z.coerce
     .number()
     .min(1, "CIRCUIT_BREAKER_THRESHOLD must be at least 1")
@@ -127,48 +100,6 @@ export const TelemetryConfigSchema = z.object({
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
     .default(60000), // 1 minute
-  // Log-level specific sampling rate validation
-  LOG_SAMPLING_DEBUG: z.coerce
-    .number()
-    .min(0.01, "LOG_SAMPLING_DEBUG must be at least 1%")
-    .max(1.0, "LOG_SAMPLING_DEBUG cannot exceed 100%")
-    .default(0.1),
-  LOG_SAMPLING_INFO: z.coerce
-    .number()
-    .min(0.01, "LOG_SAMPLING_INFO must be at least 1%")
-    .max(1.0, "LOG_SAMPLING_INFO cannot exceed 100%")
-    .default(0.5),
-  LOG_SAMPLING_WARN: z.coerce
-    .number()
-    .min(0.01, "LOG_SAMPLING_WARN must be at least 1%")
-    .max(1.0, "LOG_SAMPLING_WARN cannot exceed 100%")
-    .default(0.9),
-  LOG_SAMPLING_ERROR: z.coerce
-    .number()
-    .min(0.01, "LOG_SAMPLING_ERROR must be at least 1%")
-    .max(1.0, "LOG_SAMPLING_ERROR cannot exceed 100%")
-    .default(1.0),
-  // Metric sampling rate validation (2025 standards)
-  METRIC_SAMPLING_BUSINESS: z.coerce
-    .number()
-    .min(0.01, "METRIC_SAMPLING_BUSINESS must be at least 1%")
-    .max(1.0, "METRIC_SAMPLING_BUSINESS cannot exceed 100%")
-    .default(1.0), // 100% for business metrics
-  METRIC_SAMPLING_TECHNICAL: z.coerce
-    .number()
-    .min(0.01, "METRIC_SAMPLING_TECHNICAL must be at least 1%")
-    .max(1.0, "METRIC_SAMPLING_TECHNICAL cannot exceed 100%")
-    .default(0.75), // 75% for technical metrics
-  METRIC_SAMPLING_INFRASTRUCTURE: z.coerce
-    .number()
-    .min(0.01, "METRIC_SAMPLING_INFRASTRUCTURE must be at least 1%")
-    .max(1.0, "METRIC_SAMPLING_INFRASTRUCTURE cannot exceed 100%")
-    .default(0.5), // 50% for infrastructure metrics
-  METRIC_SAMPLING_DEBUG: z.coerce
-    .number()
-    .min(0.01, "METRIC_SAMPLING_DEBUG must be at least 1%")
-    .max(1.0, "METRIC_SAMPLING_DEBUG cannot exceed 100%")
-    .default(0.25), // 25% for debug metrics
   // Log retention policy validation
   LOG_RETENTION_DEBUG_DAYS: z.coerce
     .number()
@@ -269,10 +200,6 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
       (parseEnvVar(getEnvVar(telemetryEnvMapping.MAX_QUEUE_SIZE), "number", "MAX_QUEUE_SIZE") as number) ||
       telemetryDefaults.MAX_QUEUE_SIZE,
 
-    SAMPLING_RATE:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.SAMPLING_RATE), "number", "SAMPLING_RATE") as number) ||
-      telemetryDefaults.SAMPLING_RATE,
-
     CIRCUIT_BREAKER_THRESHOLD:
       (parseEnvVar(
         getEnvVar(telemetryEnvMapping.CIRCUIT_BREAKER_THRESHOLD),
@@ -286,52 +213,6 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
         "number",
         "CIRCUIT_BREAKER_TIMEOUT_MS"
       ) as number) || telemetryDefaults.CIRCUIT_BREAKER_TIMEOUT_MS,
-
-    // Log-level specific sampling rates
-    LOG_SAMPLING_DEBUG:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_SAMPLING_DEBUG), "number", "LOG_SAMPLING_DEBUG") as number) ||
-      telemetryDefaults.LOG_SAMPLING_DEBUG,
-
-    LOG_SAMPLING_INFO:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_SAMPLING_INFO), "number", "LOG_SAMPLING_INFO") as number) ||
-      telemetryDefaults.LOG_SAMPLING_INFO,
-
-    LOG_SAMPLING_WARN:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_SAMPLING_WARN), "number", "LOG_SAMPLING_WARN") as number) ||
-      telemetryDefaults.LOG_SAMPLING_WARN,
-
-    LOG_SAMPLING_ERROR:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOG_SAMPLING_ERROR), "number", "LOG_SAMPLING_ERROR") as number) ||
-      telemetryDefaults.LOG_SAMPLING_ERROR,
-
-    // Metric sampling rates by category
-    METRIC_SAMPLING_BUSINESS:
-      (parseEnvVar(
-        getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_BUSINESS),
-        "number",
-        "METRIC_SAMPLING_BUSINESS"
-      ) as number) || telemetryDefaults.METRIC_SAMPLING_BUSINESS,
-
-    METRIC_SAMPLING_TECHNICAL:
-      (parseEnvVar(
-        getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_TECHNICAL),
-        "number",
-        "METRIC_SAMPLING_TECHNICAL"
-      ) as number) || telemetryDefaults.METRIC_SAMPLING_TECHNICAL,
-
-    METRIC_SAMPLING_INFRASTRUCTURE:
-      (parseEnvVar(
-        getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_INFRASTRUCTURE),
-        "number",
-        "METRIC_SAMPLING_INFRASTRUCTURE"
-      ) as number) || telemetryDefaults.METRIC_SAMPLING_INFRASTRUCTURE,
-
-    METRIC_SAMPLING_DEBUG:
-      (parseEnvVar(
-        getEnvVar(telemetryEnvMapping.METRIC_SAMPLING_DEBUG),
-        "number",
-        "METRIC_SAMPLING_DEBUG"
-      ) as number) || telemetryDefaults.METRIC_SAMPLING_DEBUG,
 
     // Log retention policy
     LOG_RETENTION_DEBUG_DAYS:
@@ -379,11 +260,6 @@ export function validateTelemetryConfig(config: TelemetryConfig, isProduction: b
 
   // Production-specific validations
   if (isProduction) {
-    // Validate telemetry sampling rate for production
-    if (config.SAMPLING_RATE > 0.5) {
-      warnings.push("SAMPLING_RATE above 50% may impact performance in production");
-    }
-
     // Validate export timeout compliance with 2025 standards
     if (config.EXPORT_TIMEOUT_MS > 30000) {
       warnings.push("EXPORT_TIMEOUT_MS exceeds 30 seconds - this violates 2025 OpenTelemetry standards");
@@ -394,8 +270,6 @@ export function validateTelemetryConfig(config: TelemetryConfig, isProduction: b
       warnings.push("BATCH_SIZE is below recommended 1024 for production environments");
     }
   }
-
-  // Note: Different hosts for telemetry endpoints is valid (separate collectors per signal)
 
   return warnings;
 }
@@ -416,7 +290,6 @@ export function getTelemetryEnvVarPath(configPath: string): string | undefined {
     "telemetry.EXPORT_TIMEOUT_MS": "EXPORT_TIMEOUT_MS",
     "telemetry.BATCH_SIZE": "BATCH_SIZE",
     "telemetry.MAX_QUEUE_SIZE": "MAX_QUEUE_SIZE",
-    "telemetry.SAMPLING_RATE": "SAMPLING_RATE",
     "telemetry.CIRCUIT_BREAKER_THRESHOLD": "CIRCUIT_BREAKER_THRESHOLD",
     "telemetry.CIRCUIT_BREAKER_TIMEOUT_MS": "CIRCUIT_BREAKER_TIMEOUT_MS",
   };

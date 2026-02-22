@@ -54,11 +54,6 @@ export function validateCrossConfiguration(config: Config): string[] {
       warnings.push("Production CORS origins should not include localhost or wildcards");
     }
 
-    // Validate telemetry sampling rate for production
-    if (config.telemetry.SAMPLING_RATE > 0.5) {
-      warnings.push("SAMPLING_RATE above 50% may impact performance in production");
-    }
-
     // Validate export timeout compliance with 2025 standards
     if (config.telemetry.EXPORT_TIMEOUT_MS > 30000) {
       warnings.push("EXPORT_TIMEOUT_MS exceeds 30 seconds - this violates 2025 OpenTelemetry standards");
@@ -133,10 +128,6 @@ export function validateConfigHealth(config: Config): { healthy: boolean; issues
 
   // Production telemetry validation
   if (isProduction) {
-    if (config.telemetry.SAMPLING_RATE > 0.8) {
-      warnings.push("Very high sampling rate may impact production performance");
-    }
-
     if (config.telemetry.BATCH_SIZE < 512) {
       warnings.push("Small batch size may impact telemetry efficiency in production");
     }

@@ -65,19 +65,8 @@ export interface TelemetryConfig {
   EXPORT_TIMEOUT_MS: number;
   BATCH_SIZE: number;
   MAX_QUEUE_SIZE: number;
-  SAMPLING_RATE: number;
   CIRCUIT_BREAKER_THRESHOLD: number;
   CIRCUIT_BREAKER_TIMEOUT_MS: number;
-  // Log-level specific sampling rates
-  LOG_SAMPLING_DEBUG: number;
-  LOG_SAMPLING_INFO: number;
-  LOG_SAMPLING_WARN: number;
-  LOG_SAMPLING_ERROR: number;
-  // Metric sampling rates by category (2025 standard)
-  METRIC_SAMPLING_BUSINESS: number;
-  METRIC_SAMPLING_TECHNICAL: number;
-  METRIC_SAMPLING_INFRASTRUCTURE: number;
-  METRIC_SAMPLING_DEBUG: number;
   // Log retention policy (days)
   LOG_RETENTION_DEBUG_DAYS: number;
   LOG_RETENTION_INFO_DAYS: number;
@@ -215,11 +204,6 @@ export const TelemetryConfigSchema = z.object({
     .min(100, "MAX_QUEUE_SIZE must be at least 100")
     .max(20000, "MAX_QUEUE_SIZE should not exceed 20000")
     .default(10000),
-  SAMPLING_RATE: z.coerce
-    .number()
-    .min(0.01, "SAMPLING_RATE must be at least 1%")
-    .max(1.0, "SAMPLING_RATE cannot exceed 100%")
-    .default(0.15),
   CIRCUIT_BREAKER_THRESHOLD: z.coerce
     .number()
     .min(1, "CIRCUIT_BREAKER_THRESHOLD must be at least 1")
@@ -230,16 +214,6 @@ export const TelemetryConfigSchema = z.object({
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
     .default(60000),
-  // Log-level specific sampling rate validation
-  LOG_SAMPLING_DEBUG: z.coerce.number().min(0.01).max(1.0).default(0.1),
-  LOG_SAMPLING_INFO: z.coerce.number().min(0.01).max(1.0).default(0.5),
-  LOG_SAMPLING_WARN: z.coerce.number().min(0.01).max(1.0).default(0.9),
-  LOG_SAMPLING_ERROR: z.coerce.number().min(0.01).max(1.0).default(1.0),
-  // Metric sampling rate validation (2025 standards)
-  METRIC_SAMPLING_BUSINESS: z.coerce.number().min(0.01).max(1.0).default(1.0),
-  METRIC_SAMPLING_TECHNICAL: z.coerce.number().min(0.01).max(1.0).default(0.75),
-  METRIC_SAMPLING_INFRASTRUCTURE: z.coerce.number().min(0.01).max(1.0).default(0.5),
-  METRIC_SAMPLING_DEBUG: z.coerce.number().min(0.01).max(1.0).default(0.25),
   // Log retention policy validation
   LOG_RETENTION_DEBUG_DAYS: z.coerce.number().min(1).max(365).default(1),
   LOG_RETENTION_INFO_DAYS: z.coerce.number().min(1).max(365).default(7),

@@ -354,7 +354,6 @@ class WinstonTelemetryLogger {
 
     try {
       // Log through Winston with OTLP transport
-      // Sampling is handled by the collector (KISS principle)
       this.logger.log({
         level: logData.level,
         message: logData.message,

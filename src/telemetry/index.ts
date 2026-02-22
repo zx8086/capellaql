@@ -14,7 +14,7 @@ export {
 // Health monitoring exports
 export { getTelemetryHealth, telemetryHealthMonitor } from "./health/telemetryHealth";
 // Main telemetry exports and initialization
-export { getSimpleSmartSampler, getTelemetrySDK, initializeTelemetry, shutdownTelemetry } from "./instrumentation";
+export { getTelemetrySDK, initializeTelemetry, shutdownTelemetry } from "./instrumentation";
 // Logging exports (Winston-based with ECS field mapping and OTLP transport)
 export { debug, err, error, log, telemetryLogger, warn, winstonTelemetryLogger } from "./winston-logger";
 export type { LogContext, LogLevel, StructuredLogData } from "./winston-logger";
@@ -34,16 +34,6 @@ export {
   recordHttpRequest,
   recordHttpResponseTime,
 } from "./metrics/httpMetrics";
-export {
-  createCostOptimizedSampler,
-  createHighFidelitySampler,
-  estimateCostImpact,
-  type SimpleSamplingDecision,
-  SimpleSmartSampler,
-  type SimpleSmartSamplingConfig,
-} from "./sampling/SimpleSmartSampler";
-// Sampling exports
-export { SmartSampler, type SmartSamplingConfig } from "./sampling/SmartSampler";
 // Tracing exports
 export {
   createCouchbaseGetSpan,
