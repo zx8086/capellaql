@@ -38,6 +38,7 @@ import {
   wrapMetricExporter,
   wrapSpanExporter,
 } from "./export-stats-tracker";
+import { markTelemetryInitialized } from "./health/telemetryHealth";
 import { log, warn, winstonTelemetryLogger } from "./winston-logger";
 
 // ============================================================================
@@ -55,8 +56,18 @@ let loggerProvider: LoggerProvider | undefined;
 let hostMetrics: HostMetrics | undefined;
 let metricExporter: PushMetricExporter | undefined;
 let metricReader: MetricReaderLike | undefined;
-let isInitialized = false;
 let config: TelemetryConfig;
+
+// Use globalThis to persist initialization state across hot-reloads
+// This prevents "duplicate registration" errors when Bun reloads modules
+const OTEL_INIT_KEY = "__capellaql_otel_initialized__";
+const isInitialized = (): boolean => (globalThis as any)[OTEL_INIT_KEY] === true;
+const setInitialized = (): void => {
+  (globalThis as any)[OTEL_INIT_KEY] = true;
+};
+const resetInitialized = (): void => {
+  (globalThis as any)[OTEL_INIT_KEY] = false;
+};
 
 // Export stats trackers (per migrate/telemetry/instrumentation.ts lines 57-59)
 const traceExportStats = createExportStatsTracker();
@@ -64,7 +75,7 @@ const metricExportStats = createExportStatsTracker();
 const logExportStats = createExportStatsTracker();
 
 export async function initializeTelemetry(): Promise<void> {
-  if (isInitialized) {
+  if (isInitialized()) {
     warn("OpenTelemetry already initialized, skipping");
     return;
   }
@@ -234,7 +245,10 @@ export async function initializeTelemetry(): Promise<void> {
     // Per migrate/telemetry/instrumentation.ts lines 215-220
     winstonTelemetryLogger.reinitialize();
 
-    isInitialized = true;
+    setInitialized();
+
+    // Mark telemetry as initialized for health monitoring
+    markTelemetryInitialized();
 
     if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
       console.debug("OpenTelemetry SDK initialized successfully", {
@@ -323,7 +337,7 @@ export async function shutdownTelemetry(): Promise<void> {
     try {
       await sdk.shutdown();
       sdk = undefined;
-      isInitialized = false;
+      resetInitialized();
     } catch (error) {
       console.warn("Error shutting down OpenTelemetry:", error);
     }
@@ -394,7 +408,7 @@ export function getTelemetrySDK(): NodeSDK | undefined {
 }
 
 export function isTelemetryInitialized(): boolean {
-  return isInitialized;
+  return isInitialized();
 }
 
 export const initializeBunFullTelemetry = initializeTelemetry;
@@ -411,7 +425,7 @@ export async function measureDatabaseOperation<T>(
 ): Promise<T> {
   const { result, duration } = await BunPerf.measure(operation, `DB:${operationName}`);
 
-  if (isInitialized) {
+  if (isInitialized()) {
     try {
       log(`Database operation completed`, {
         operation: operationName,
@@ -434,7 +448,7 @@ export async function measureGraphQLResolver<T>(
 ): Promise<T> {
   const { result, duration } = await BunPerf.measure(operation, `GraphQL:${resolverName}.${fieldName}`);
 
-  if (isInitialized) {
+  if (isInitialized()) {
     try {
       log(`GraphQL resolver completed`, {
         resolver: resolverName,

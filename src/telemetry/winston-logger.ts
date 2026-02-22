@@ -50,26 +50,24 @@ export interface StructuredLogData {
  * ECS (Elastic Common Schema) field mapping for observability platform integration.
  * Maps custom application fields to ECS-standard field names.
  *
- * Benefits:
+ * Per monitoring-updated.md lines 108-135:
  * - Top-level fields in Elasticsearch (not nested under labels.*)
  * - Kibana auto-complete recognition
  * - Direct field access (consumer.id instead of labels.consumerId)
  * - Standard compliance with Elastic Common Schema
+ *
+ * IMPORTANT: The service uses `consumer.*` namespace, NOT `user.*`.
+ * This is intentional per documentation lines 218-224:
+ * - `consumer.*` - API consumer entities (API clients)
+ * - `user.*` - Reserved for end-user identification (not currently used)
  */
 const ECS_FIELD_MAPPING: Record<string, string> = {
+  // Consumer fields (API client identification)
   consumerId: "consumer.id",
   username: "consumer.name",
+  // Event correlation fields
   requestId: "event.id",
   totalDuration: "event.duration",
-};
-
-/**
- * Consumer field mapping for OTLP transport compatibility.
- * Kong consumer fields are mapped to labels.consumer_* namespace.
- */
-const CONSUMER_FIELD_MAPPING: Record<string, string> = {
-  consumerId: "labels.consumer_id",
-  username: "labels.consumer_name",
 };
 
 // ============================================================================
@@ -106,6 +104,11 @@ function getCurrentTraceContext(): LogContext {
  * Apply ECS field mapping to metadata.
  * Transforms custom fields to ECS-standard fields.
  *
+ * Per monitoring-updated.md lines 108-135:
+ * - Fields with ECS mapping appear at root level in Elasticsearch
+ * - Non-mapped fields go under labels.* namespace
+ * - No duplication between top-level and labels
+ *
  * @param meta - Original metadata object
  * @returns Transformed metadata with ECS fields
  */
@@ -113,21 +116,18 @@ function applyECSMapping(meta: Record<string, unknown>): Record<string, unknown>
   const mapped: Record<string, unknown> = {};
 
   for (const [key, value] of Object.entries(meta)) {
-    // Check if field has ECS mapping
+    // Check if field has ECS mapping - these become top-level fields
     if (key in ECS_FIELD_MAPPING) {
       const ecsField = ECS_FIELD_MAPPING[key];
       mapped[ecsField] = value;
     }
-    // Check if field has consumer mapping for OTLP compatibility
-    else if (key in CONSUMER_FIELD_MAPPING) {
-      const consumerField = CONSUMER_FIELD_MAPPING[key];
-      mapped[consumerField] = value;
+    // Fields already namespaced (contain dots or start with labels.) pass through
+    else if (key.startsWith("labels.") || key.includes(".")) {
+      mapped[key] = value;
     }
     // Non-mapped fields go under labels.* namespace
-    else if (!key.startsWith("labels.") && !key.includes(".")) {
+    else {
       mapped[`labels.${key}`] = value;
-    } else {
-      mapped[key] = value;
     }
   }
 

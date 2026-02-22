@@ -167,6 +167,10 @@ export async function getCouchbaseHealth(): Promise<{
     };
 
     // Check service states from ping
+    // Note: Couchbase SDK returns state as number (0 = ok, 1 = timeout, 2 = error)
+    // or as string "ok" depending on SDK version
+    const isServiceOk = (s: any) => s.state === 0 || s.state === "ok";
+
     if (ping.services) {
       const kvServices = ping.services.kv || [];
       const queryServices = ping.services.query || [];
@@ -175,38 +179,38 @@ export async function getCouchbaseHealth(): Promise<{
 
       serviceHealth.kv = {
         status:
-          kvServices.length > 0 ? (kvServices.every((s) => s.state === "ok") ? "healthy" : "degraded") : "unavailable",
-        healthy: kvServices.length > 0 && kvServices.every((s) => s.state === "ok"),
+          kvServices.length > 0 ? (kvServices.every(isServiceOk) ? "healthy" : "degraded") : "unavailable",
+        healthy: kvServices.length > 0 && kvServices.every(isServiceOk),
       };
 
       serviceHealth.query = {
         status:
           queryServices.length > 0
-            ? queryServices.every((s) => s.state === "ok")
+            ? queryServices.every(isServiceOk)
               ? "healthy"
               : "degraded"
             : "unavailable",
-        healthy: queryServices.length > 0 && queryServices.every((s) => s.state === "ok"),
+        healthy: queryServices.length > 0 && queryServices.every(isServiceOk),
       };
 
       serviceHealth.analytics = {
         status:
           analyticsServices.length > 0
-            ? analyticsServices.every((s) => s.state === "ok")
+            ? analyticsServices.every(isServiceOk)
               ? "healthy"
               : "degraded"
             : "unavailable",
-        healthy: analyticsServices.length > 0 && analyticsServices.every((s) => s.state === "ok"),
+        healthy: analyticsServices.length > 0 && analyticsServices.every(isServiceOk),
       };
 
       serviceHealth.search = {
         status:
           searchServices.length > 0
-            ? searchServices.every((s) => s.state === "ok")
+            ? searchServices.every(isServiceOk)
               ? "healthy"
               : "degraded"
             : "unavailable",
-        healthy: searchServices.length > 0 && searchServices.every((s) => s.state === "ok"),
+        healthy: searchServices.length > 0 && searchServices.every(isServiceOk),
       };
     }
 

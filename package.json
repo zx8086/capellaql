@@ -34,7 +34,7 @@
     "test:k6:all:modern": "bun run --sequential test:k6:smoke:all test:k6:load:coverage test:k6:scenario:buyer",
     "test:k6:all:legacy": "bun run --sequential test:k6:smoke test:k6:load test:k6:graphql",
     "test:all": "bun run --sequential test:bun test:playwright test:k6:smoke:health",
-    "dev": "bun run src/index.ts",
+    "dev": "bun run --hot --watch src/index.ts",
     "dev:verbose": "BUN_CONFIG_VERBOSE_FETCH=true bun run --hot --watch src/index.ts",
     "dev:debug": "BUN_CONFIG_VERBOSE_FETCH=true bun --inspect --hot --watch src/index.ts",
     "start": "bun run src/index.ts",

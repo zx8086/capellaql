@@ -3,6 +3,11 @@
 import { getGraphQLPerformanceStats, getRecentGraphQLPerformance } from "../../lib/graphqlPerformanceTracker";
 import { getPerformanceHistory, getPerformanceMetrics, getPerformanceTrends } from "../../lib/performanceMonitor";
 import { getSystemHealth, getSystemHealthSummary } from "../../lib/systemHealth";
+import {
+  getComprehensiveHealth,
+  getLivenessCheck,
+  getReadinessCheck,
+} from "../../services/health";
 import { err, getTelemetryHealth } from "../../telemetry";
 import { createHealthcheck } from "../../utils/bunUtils";
 import type { RouteHandler } from "../types";
@@ -543,6 +548,103 @@ function generateOverallRecommendations(results: PromiseSettledResult<any>[]): s
   return recommendations;
 }
 
+/**
+ * /health/status - Standardized health check (per monitoring-updated.md pattern)
+ * Returns comprehensive status with Couchbase, cache, and telemetry dependencies
+ */
+export const statusHealthHandler: RouteHandler = async (request, context) => {
+  try {
+    const requestId = context?.requestId || request.headers.get("x-request-id") || crypto.randomUUID();
+    const healthResponse = await getComprehensiveHealth(requestId);
+
+    // Determine HTTP status code based on health status
+    const statusCode = healthResponse.status === "healthy" ? 200 : healthResponse.status === "degraded" ? 200 : 503;
+
+    return new Response(JSON.stringify(healthResponse, null, 2), {
+      status: statusCode,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "X-Request-ID": requestId,
+      },
+    });
+  } catch (error) {
+    err("Standardized health check failed", error);
+    return jsonResponse(
+      {
+        status: "critical",
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+        requestId: crypto.randomUUID(),
+      },
+      503
+    );
+  }
+};
+
+/**
+ * /health/ready - Readiness probe for Kubernetes/container orchestrators
+ * Returns 200 if ready to receive traffic, 503 if not
+ */
+export const readinessHandler: RouteHandler = async (request, context) => {
+  try {
+    const requestId = context?.requestId || request.headers.get("x-request-id") || crypto.randomUUID();
+    const readinessResponse = await getReadinessCheck(requestId);
+
+    return new Response(JSON.stringify(readinessResponse, null, 2), {
+      status: readinessResponse.ready ? 200 : 503,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "X-Request-ID": requestId,
+      },
+    });
+  } catch (error) {
+    err("Readiness check failed", error);
+    return jsonResponse(
+      {
+        ready: false,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+        requestId: crypto.randomUUID(),
+      },
+      503
+    );
+  }
+};
+
+/**
+ * /health/live - Liveness probe for Kubernetes/container orchestrators
+ * Returns 200 if process is alive
+ */
+export const livenessHandler: RouteHandler = async (request, context) => {
+  try {
+    const requestId = context?.requestId || request.headers.get("x-request-id") || crypto.randomUUID();
+    const livenessResponse = getLivenessCheck(requestId);
+
+    return new Response(JSON.stringify(livenessResponse, null, 2), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "X-Request-ID": requestId,
+      },
+    });
+  } catch (error) {
+    err("Liveness check failed", error);
+    // Even on error, if we can respond, we're alive
+    return jsonResponse(
+      {
+        alive: true,
+        timestamp: new Date().toISOString(),
+        error: error instanceof Error ? error.message : String(error),
+        requestId: crypto.randomUUID(),
+      },
+      200
+    );
+  }
+};
+
 // Export all handlers as a collection
 export const healthHandlers = {
   basic: basicHealthHandler,
@@ -555,4 +657,8 @@ export const healthHandlers = {
   telemetryDetailed: telemetryDetailedHandler,
   comprehensive: comprehensiveHealthHandler,
   graphql: graphqlPerformanceHandler,
+  // New standardized health endpoints
+  status: statusHealthHandler,
+  ready: readinessHandler,
+  live: livenessHandler,
 };

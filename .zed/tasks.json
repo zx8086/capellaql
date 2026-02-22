@@ -48,6 +48,60 @@
     "reveal": "always"
   },
   {
+    "label": "health: status (standardized)",
+    "command": "echo '=== Server Health Check ===' && curl -sf http://localhost:4000/health/status | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: ready (k8s probe)",
+    "command": "echo '=== Readiness Probe ===' && curl -sf http://localhost:4000/health/ready | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: live (k8s probe)",
+    "command": "echo '=== Liveness Probe ===' && curl -sf http://localhost:4000/health/live | jq .",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: dependencies only",
+    "command": "echo '=== Dependencies Health ===' && curl -sf http://localhost:4000/health/status | jq '.dependencies'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: couchbase details",
+    "command": "echo '=== Couchbase Health ===' && curl -sf http://localhost:4000/health/status | jq '.dependencies.couchbase'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: cache details",
+    "command": "echo '=== Cache Health ===' && curl -sf http://localhost:4000/health/status | jq '.dependencies.cache'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: telemetry signals",
+    "command": "echo '=== Telemetry Signals ===' && curl -sf http://localhost:4000/health/status | jq '.dependencies.telemetry'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: circuit breakers",
+    "command": "echo '=== Circuit Breakers ===' && curl -sf http://localhost:4000/health/status | jq '{overall: .circuitBreakerState, highAvailability: .highAvailability}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
+    "label": "health: quick status",
+    "command": "echo '=== Quick Status ===' && curl -sf http://localhost:4000/health/status | jq '{status: .status, uptime: .uptime, ha: .highAvailability, circuit: .circuitBreakerState}'",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+  {
     "label": "health: system",
     "command": "echo '=== System Health ===' && curl -sf http://localhost:4000/health/system | jq .",
     "use_new_terminal": false,

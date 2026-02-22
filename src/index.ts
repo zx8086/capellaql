@@ -134,6 +134,10 @@ const wrappedHealthHandlers = {
   telemetryDetailed: withMiddleware(healthHandlers.telemetryDetailed),
   comprehensive: withMiddleware(healthHandlers.comprehensive),
   graphql: withMiddleware(healthHandlers.graphql),
+  // New standardized health endpoints
+  status: withMiddleware(healthHandlers.status),
+  ready: withMiddleware(healthHandlers.ready),
+  live: withMiddleware(healthHandlers.live),
 };
 
 const wrappedGraphqlHandler = withMiddleware(graphqlHandler);
@@ -200,6 +204,20 @@ async function createServer(): Promise<Server> {
       "/health/graphql": async (request) => {
         const context = createRequestContext(request);
         return wrappedHealthHandlers.graphql(request, context);
+      },
+
+      // New standardized health endpoints (per monitoring-updated.md pattern)
+      "/health/status": async (request) => {
+        const context = createRequestContext(request);
+        return wrappedHealthHandlers.status(request, context);
+      },
+      "/health/ready": async (request) => {
+        const context = createRequestContext(request);
+        return wrappedHealthHandlers.ready(request, context);
+      },
+      "/health/live": async (request) => {
+        const context = createRequestContext(request);
+        return wrappedHealthHandlers.live(request, context);
       },
 
       // GraphQL with per-method handling
