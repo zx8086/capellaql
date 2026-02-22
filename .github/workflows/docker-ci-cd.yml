@@ -157,13 +157,9 @@ jobs:
             BUILD_VERSION=${{ env.PKG_VERSION }}
             COMMIT_HASH=${{ github.sha }}
           cache-from: |
-            type=gha,scope=${{ github.workflow }}-${{ github.ref_name }}
-            type=gha,scope=${{ github.workflow }}-master
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
             type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          cache-to: |
-            type=gha,scope=${{ github.workflow }}-${{ github.ref_name }},mode=max
-            type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
           provenance: true
           sbom: true
 
@@ -473,9 +469,7 @@ jobs:
             echo ""
             echo "### Build Optimizations"
             echo "- Docker BuildKit with Buildx"
-            echo "- Dual-layer caching:"
-            echo "  - GHA cache (fast, GitHub-native)"
-            echo "  - Registry cache (cross-workflow)"
+            echo "- Registry cache (persistent, cross-workflow)"
             echo "- Bun dependency caching"
             echo "- Multi-platform parallel builds"
           } >> $GITHUB_STEP_SUMMARY
