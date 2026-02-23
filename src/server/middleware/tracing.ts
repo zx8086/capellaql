@@ -25,6 +25,34 @@ function getSpanName(request: Request, context: RequestContext): string {
 }
 
 /**
+ * Extract operation name from GraphQL query string
+ * Handles: query OpName { }, mutation OpName { }, subscription OpName { }
+ * Also handles: query OpName($var: Type) { }
+ */
+function extractOperationNameFromQuery(query: string): string | undefined {
+  if (!query) return undefined;
+
+  // Match: query/mutation/subscription followed by optional operation name
+  // Patterns: "query OpName {", "query OpName(", "query {"
+  const operationMatch = query.match(
+    /^\s*(?:query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[({]/
+  );
+
+  if (operationMatch?.[1]) {
+    return operationMatch[1];
+  }
+
+  // Check for anonymous query with field name (e.g., "{ looks(...) }")
+  // Extract the first field name as a fallback
+  const fieldMatch = query.match(/^\s*(?:query|mutation|subscription)?\s*\{\s*([A-Za-z_][A-Za-z0-9_]*)/);
+  if (fieldMatch?.[1]) {
+    return fieldMatch[1];
+  }
+
+  return undefined;
+}
+
+/**
  * Extract GraphQL operation name from request body
  */
 async function extractGraphQLOperation(request: Request): Promise<{
@@ -41,8 +69,12 @@ async function extractGraphQLOperation(request: Request): Promise<{
 
     const body = JSON.parse(text);
     if (body && typeof body === "object") {
+      // Use explicit operationName if provided, otherwise extract from query
+      const operationName =
+        body.operationName || extractOperationNameFromQuery(body.query);
+
       return {
-        operationName: body.operationName,
+        operationName,
         query: body.query,
         variables: body.variables,
       };
