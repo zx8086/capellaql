@@ -45,6 +45,34 @@ export interface SearchDocumentsResponse {
   searchDocuments: DocumentResult[];
 }
 
+export interface LookSummary {
+  hasDeliveryName: number;
+  hasDescription: number;
+  hasGender: number;
+  hasRelatedStyles: number;
+  hasTag: number;
+  hasTitle: number;
+  hasTrend: number;
+  totalLooks: number;
+}
+
+export interface LooksSummaryResponse {
+  looksSummary: LookSummary;
+}
+
+export interface UrlSuffixesResult {
+  divisionCode: string;
+  urls: string[];
+}
+
+export interface GetLooksUrlCheckResponse {
+  getLooksUrlCheck: UrlSuffixesResult[];
+}
+
+export interface GetImageUrlCheckResponse {
+  getImageUrlCheck: UrlSuffixesResult[];
+}
+
 /**
  * Execute a GraphQL query against the API
  */
@@ -117,6 +145,48 @@ export const SEARCH_DOCUMENTS_QUERY = `
 `;
 
 /**
+ * GraphQL query for fetching looks summary statistics
+ */
+export const LOOKS_SUMMARY_QUERY = `
+  query LooksSummary($brand: String, $division: String, $season: String) {
+    looksSummary(brand: $brand, division: $division, season: $season) {
+      hasDeliveryName
+      hasDescription
+      hasGender
+      hasRelatedStyles
+      hasTag
+      hasTitle
+      hasTrend
+      totalLooks
+    }
+  }
+`;
+
+/**
+ * GraphQL query for fetching looks URL suffixes by division
+ */
+export const GET_LOOKS_URL_CHECK_QUERY = `
+  query GetLooksUrlCheck($divisions: [String!]!, $season: String!) {
+    getLooksUrlCheck(divisions: $divisions, season: $season) {
+      divisionCode
+      urls
+    }
+  }
+`;
+
+/**
+ * GraphQL query for fetching image URL suffixes by division
+ */
+export const GET_IMAGE_URL_CHECK_QUERY = `
+  query GetImageUrlCheck($divisions: [String!]!, $season: String!) {
+    getImageUrlCheck(divisions: $divisions, season: $season) {
+      divisionCode
+      urls
+    }
+  }
+`;
+
+/**
  * Validate Look object structure
  */
 export function validateLookStructure(look: Look): void {
@@ -150,6 +220,56 @@ export function validateDocumentResultStructure(result: DocumentResult): void {
   expect(typeof result.scope).toBe("string");
   expect(typeof result.collection).toBe("string");
   expect(typeof result.timeTaken).toBe("number");
+}
+
+/**
+ * Validate LookSummary object structure
+ */
+export function validateLookSummaryStructure(summary: LookSummary): void {
+  const expectedFields = [
+    "hasDeliveryName",
+    "hasDescription",
+    "hasGender",
+    "hasRelatedStyles",
+    "hasTag",
+    "hasTitle",
+    "hasTrend",
+    "totalLooks",
+  ];
+
+  for (const field of expectedFields) {
+    expect(summary).toHaveProperty(field);
+  }
+
+  // Type validation - all fields should be numbers
+  expect(typeof summary.hasDeliveryName).toBe("number");
+  expect(typeof summary.hasDescription).toBe("number");
+  expect(typeof summary.hasGender).toBe("number");
+  expect(typeof summary.hasRelatedStyles).toBe("number");
+  expect(typeof summary.hasTag).toBe("number");
+  expect(typeof summary.hasTitle).toBe("number");
+  expect(typeof summary.hasTrend).toBe("number");
+  expect(typeof summary.totalLooks).toBe("number");
+
+  // Values should be non-negative
+  expect(summary.totalLooks).toBeGreaterThanOrEqual(0);
+}
+
+/**
+ * Validate UrlSuffixesResult object structure
+ */
+export function validateUrlSuffixesResultStructure(result: UrlSuffixesResult): void {
+  expect(result).toHaveProperty("divisionCode");
+  expect(result).toHaveProperty("urls");
+
+  // Type validation
+  expect(typeof result.divisionCode).toBe("string");
+  expect(Array.isArray(result.urls)).toBe(true);
+
+  // Each URL should be a string
+  for (const url of result.urls) {
+    expect(typeof url).toBe("string");
+  }
 }
 
 /**

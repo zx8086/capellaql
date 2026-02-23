@@ -4,9 +4,12 @@ import { test, expect } from "@playwright/test";
 import {
   executeGraphQL,
   LOOKS_QUERY,
+  LOOKS_SUMMARY_QUERY,
   validateLookStructure,
+  validateLookSummaryStructure,
   measureQueryTime,
   type LooksQueryResponse,
+  type LooksSummaryResponse,
 } from "../helpers/graphql-client";
 
 const TEST_CONFIG = {
@@ -240,6 +243,194 @@ test.describe("GraphQL Looks Query - TH Brand C52 Season", () => {
 
       // Allow some deleted, but majority should be active
       expect(deletedCount).toBeLessThanOrEqual(totalCount);
+    }
+  });
+});
+
+test.describe("GraphQL LooksSummary Query - TH Brand C52 Season", () => {
+  test("looksSummary - returns valid response structure", async ({ request }) => {
+    const result = await executeGraphQL<LooksSummaryResponse>(
+      request,
+      LOOKS_SUMMARY_QUERY,
+      {
+        brand: TEST_CONFIG.brand,
+        division: TEST_CONFIG.divisions[0],
+        season: TEST_CONFIG.season,
+      }
+    );
+
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.looksSummary).toBeDefined();
+
+    if (result.data?.looksSummary) {
+      validateLookSummaryStructure(result.data.looksSummary);
+    }
+  });
+
+  test("looksSummary - totalLooks matches looks query count", async ({ request }) => {
+    const [summaryResult, looksResult] = await Promise.all([
+      executeGraphQL<LooksSummaryResponse>(request, LOOKS_SUMMARY_QUERY, {
+        brand: TEST_CONFIG.brand,
+        division: TEST_CONFIG.divisions[0],
+        season: TEST_CONFIG.season,
+      }),
+      executeGraphQL<LooksQueryResponse>(request, LOOKS_QUERY, {
+        brand: TEST_CONFIG.brand,
+        season: TEST_CONFIG.season,
+        division: TEST_CONFIG.divisions[0],
+      }),
+    ]);
+
+    expect(summaryResult.errors).toBeUndefined();
+    expect(looksResult.errors).toBeUndefined();
+
+    if (summaryResult.data?.looksSummary && looksResult.data?.looks) {
+      // totalLooks from summary should match actual looks count
+      expect(summaryResult.data.looksSummary.totalLooks).toBe(looksResult.data.looks.length);
+    }
+  });
+
+  // Test each division
+  for (const division of TEST_CONFIG.divisions) {
+    test(`looksSummary division ${division} - returns valid summary`, async ({ request }) => {
+      const result = await executeGraphQL<LooksSummaryResponse>(
+        request,
+        LOOKS_SUMMARY_QUERY,
+        {
+          brand: TEST_CONFIG.brand,
+          division,
+          season: TEST_CONFIG.season,
+        }
+      );
+
+      expect(result.errors).toBeUndefined();
+      expect(result.data?.looksSummary).toBeDefined();
+
+      if (result.data?.looksSummary) {
+        validateLookSummaryStructure(result.data.looksSummary);
+
+        // All counts should be non-negative
+        expect(result.data.looksSummary.totalLooks).toBeGreaterThanOrEqual(0);
+        expect(result.data.looksSummary.hasDeliveryName).toBeGreaterThanOrEqual(0);
+        expect(result.data.looksSummary.hasDescription).toBeGreaterThanOrEqual(0);
+        expect(result.data.looksSummary.hasGender).toBeGreaterThanOrEqual(0);
+        expect(result.data.looksSummary.hasRelatedStyles).toBeGreaterThanOrEqual(0);
+        expect(result.data.looksSummary.hasTag).toBeGreaterThanOrEqual(0);
+        expect(result.data.looksSummary.hasTitle).toBeGreaterThanOrEqual(0);
+        expect(result.data.looksSummary.hasTrend).toBeGreaterThanOrEqual(0);
+      }
+    });
+  }
+
+  test("looksSummary - response time under 5 seconds", async ({ request }) => {
+    const { durationMs } = await measureQueryTime<LooksSummaryResponse>(
+      request,
+      LOOKS_SUMMARY_QUERY,
+      {
+        brand: TEST_CONFIG.brand,
+        division: TEST_CONFIG.divisions[0],
+        season: TEST_CONFIG.season,
+      }
+    );
+
+    expect(durationMs).toBeLessThan(5000);
+  });
+
+  test("looksSummary - handles empty brand gracefully", async ({ request }) => {
+    const result = await executeGraphQL<LooksSummaryResponse>(
+      request,
+      LOOKS_SUMMARY_QUERY,
+      {
+        brand: "",
+        division: TEST_CONFIG.divisions[0],
+        season: TEST_CONFIG.season,
+      }
+    );
+
+    // Should either return valid summary or error
+    expect(
+      result.data?.looksSummary !== undefined || result.errors !== undefined
+    ).toBeTruthy();
+  });
+
+  test("looksSummary - handles empty season gracefully", async ({ request }) => {
+    const result = await executeGraphQL<LooksSummaryResponse>(
+      request,
+      LOOKS_SUMMARY_QUERY,
+      {
+        brand: TEST_CONFIG.brand,
+        division: TEST_CONFIG.divisions[0],
+        season: "",
+      }
+    );
+
+    expect(
+      result.data?.looksSummary !== undefined || result.errors !== undefined
+    ).toBeTruthy();
+  });
+
+  test("looksSummary - handles invalid division gracefully", async ({ request }) => {
+    const result = await executeGraphQL<LooksSummaryResponse>(
+      request,
+      LOOKS_SUMMARY_QUERY,
+      {
+        brand: TEST_CONFIG.brand,
+        division: "99",
+        season: TEST_CONFIG.season,
+      }
+    );
+
+    expect(result.errors).toBeUndefined();
+    expect(result.data?.looksSummary).toBeDefined();
+
+    if (result.data?.looksSummary) {
+      // Should return zero counts for non-existent division
+      expect(result.data.looksSummary.totalLooks).toBe(0);
+    }
+  });
+
+  test("looksSummary - all divisions can be queried in parallel", async ({ request }) => {
+    const queries = TEST_CONFIG.divisions.map((division) =>
+      executeGraphQL<LooksSummaryResponse>(request, LOOKS_SUMMARY_QUERY, {
+        brand: TEST_CONFIG.brand,
+        division,
+        season: TEST_CONFIG.season,
+      })
+    );
+
+    const results = await Promise.all(queries);
+
+    // All queries should succeed
+    for (const result of results) {
+      expect(result.errors).toBeUndefined();
+      expect(result.data?.looksSummary).toBeDefined();
+    }
+  });
+
+  test("looksSummary - counts are consistent with totalLooks", async ({ request }) => {
+    const result = await executeGraphQL<LooksSummaryResponse>(
+      request,
+      LOOKS_SUMMARY_QUERY,
+      {
+        brand: TEST_CONFIG.brand,
+        division: TEST_CONFIG.divisions[0],
+        season: TEST_CONFIG.season,
+      }
+    );
+
+    expect(result.errors).toBeUndefined();
+
+    if (result.data?.looksSummary) {
+      const summary = result.data.looksSummary;
+
+      // Individual counts should not exceed total
+      expect(summary.hasDeliveryName).toBeLessThanOrEqual(summary.totalLooks);
+      expect(summary.hasDescription).toBeLessThanOrEqual(summary.totalLooks);
+      expect(summary.hasGender).toBeLessThanOrEqual(summary.totalLooks);
+      expect(summary.hasRelatedStyles).toBeLessThanOrEqual(summary.totalLooks);
+      expect(summary.hasTag).toBeLessThanOrEqual(summary.totalLooks);
+      expect(summary.hasTitle).toBeLessThanOrEqual(summary.totalLooks);
+      expect(summary.hasTrend).toBeLessThanOrEqual(summary.totalLooks);
     }
   });
 });
