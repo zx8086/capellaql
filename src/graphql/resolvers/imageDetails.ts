@@ -90,8 +90,7 @@ const imageDetailsResolver = withValidation(
         10 * 60 * 1000 // 10-minute TTL
       );
     } catch (error) {
-      err("Error in image details resolver:", {
-        error,
+      err("Error in image details resolver:", error, {
         requestId: context.requestId,
         args,
       });

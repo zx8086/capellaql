@@ -88,7 +88,7 @@ const searchDocumentsResolver = withValidation(
 
             return deduplicatedResults;
           } catch (error) {
-            err("Error in document search:", { error, requestId: context.requestId });
+            err("Error in document search:", error, { requestId: context.requestId });
             throw error;
           }
         });

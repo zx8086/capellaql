@@ -8,6 +8,7 @@ import * as apiLogs from "@opentelemetry/api-logs";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
 import winston from "winston";
 import { applicationConfig, telemetryConfig } from "$config";
+import { serializeError } from "$utils/errorUtils";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 
 // ============================================================================
@@ -134,8 +135,7 @@ const fieldMappingTransform = winston.format((info) => {
 // 4. ecsFormat()                     -> ECS JSON structure
 //
 // Console transport format:
-// 1. winston.format.colorize()       -> Adds ANSI colors
-// 2. winston.format.simple()         -> "level: message {json}"
+// Custom clean format for development readability
 // ============================================================================
 
 // Service configuration for ECS format
@@ -144,6 +144,29 @@ const localConfig = {
   serviceVersion: telemetryConfig.SERVICE_VERSION || "2.0.0",
   environment: process.env.NODE_ENV || process.env.BUN_ENV || "development",
 };
+
+// ============================================================================
+// Clean Console Format for Development
+// Shows: timestamp level: message {relevant-fields-only}
+// ============================================================================
+
+const cleanConsoleFormat = winston.format.printf((info) => {
+  const { level, message, timestamp, ...meta } = info;
+  const ts = new Date(timestamp as string).toLocaleTimeString();
+
+  // Filter out ECS boilerplate, keep only relevant fields
+  const relevant: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(meta)) {
+    // Skip ECS/service metadata
+    if (k.startsWith("@") || k.startsWith("ecs") || k.startsWith("service.") || k === "event.dataset") continue;
+    // Skip undefined/null
+    if (v === undefined || v === null) continue;
+    relevant[k] = v;
+  }
+
+  const metaStr = Object.keys(relevant).length > 0 ? ` ${JSON.stringify(relevant)}` : "";
+  return `${ts} ${level}: ${message}${metaStr}`;
+});
 
 // ============================================================================
 // Winston Telemetry Logger Class
@@ -161,7 +184,7 @@ class WinstonTelemetryLogger {
 
     // Create Winston logger per monitoring-updated.md specification:
     // Logger format: timestamp -> errors -> custom field transform -> ecsFormat
-    // Console transport: colorize + simple -> produces "info: message {json}"
+    // Console transport: Clean readable format for development
     this.logger = winston.createLogger({
       level: configuredLevel,
       format: winston.format.combine(
@@ -179,7 +202,8 @@ class WinstonTelemetryLogger {
       ),
       transports: [
         new winston.transports.Console({
-          format: winston.format.combine(winston.format.colorize({ all: true }), winston.format.simple()),
+          // Use clean format for readable development output
+          format: winston.format.combine(winston.format.colorize({ all: true }), cleanConsoleFormat),
         }),
       ],
     });
@@ -250,19 +274,38 @@ class WinstonTelemetryLogger {
   }
 
   public error(message: string, error?: Error | unknown, meta?: Record<string, unknown>): void {
-    const errorMeta =
-      error instanceof Error
-        ? {
-            error: {
-              name: error.name,
-              message: error.message,
-              stack: error.stack,
-            },
-            ...meta,
-          }
-        : error
-          ? { error: String(error), ...meta }
-          : meta;
+    const errorMeta: Record<string, unknown> = {};
+
+    if (error != null) {
+      const serialized = serializeError(error);
+
+      // Simple, flat error fields
+      errorMeta["error.type"] = serialized.name;
+      errorMeta["error.message"] = serialized.message;
+      if (serialized.code !== undefined) errorMeta["error.code"] = serialized.code;
+      if (serialized.cause) {
+        errorMeta["error.cause"] = `${serialized.cause.name}: ${serialized.cause.message}`;
+        if (serialized.cause.code !== undefined) errorMeta["error.cause.code"] = serialized.cause.code;
+      }
+      // Simplified stack (first 3 frames)
+      if (serialized.stack) {
+        const frames = serialized.stack
+          .split("\n")
+          .slice(1, 4)
+          .map((l) => l.trim())
+          .join(" → ");
+        errorMeta["error.stack"] = frames;
+      }
+    }
+
+    // Add meta fields (filter out objects to avoid OTEL warnings)
+    if (meta) {
+      for (const [k, v] of Object.entries(meta)) {
+        if (v !== undefined && v !== null && typeof v !== "object") {
+          errorMeta[k] = v;
+        }
+      }
+    }
 
     this.log(LogLevel.ERROR, message, errorMeta);
   }

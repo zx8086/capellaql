@@ -214,7 +214,7 @@ export class BunSQLiteCache {
       await this.set(key, data, ttlMs);
       return data;
     } catch (error) {
-      err("Cache fetcher failed", { key, error });
+      err("Cache fetcher failed", error, { key });
       throw error;
     }
   }

@@ -56,7 +56,7 @@ export const loggingMiddleware: Middleware = async (
     const isError = status >= 400;
 
     if (isError) {
-      err("Request failed", {
+      err("Request failed", undefined, {
         requestId: context.requestId,
         method,
         route,

@@ -166,12 +166,10 @@ export class CouchbaseTransactionHandler {
       const duration = Date.now() - startTime;
       const classification = CouchbaseTransactionHandler.classifyTransactionError(error);
 
-      err("Transaction failed", {
+      err("Transaction failed", error, {
         transactionId,
         totalAttempts: attemptCount,
         duration,
-        errorType: (error as Error).constructor.name,
-        classification,
         operationType: context.operationType,
         requestId: context.requestId,
         isRetryable: classification.retryable,
@@ -242,11 +240,10 @@ export class CouchbaseTransactionHandler {
       return await ctx.insert(collection, key, content);
     } catch (error) {
       if (error instanceof DocumentExistsError) {
-        err("Document already exists in transaction", {
+        err("Document already exists in transaction", error, {
           key,
           transactionId: operationContext.transactionId,
           requestId: operationContext.requestId,
-          suggestion: "Consider using upsert or checking existence first",
         });
       }
       throw error;
@@ -351,13 +348,11 @@ export class CouchbaseTransactionHandler {
     const classification = CouchbaseTransactionHandler.classifyTransactionError(error);
 
     if (classification.severity === "critical") {
-      err("Critical error within transaction", {
-        errorType: error.constructor.name,
-        message: error.message,
+      err("Critical error within transaction", error, {
         transactionId: context.transactionId,
         attemptNumber: context.attemptNumber,
         requestId: context.requestId,
-        classification,
+        severity: classification.severity,
       });
     } else if (classification.severity === "warning") {
       warn("Warning within transaction", {
@@ -406,8 +401,7 @@ export class CouchbaseTransactionHandler {
         operationType: context.operationType,
       });
     } catch (storeError) {
-      err("Failed to store ambiguous transaction data", {
-        error: storeError,
+      err("Failed to store ambiguous transaction data", storeError, {
         originalTransactionId: context.transactionId,
       });
     }
@@ -482,11 +476,10 @@ export class CouchbaseTransactionHandler {
             const result = await operations[i](ctx);
             results.push(result);
           } catch (error) {
-            err("Batch operation failed", {
+            err("Batch operation failed", error, {
               operationIndex: i,
               totalOperations: operations.length,
               transactionId: context.transactionId,
-              error: (error as Error).constructor.name,
             });
             throw error;
           }

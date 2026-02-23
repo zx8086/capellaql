@@ -12,6 +12,7 @@
  */
 
 import type { Collection, DurabilityLevel, GetOptions, GetResult, MutationResult, UpsertOptions } from "couchbase";
+import { getErrorMessage } from "$utils/errorUtils";
 import { warn } from "../../telemetry/logger";
 import { DocumentNotFoundError } from "./errors";
 import type { KVGetOptions, KVUpsertOptions, SubdocOperation } from "./types";
@@ -335,7 +336,7 @@ export class KVOperations {
             component: "couchbase",
             operation: "kv_get_many",
             documentId: id,
-            error: String(error),
+            error: getErrorMessage(error),
           });
         }
         return null;

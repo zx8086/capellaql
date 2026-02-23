@@ -74,9 +74,7 @@ export const websocketHandlers = {
    * Handle WebSocket error
    */
   error(ws: ServerWebSocket<WebSocketData>, error: Error) {
-    err("WebSocket connection error", {
-      error: error.message,
-      errorType: error.constructor.name,
+    err("WebSocket connection error", error, {
       connectionType: "websocket",
       requestId: ws.data.requestId,
     });

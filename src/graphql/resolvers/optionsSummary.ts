@@ -80,8 +80,7 @@ const optionsSummaryResolver = withValidation(
         3 * 60 * 1000 // 3-minute TTL
       );
     } catch (error) {
-      err("Error in options summary resolver:", {
-        error,
+      err("Error in options summary resolver:", error, {
         requestId: context.requestId,
         args,
       });

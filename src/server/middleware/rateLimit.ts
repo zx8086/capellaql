@@ -94,11 +94,10 @@ export const rateLimitMiddleware: Middleware = async (
 ) => {
   if (checkRateLimit(request, context)) {
     // Log blocking event
-    err("Rate limit exceeded - blocking request", {
+    err("Rate limit exceeded - blocking request", undefined, {
       clientIp: context.clientIp,
       method: request.method,
       route: context.url.pathname,
-      userAgent: request.headers.get("user-agent")?.substring(0, 100),
       requestId: context.requestId,
     });
 

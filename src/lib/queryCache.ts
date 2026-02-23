@@ -101,7 +101,7 @@ export class QueryCache {
 
       return data;
     } catch (error) {
-      err("Cache fetcher failed", { key, error });
+      err("Cache fetcher failed", error, { key });
       throw error;
     }
   }

@@ -75,8 +75,7 @@ const looksSummaryResolver = withValidation(
         5 * 60 * 1000 // 5-minute TTL
       );
     } catch (error) {
-      err("Error in looks summary resolver:", {
-        error,
+      err("Error in looks summary resolver:", error, {
         requestId: context.requestId,
         args,
       });

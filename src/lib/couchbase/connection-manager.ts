@@ -35,6 +35,7 @@ import { buildConnectionOptions } from "./connection-options";
 import {
   AuthenticationFailureError,
   CasMismatchError,
+  ConnectionError,
   CouchbaseError,
   CouchbaseErrorClassifier,
   DocumentNotFoundError,
@@ -146,11 +147,15 @@ export class CouchbaseConnectionManager {
       this.isHealthy = false;
 
       const errorContext = CouchbaseErrorClassifier.extractContext(error, "initialize");
-      err("Couchbase initialization failed", {
+      // Pass only primitive values to avoid OTEL "Invalid attribute value" warnings
+      err("Couchbase initialization failed", error, {
         component: "couchbase",
-        operation: "initialize",
-        ...errorContext,
+        operation: errorContext.operation,
+        isRetryable: errorContext.isRetryable,
+        isCritical: errorContext.isCritical,
         attempt: this.connectionAttempts,
+        errorCode: errorContext.errorCode,
+        errorName: errorContext.errorName,
       });
 
       throw error;
@@ -199,7 +204,10 @@ export class CouchbaseConnectionManager {
 
         // Don't retry on authentication errors
         if (CouchbaseErrorClassifier.isAuthError(error)) {
-          err("Couchbase authentication failed - not retrying", { component: "couchbase", operation: "connect" });
+          err("Couchbase authentication failed - not retrying", lastError, {
+            component: "couchbase",
+            operation: "connect",
+          });
           throw lastError;
         }
 
@@ -211,7 +219,13 @@ export class CouchbaseConnectionManager {
       }
     }
 
-    throw new Error(`Failed to connect after ${maxAttempts} attempts: ${lastError?.message}`);
+    // Preserve original error context for debugging (SIO-442)
+    const errorContext = lastError ? CouchbaseErrorClassifier.extractContext(lastError, "connect") : undefined;
+    throw new ConnectionError(
+      `Failed to connect after ${maxAttempts} attempts: ${lastError?.message}`,
+      lastError || undefined,
+      errorContext
+    );
   }
 
   /**
@@ -231,7 +245,13 @@ export class CouchbaseConnectionManager {
       }
     }
 
-    throw new Error(`Bucket '${bucket.name}' not ready after ${timeoutMs}ms`);
+    throw new ConnectionError(`Bucket '${bucket.name}' not ready after ${timeoutMs}ms`, undefined, {
+      message: `Bucket readiness timeout after ${timeoutMs}ms`,
+      operation: "bucket_ready",
+      isRetryable: true,
+      isCritical: false,
+      isTransient: true,
+    });
   }
 
   // =============================================================================
@@ -263,10 +283,9 @@ export class CouchbaseConnectionManager {
           warn("Couchbase unhealthy connection detected", { component: "couchbase", operation: "health_check" });
         }
       } catch (error) {
-        err("Couchbase health check failed", {
+        err("Couchbase health check failed", error, {
           component: "couchbase",
           operation: "health_check",
-          error: String(error),
         });
         this.isHealthy = false;
       }
@@ -438,7 +457,13 @@ export class CouchbaseConnectionManager {
    */
   public getCollection(bucketName?: string, scopeName?: string, collectionName?: string): Collection {
     if (!this.bucket || !this.cluster) {
-      throw new Error("Couchbase not initialized");
+      throw new ConnectionError("Cannot access collection - Couchbase not initialized", undefined, {
+        message: "Connection not established. Call initialize() first.",
+        operation: "getCollection",
+        isRetryable: true,
+        isCritical: true,
+        isTransient: false,
+      });
     }
 
     const bucket = bucketName || this.config?.bucketName || this.bucket.name;
@@ -463,14 +488,26 @@ export class CouchbaseConnectionManager {
    */
   public getScope(bucketName?: string, scopeName?: string): Scope {
     if (!this.cluster) {
-      throw new Error("Couchbase not initialized");
+      throw new ConnectionError("Cannot access scope - Couchbase not initialized", undefined, {
+        message: "Connection not established. Call initialize() first.",
+        operation: "getScope",
+        isRetryable: true,
+        isCritical: true,
+        isTransient: false,
+      });
     }
 
     const bucket = bucketName || this.config?.bucketName || this.bucket?.name;
     const scope = scopeName || this.config?.scopeName || "_default";
 
     if (!bucket) {
-      throw new Error("No bucket specified");
+      throw new ConnectionError("Cannot access scope - no bucket specified", undefined, {
+        message: "Bucket name required but not provided or configured",
+        operation: "getScope",
+        isRetryable: false,
+        isCritical: true,
+        isTransient: false,
+      });
     }
 
     return this.cluster.bucket(bucket).scope(scope);
@@ -481,12 +518,25 @@ export class CouchbaseConnectionManager {
    */
   public async getConnection(): Promise<CouchbaseConnection> {
     if (!this.cluster || !this.bucket || !this.config) {
-      throw new Error("Couchbase not initialized. Call initialize() first.");
+      throw new ConnectionError("Couchbase not initialized", undefined, {
+        message: "Connection not established. Call initialize() first.",
+        operation: "getConnection",
+        isRetryable: true,
+        isCritical: true,
+        isTransient: false,
+      });
     }
 
     const circuitState = this.circuitBreaker.getState();
     if (circuitState === "open") {
-      throw new Error("Circuit breaker is OPEN - database temporarily unavailable");
+      const stats = this.circuitBreaker.getStats();
+      throw new ConnectionError("Circuit breaker is OPEN - database temporarily unavailable", undefined, {
+        message: `Database unavailable. Circuit breaker state: ${circuitState}. Failures: ${stats.failures}`,
+        operation: "getConnection",
+        isRetryable: true,
+        isCritical: false,
+        isTransient: true,
+      });
     }
 
     return {
@@ -647,7 +697,10 @@ export class CouchbaseConnectionManager {
         await this.cluster.close();
         log("Couchbase connection closed successfully", { component: "couchbase", operation: "close_complete" });
       } catch (error) {
-        err("Couchbase error closing connection", { component: "couchbase", operation: "close", error: String(error) });
+        err("Couchbase error closing connection", error, {
+          component: "couchbase",
+          operation: "close",
+        });
       }
     }
 

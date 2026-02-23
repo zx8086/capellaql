@@ -135,10 +135,10 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
                 timeTaken,
               };
             } else if (error instanceof AuthenticationFailureError) {
-              err("Authentication/Permission error in DataLoader", {
-                errorType: error.constructor.name,
-                keyInfo,
-                classification: CouchbaseErrorClassifier.classifyError(error),
+              err("Authentication/Permission error in DataLoader", error, {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
               });
               return {
                 bucket: keyInfo.bucket,
@@ -149,9 +149,10 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
                 error: `Access denied: ${error.message}`,
               };
             } else if (error instanceof AmbiguousTimeoutError) {
-              err("Ambiguous timeout in DataLoader - manual investigation required", {
-                keyInfo,
-                errorMessage: error.message,
+              err("Ambiguous timeout in DataLoader - manual investigation required", error, {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
                 requiresInvestigation: true,
               });
               return {
@@ -199,10 +200,10 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
                 error: `Couchbase error: ${error.message}`,
               };
             } else {
-              err("Unexpected error in DataLoader", {
-                error: (error as Error).message,
-                keyInfo,
-                errorType: (error as Error).constructor.name,
+              err("Unexpected error in DataLoader", error, {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
               });
               return {
                 bucket: keyInfo.bucket,

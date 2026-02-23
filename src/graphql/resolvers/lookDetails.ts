@@ -85,8 +85,7 @@ const lookDetailsResolver = withValidation(
         10 * 60 * 1000 // 10-minute TTL for look details
       );
     } catch (error) {
-      err("Error in look details resolver:", {
-        error,
+      err("Error in look details resolver:", error, {
         requestId: context.requestId,
         args,
       });

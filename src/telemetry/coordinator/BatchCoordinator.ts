@@ -2,6 +2,7 @@ import type { LogRecord } from "@opentelemetry/api-logs";
 import type { MetricData } from "@opentelemetry/sdk-metrics";
 import type { SpanData } from "@opentelemetry/sdk-trace-base";
 import config from "$config";
+import { getErrorMessage } from "$utils/errorUtils";
 import { log } from "../winston-logger";
 
 // Batch data types for coordinated exports
@@ -258,7 +259,7 @@ export class TelemetryBatchCoordinator {
       const duration = Date.now() - startTime;
       console.error(`Batch ${batchId} export error:`, error);
 
-      this.updateStatistics({ success: false, exportedCount: 0, duration, error: String(error) }, duration);
+      this.updateStatistics({ success: false, exportedCount: 0, duration, error: getErrorMessage(error) }, duration);
     } finally {
       this.isExporting = false;
     }

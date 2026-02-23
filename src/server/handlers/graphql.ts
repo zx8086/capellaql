@@ -150,10 +150,7 @@ const yoga = createYoga({
           });
         } else {
           // Log other errors with full details
-          err("GraphQL Error", {
-            error: error.message,
-            stack: error.stack,
-          });
+          err("GraphQL Error", error);
         }
       },
     },

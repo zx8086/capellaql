@@ -46,7 +46,12 @@ if (earlyShutdownRequested) {
 // Initialize Couchbase connection (after telemetry for proper instrumentation)
 import { connectionManager } from "./lib/couchbase";
 
-await connectionManager.initialize();
+try {
+  await connectionManager.initialize();
+} catch {
+  // Error already logged by connectionManager - exit cleanly without Bun's ugly crash output
+  process.exit(1);
+}
 
 if (earlyShutdownRequested) {
   console.log("Shutdown requested, exiting before server start");

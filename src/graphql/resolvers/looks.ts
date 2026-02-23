@@ -92,9 +92,7 @@ const looksResolver = withValidation(
         5 * 60 * 1000 // 5-minute TTL
       );
     } catch (error) {
-      err("GraphQL looks query failed", {
-        error: error instanceof Error ? error.message : String(error),
-        errorType: error instanceof Error ? error.constructor.name : "unknown",
+      err("GraphQL looks query failed", error, {
         requestId: context.requestId,
         operationName: "looks",
         parameters: args,

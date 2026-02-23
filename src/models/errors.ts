@@ -1,5 +1,7 @@
 /* src/models/errors.ts - Structured Error Hierarchy */
 
+import { serializeError, toError } from "$utils/errorUtils";
+
 /**
  * Base application error class that all custom errors extend
  */
@@ -179,17 +181,44 @@ export function isAppError(error: any): error is AppError {
 
 /**
  * Utility function to convert any error to an AppError
+ *
+ * Uses serializeError to properly extract error information from:
+ * - AppError instances (returned as-is)
+ * - Standard Error instances
+ * - Couchbase SDK errors with codes
+ * - Plain objects with error-like properties
+ * - Primitives and unknown values
  */
-export function toAppError(error: any, defaultMessage?: string): AppError {
+export function toAppError(error: unknown, defaultMessage?: string): AppError {
+  // Return AppError instances directly
   if (isAppError(error)) {
     return error;
   }
 
-  if (error instanceof Error) {
-    return new DatabaseError(defaultMessage || error.message, error);
+  // Serialize unknown errors to extract all available information
+  const serialized = serializeError(error);
+
+  // Convert to Error instance for cause chain
+  const causeError = toError(error);
+
+  // Check for Couchbase-specific errors by name or code
+  const isCouchbaseError =
+    serialized.name.includes("Couchbase") ||
+    serialized.name === "DocumentNotFoundError" ||
+    serialized.name === "TimeoutError" ||
+    serialized.name === "ConnectionError" ||
+    typeof serialized.code === "number"; // SDK errors often have numeric codes
+
+  if (isCouchbaseError) {
+    return new DatabaseError(defaultMessage || serialized.message, causeError, {
+      originalError: serialized,
+      errorCode: serialized.code,
+    });
   }
 
-  return new DatabaseError(defaultMessage || "An unknown error occurred", undefined, { originalError: error });
+  return new DatabaseError(defaultMessage || serialized.message || "An unknown error occurred", causeError, {
+    originalError: serialized,
+  });
 }
 
 /**
@@ -208,15 +237,39 @@ export function formatErrorResponse(error: AppError) {
 
 /**
  * Map Couchbase errors to application errors
+ *
+ * Uses serializeError to extract complete error information from SDK errors,
+ * preserving codes, context, and cause chains for proper debugging.
  */
-export function mapCouchbaseError(error: any, context?: Record<string, any>): AppError {
-  if (error?.name === "DocumentNotFoundError") {
-    return new DocumentNotFoundError(context?.documentId || "unknown", context?.collection, error);
+export function mapCouchbaseError(error: unknown, context?: Record<string, any>): AppError {
+  const serialized = serializeError(error);
+  const causeError = toError(error);
+
+  // Merge serialized error context with provided context
+  const mergedContext = {
+    ...context,
+    errorCode: serialized.code,
+    errorName: serialized.name,
+    ...(serialized.context || {}),
+  };
+
+  if (serialized.name === "DocumentNotFoundError") {
+    return new DocumentNotFoundError(context?.documentId || "unknown", context?.collection, causeError);
   }
 
-  if (error?.name === "CouchbaseError") {
-    return new DatabaseError(error.message || "Couchbase operation failed", error, context);
+  if (serialized.name.includes("Couchbase") || serialized.name === "CouchbaseError") {
+    return new DatabaseError(serialized.message || "Couchbase operation failed", causeError, mergedContext);
   }
 
-  return new DatabaseError("Unexpected database error", error, context);
+  // Handle timeout errors specifically
+  if (serialized.name === "TimeoutError" || serialized.name.includes("Timeout")) {
+    return new DatabaseError(`Database timeout: ${serialized.message}`, causeError, mergedContext);
+  }
+
+  // Handle connection errors
+  if (serialized.name === "ConnectionError" || serialized.name.includes("Connection")) {
+    return new DatabaseError(`Database connection error: ${serialized.message}`, causeError, mergedContext);
+  }
+
+  return new DatabaseError(serialized.message || "Unexpected database error", causeError, mergedContext);
 }

@@ -58,8 +58,7 @@ const imageUrlCheckResolver = withValidation(
         2 * 60 * 1000 // 2-minute TTL
       );
     } catch (error) {
-      err("Error in image URL check resolver:", {
-        error,
+      err("Error in image URL check resolver:", error, {
         requestId: context.requestId,
         args,
       });

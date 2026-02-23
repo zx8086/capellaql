@@ -43,7 +43,7 @@ export class SQLiteGraphQLCache implements Cache {
       });
       return undefined;
     } catch (error) {
-      err("GraphQL response cache get error:", { error, key: key.substring(0, 100) });
+      err("GraphQL response cache get error:", error, { key: key.substring(0, 100) });
       return undefined;
     }
   }
@@ -64,7 +64,7 @@ export class SQLiteGraphQLCache implements Cache {
         valueSize: JSON.stringify(value).length,
       });
     } catch (error) {
-      err("GraphQL response cache set error:", { error, key: key.substring(0, 100) });
+      err("GraphQL response cache set error:", error, { key: key.substring(0, 100) });
     }
   }
 
@@ -77,7 +77,7 @@ export class SQLiteGraphQLCache implements Cache {
       await this.sqliteCache.delete(prefixedKey);
       return true;
     } catch (error) {
-      err("GraphQL response cache delete error:", { error, key: key.substring(0, 100) });
+      err("GraphQL response cache delete error:", error, { key: key.substring(0, 100) });
       return false;
     }
   }

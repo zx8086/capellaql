@@ -107,8 +107,7 @@ const getAllSeasonalAssignmentsResolver = withValidation(
         5 * 60 * 1000 // 5-minute TTL
       );
     } catch (error) {
-      err("Error in get all seasonal assignments resolver:", {
-        error,
+      err("Error in get all seasonal assignments resolver:", error, {
         requestId: context.requestId,
         args,
       });

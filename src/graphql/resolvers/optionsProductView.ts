@@ -95,8 +95,7 @@ const optionsProductViewResolver = withValidation(
         5 * 60 * 1000 // 5-minute TTL
       );
     } catch (error) {
-      err("Error in options product view resolver:", {
-        error,
+      err("Error in options product view resolver:", error, {
         requestId: context.requestId,
         args,
       });

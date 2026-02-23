@@ -486,3 +486,53 @@ export {
   FeatureNotAvailableError,
   UnsupportedOperationError,
 };
+
+// ============================================================================
+// Custom Connection Error
+// ============================================================================
+
+/**
+ * Connection-specific error that preserves SDK error context.
+ * Used for connection failures, initialization errors, and circuit breaker states.
+ *
+ * @see SIO-442 - Comprehensive Error Handling Improvements
+ */
+export class ConnectionError extends Error {
+  public readonly code = "CONNECTION_ERROR";
+  public readonly cause?: Error;
+  public readonly context?: CouchbaseErrorContext;
+
+  constructor(message: string, cause?: Error, context?: CouchbaseErrorContext) {
+    super(message);
+    this.name = "ConnectionError";
+    this.cause = cause;
+    this.context = context;
+
+    // Maintain proper prototype chain for instanceof checks
+    Object.setPrototypeOf(this, ConnectionError.prototype);
+
+    if (Error.captureStackTrace) {
+      Error.captureStackTrace(this, ConnectionError);
+    }
+  }
+
+  /**
+   * Serialize for logging - ensures proper JSON output (never [object Object])
+   */
+  toJSON(): Record<string, unknown> {
+    return {
+      name: this.name,
+      message: this.message,
+      code: this.code,
+      cause: this.cause
+        ? {
+            name: this.cause.name,
+            message: this.cause.message,
+            code: (this.cause as Error & { code?: string | number }).code,
+          }
+        : undefined,
+      context: this.context,
+      stack: this.stack,
+    };
+  }
+}

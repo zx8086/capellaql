@@ -1,6 +1,6 @@
 /* src/lib/metricsCardinalityManager.ts */
 
-import { error as err, log } from "../telemetry/logger";
+import { log, warn } from "../telemetry/logger";
 
 export interface CardinalityLimit {
   metricName: string;
@@ -166,11 +166,10 @@ class MetricsCardinalityManager {
       // Log cardinality violation
       if (stats.violationsCount % 100 === 1) {
         // Log every 100th violation to avoid spam
-        err(`Cardinality limit exceeded for metric: ${metricName}`, {
+        warn(`Cardinality limit exceeded for metric: ${metricName}`, {
           currentCardinality: metricLabelSet.size,
           maxCardinality: limit.maxCardinality,
           droppedLabels: stats.droppedLabels,
-          attemptedLabels: sanitizedLabels,
         });
       }
 

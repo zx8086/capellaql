@@ -95,8 +95,7 @@ const getDivisionAssignmentResolver = withValidation(
         5 * 60 * 1000 // 5-minute TTL
       );
     } catch (error) {
-      err("Error in get division assignment resolver:", {
-        error,
+      err("Error in get division assignment resolver:", error, {
         requestId: context.requestId,
         args,
       });
