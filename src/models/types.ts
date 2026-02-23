@@ -158,7 +158,7 @@ const RuntimeConfigSchema = z.object({
 
 const DeploymentConfigSchema = z.object({
   BASE_URL: z.string().url().default("http://localhost"),
-  HOSTNAME: z.string().default("localhost"),
+  HOSTNAME: z.string().default("0.0.0.0"),
   INSTANCE_ID: z.string().default("unknown"),
   CONTAINER_ID: z.string().optional(),
   K8S_POD_NAME: z.string().optional(),

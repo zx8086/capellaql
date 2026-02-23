@@ -1,8 +1,7 @@
 /* src/graphql/resolvers/getAllSeasonalAssignments.ts */
 
 import { cacheEntities, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
-import { getCluster } from "$lib/clusterProvider";
-import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import { connectionManager, QueryExecutor } from "$lib/couchbase";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
@@ -38,34 +37,26 @@ const getAllSeasonalAssignmentsResolver = withValidation(
       return await withSQLiteCache(
         cacheKey,
         async () => {
-          const cluster = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await getCluster(),
-            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
-          );
+          const conn = await connectionManager.getConnection();
 
           const query = `EXECUTE FUNCTION \`default\`.\`new_model\`.getAllSeasonalAssignments($styleSeasonCode, $companyCode)`;
-          const queryOptions = {
-            parameters: {
-              styleSeasonCode,
-              companyCode: companyCode !== undefined ? companyCode : null,
-            },
+          const parameters = {
+            styleSeasonCode,
+            companyCode: companyCode !== undefined ? companyCode : null,
           };
 
           log("Executing get all seasonal assignments query (cache miss)", {
             query,
-            queryOptions,
+            parameters,
             requestId: context.requestId,
           });
 
-          const result = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await cluster.cluster.query(query, queryOptions),
-            CouchbaseErrorHandler.createQueryOperationContext(
-              "getAllSeasonalAssignments",
-              query,
-              context.requestId,
-              "default"
-            )
-          );
+          const result = await QueryExecutor.execute(conn.cluster, query, {
+            parameters,
+            usePreparedStatement: true,
+            queryContext: "default.new_model",
+            requestId: context.requestId,
+          });
 
           debug("Get all seasonal assignments query result", {
             requestId: context.requestId,

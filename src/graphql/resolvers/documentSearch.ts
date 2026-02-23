@@ -1,7 +1,7 @@
 /* src/graphql/resolvers/documentSearch.ts */
 
 import { cacheEntities, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
-import { batchLoadDocuments } from "$lib/dataLoader";
+import { batchLoadDocuments } from "$lib/couchbase";
 import { deduplicateByFields } from "$lib/graphqlDeduplication";
 import { createCouchbaseSearchSpan, err, log } from "../../telemetry";
 import type { GraphQLContext } from "../context";

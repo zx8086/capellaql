@@ -42,7 +42,7 @@ export const defaultConfig: Config = {
 
   deployment: {
     BASE_URL: "http://localhost",
-    HOSTNAME: "localhost",
+    HOSTNAME: "0.0.0.0",
     INSTANCE_ID: "unknown",
     CONTAINER_ID: undefined,
     K8S_POD_NAME: undefined,

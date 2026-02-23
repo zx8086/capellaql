@@ -1,8 +1,7 @@
 /* src/graphql/resolvers/looks.ts */
 
 import { cacheEntities, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
-import { getCluster } from "$lib/clusterProvider";
-import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import { connectionManager, QueryExecutor } from "$lib/couchbase";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
@@ -34,28 +33,24 @@ const looksResolver = withValidation(
       return await withSQLiteCache(
         cacheKey,
         async () => {
-          const cluster = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await getCluster(),
-            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
-          );
+          const conn = await connectionManager.getConnection();
 
           const query = `EXECUTE FUNCTION \`default\`.\`media_assets\`.get_looks($brand, $season, $division)`;
-          const queryOptions = {
-            parameters: { brand, season, division },
-          };
 
           log("Database query execution (cache miss)", {
             operationName: "looks",
             query: "get_looks",
-            queryOptions,
+            parameters: { brand, season, division },
             requestId: context.requestId,
             cacheStatus: "miss",
           });
 
-          const result = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await cluster.cluster.query(query, queryOptions),
-            CouchbaseErrorHandler.createQueryOperationContext("get_looks", query, context.requestId, "default")
-          );
+          const result = await QueryExecutor.execute(conn.cluster, query, {
+            parameters: { brand, season, division },
+            usePreparedStatement: false, // Disabled - causes race condition under high concurrency
+            queryContext: "default.media_assets",
+            requestId: context.requestId,
+          });
 
           const queryEndTime = Date.now();
           const queryDuration = queryEndTime - (context.startTime || queryEndTime);
@@ -69,12 +64,21 @@ const looksResolver = withValidation(
             cacheStatus: "populated",
           });
 
+          const data = result.rows[0];
+
+          // Handle empty results (e.g., invalid division)
+          if (!data || !Array.isArray(data) || data.length === 0) {
+            debug("Looks query returned no results", {
+              requestId: context.requestId,
+              parameters: { brand, season, division },
+            });
+            return [];
+          }
+
           debug("Looks query result details", {
             requestId: context.requestId,
-            resultSample: JSON.stringify(result.rows[0], null, 2),
+            resultCount: data.length,
           });
-
-          const data = result.rows[0];
 
           // Cache individual look entities for lookDetails reuse
           cacheEntities(data, (look: any) => (look.documentKey ? SQLiteCacheKeys.entityLook(look.documentKey) : null), {

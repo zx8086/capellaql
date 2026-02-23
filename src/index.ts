@@ -12,6 +12,10 @@ import { err, initializeHttpMetrics, initializeTelemetry, log, telemetryLogger, 
 // Initialize telemetry early (before graphql/dataloader imports)
 await initializeTelemetry();
 
+// Initialize Couchbase connection (after telemetry for proper instrumentation)
+import { connectionManager } from "./lib/couchbase";
+await connectionManager.initialize();
+
 // Dynamic imports for modules that need instrumentation
 // This ensures they're loaded AFTER telemetry is initialized
 const [
@@ -324,7 +328,7 @@ function setupGracefulShutdown(): void {
     try {
       const { shutdownPerformanceMonitor } = await import("./lib/performanceMonitor");
       const { shutdownBatchCoordinator } = await import("./telemetry/coordinator/BatchCoordinator");
-      const { closeConnection } = await import("./lib/clusterProvider");
+      // connectionManager already imported at top level
 
       const shutdownStartTime = Date.now();
 
@@ -334,8 +338,8 @@ function setupGracefulShutdown(): void {
       // Shutdown telemetry batch coordinator first
       await shutdownBatchCoordinator();
 
-      // Close database connection
-      await closeConnection();
+      // Close database connection using new connection manager
+      await connectionManager.close();
 
       // Shutdown performance monitor
       shutdownPerformanceMonitor();

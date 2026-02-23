@@ -1,8 +1,7 @@
 /* src/graphql/resolvers/imageDetails.ts */
 
 import { cacheEntities, getEntity, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
-import { getCluster } from "$lib/clusterProvider";
-import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import { connectionManager, QueryExecutor } from "$lib/couchbase";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
@@ -48,30 +47,23 @@ const imageDetailsResolver = withValidation(
       return await withSQLiteCache(
         entityKey,
         async () => {
-          const cluster = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await getCluster(),
-            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
-          );
+          const conn = await connectionManager.getConnection();
 
           const query = `EXECUTE FUNCTION \`default\`.\`_default\`.getImageDetails($divisionCode, $styleSeasonCode, $styleCode)`;
-          const queryOptions = {
-            parameters: {
-              divisionCode,
-              styleSeasonCode,
-              styleCode,
-            },
-          };
+          const parameters = { divisionCode, styleSeasonCode, styleCode };
 
           log("Executing image details query (cache miss)", {
             query,
-            queryOptions,
+            parameters,
             requestId: context.requestId,
           });
 
-          const result = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await cluster.cluster.query(query, queryOptions),
-            CouchbaseErrorHandler.createQueryOperationContext("getImageDetails", query, context.requestId, "default")
-          );
+          const result = await QueryExecutor.execute(conn.cluster, query, {
+            parameters,
+            usePreparedStatement: true,
+            queryContext: "default._default",
+            requestId: context.requestId,
+          });
 
           debug("Image details query result", {
             requestId: context.requestId,

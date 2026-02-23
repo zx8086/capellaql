@@ -1,4 +1,4 @@
-import { getCouchbaseHealth, pingCouchbase } from "$lib/couchbaseConnector";
+import { connectionManager } from "$lib/couchbase";
 import { getTelemetryHealth } from "$telemetry";
 import { createHealthcheck } from "$utils/bunUtils";
 
@@ -58,10 +58,10 @@ export async function getSystemHealth(): Promise<SystemHealthStatus> {
   try {
     // Run health checks in parallel for better performance
     const [databaseHealth, runtimeHealth, telemetryHealth, databasePing] = await Promise.allSettled([
-      getCouchbaseHealth(),
+      connectionManager.getHealthWithDiagnostics(),
       createHealthcheck(),
       getTelemetryHealth(),
-      pingCouchbase(),
+      connectionManager.ping(),
     ]);
 
     // Process database health

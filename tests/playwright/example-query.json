@@ -1,0 +1,17 @@
+{
+  "query": "query SearchDocuments($collections: [BucketScopeCollection!]!, $keys: [String!]!) { searchDocuments(collections: $collections, keys: $keys) { bucket scope collection data timeTaken } }",
+  "variables": {
+    "collections": [
+      {"bucket": "default", "scope": "styles", "collection": "article"},
+      {"bucket": "default", "scope": "styles", "collection": "product2g"},
+      {"bucket": "default", "scope": "styles", "collection": "variant"},
+      {"bucket": "default", "scope": "new_model", "collection": "article"},
+      {"bucket": "default", "scope": "new_model", "collection": "product2g"},
+      {"bucket": "default", "scope": "new_model", "collection": "variant"},
+      {"bucket": "default", "scope": "styles_stibo", "collection": "article"},
+      {"bucket": "default", "scope": "styles_stibo", "collection": "product2g"},
+      {"bucket": "default", "scope": "styles_stibo", "collection": "variant"}
+    ],
+    "keys": ["ARTICLE_2025WISPSP_AM0AM13361GUE004"]
+  }
+}

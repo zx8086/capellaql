@@ -2,7 +2,7 @@
 // Couchbase health check service - matches reference format exactly
 
 import config from "$config";
-import { clusterConn, getCouchbaseHealth, pingCouchbase } from "$lib/couchbaseConnector";
+import { connectionManager } from "$lib/couchbase";
 import { err } from "../../telemetry";
 import { type CouchbaseDependency, formatResponseTime, type HealthStatus } from "./types";
 
@@ -57,8 +57,8 @@ export class CouchbaseHealthService {
     const startTime = performance.now();
 
     try {
-      // Use existing getCouchbaseHealth function from couchbaseConnector
-      const health = await getCouchbaseHealth();
+      // Use new connectionManager health check
+      const health = await connectionManager.getHealthWithDiagnostics();
       const responseTime = performance.now() - startTime;
 
       // Map status to valid HealthStatus (critical -> unhealthy)
@@ -69,6 +69,19 @@ export class CouchbaseHealthService {
         status = "degraded";
       }
 
+      // Get service health - handle both SDK naming (n1ql, fts) and common naming (query, search)
+      const serviceHealth = health.details.serviceHealth || {};
+      const kvHealthy = serviceHealth.kv?.healthy || false;
+      // n1ql is the SDK name, query is the common name
+      const queryHealthy = serviceHealth.n1ql?.healthy || serviceHealth.query?.healthy || false;
+      // fts is the SDK name, search is the common name
+      const searchHealthy = serviceHealth.fts?.healthy || serviceHealth.search?.healthy || false;
+
+      // If no service info available but connection succeeded, assume services are healthy
+      // This handles the case where diagnostics() returns empty services on a working connection
+      const hasServiceInfo = Object.keys(serviceHealth).length > 0;
+      const connectionSucceeded = health.status === "healthy" || health.status === "degraded";
+
       const result: CouchbaseDependency = {
         status,
         responseTime: formatResponseTime(responseTime),
@@ -76,9 +89,10 @@ export class CouchbaseHealthService {
           connectionString: this.maskConnectionString(config.capella.COUCHBASE_URL),
           bucket: config.capella.COUCHBASE_BUCKET,
           services: {
-            kv: health.details.serviceHealth.kv?.healthy || false,
-            query: health.details.serviceHealth.query?.healthy || false,
-            search: health.details.serviceHealth.search?.healthy || false,
+            // If no service info but connection works, assume services are healthy
+            kv: hasServiceInfo ? kvHealthy : connectionSucceeded,
+            query: hasServiceInfo ? queryHealthy : connectionSucceeded,
+            search: hasServiceInfo ? searchHealthy : connectionSucceeded,
           },
         },
       };
@@ -101,7 +115,7 @@ export class CouchbaseHealthService {
    */
   async ping(): Promise<{ success: boolean; latencyMs: number; error?: string }> {
     try {
-      const result = await pingCouchbase();
+      const result = await connectionManager.ping();
       return {
         success: result.success,
         latencyMs: result.latency || 0,
@@ -121,7 +135,7 @@ export class CouchbaseHealthService {
    */
   async testConnection(): Promise<boolean> {
     try {
-      await clusterConn();
+      await connectionManager.getConnection();
       return true;
     } catch {
       return false;

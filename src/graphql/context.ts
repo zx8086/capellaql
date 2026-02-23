@@ -2,7 +2,7 @@
 
 import type DataLoader from "dataloader";
 import { ulid } from "ulid";
-import { type CollectionKey, createDocumentDataLoader, type DocumentResult } from "$lib/dataLoader";
+import { type CollectionKey, createDocumentDataLoader, type DocumentResult } from "$lib/couchbase";
 import { debug } from "../telemetry/logger";
 
 // Enhanced GraphQL context type with additional tracking

@@ -1,8 +1,7 @@
 /* src/graphql/resolvers/looksSummary.ts */
 
 import { withSQLiteCache } from "$lib/bunSQLiteCache";
-import { getCluster } from "$lib/clusterProvider";
-import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import { connectionManager, QueryExecutor } from "$lib/couchbase";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
@@ -34,30 +33,22 @@ const looksSummaryResolver = withValidation(
       return await withSQLiteCache(
         cacheKey,
         async () => {
-          const cluster = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await getCluster(),
-            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
-          );
+          const conn = await connectionManager.getConnection();
 
           const query = `EXECUTE FUNCTION \`default\`.\`media_assets\`.get_looks_summary($brand, $season, $division)`;
-          const queryOptions = {
-            parameters: {
-              brand,
-              season,
-              division,
-            },
-          };
 
           log("Executing looks summary query (cache miss)", {
             query,
-            queryOptions,
+            parameters: { brand, season, division },
             requestId: context.requestId,
           });
 
-          const result = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await cluster.cluster.query(query, queryOptions),
-            CouchbaseErrorHandler.createQueryOperationContext("get_looks_summary", query, context.requestId, "default")
-          );
+          const result = await QueryExecutor.execute(conn.cluster, query, {
+            parameters: { brand, season, division },
+            usePreparedStatement: true,
+            queryContext: "default.media_assets",
+            requestId: context.requestId,
+          });
 
           debug("Looks summary query result", {
             requestId: context.requestId,

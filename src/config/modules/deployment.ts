@@ -16,7 +16,7 @@ export const deploymentEnvMapping = {
 // Deployment configuration defaults
 export const deploymentDefaults: DeploymentConfig = {
   BASE_URL: "http://localhost",
-  HOSTNAME: "localhost",
+  HOSTNAME: "0.0.0.0", // Bind to all interfaces for k6/IPv4 compatibility
   INSTANCE_ID: "unknown",
   CONTAINER_ID: undefined,
   K8S_POD_NAME: undefined,
@@ -26,7 +26,7 @@ export const deploymentDefaults: DeploymentConfig = {
 // Zod schema for deployment configuration
 export const DeploymentConfigSchema = z.object({
   BASE_URL: z.string().url().default("http://localhost"),
-  HOSTNAME: z.string().default("localhost"),
+  HOSTNAME: z.string().default("0.0.0.0"),
   INSTANCE_ID: z.string().default("unknown"),
   CONTAINER_ID: z.string().optional(),
   K8S_POD_NAME: z.string().optional(),

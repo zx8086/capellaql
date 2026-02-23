@@ -1,8 +1,7 @@
 /* src/graphql/resolvers/getDivisionalAssignment.ts */
 
 import { cacheEntities, getEntity, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
-import { getCluster } from "$lib/clusterProvider";
-import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import { connectionManager, QueryExecutor } from "$lib/couchbase";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
@@ -52,35 +51,23 @@ const getDivisionAssignmentResolver = withValidation(
       return await withSQLiteCache(
         userScopedKey,
         async () => {
-          const cluster = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await getCluster(),
-            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
-          );
+          const conn = await connectionManager.getConnection();
 
           const query = `EXECUTE FUNCTION \`default\`.\`new_model\`.getDivisionAssignment($styleSeasonCode, $companyCode, $divisionCode)`;
-          const queryOptions = {
-            parameters: {
-              styleSeasonCode,
-              companyCode,
-              divisionCode,
-            },
-          };
+          const parameters = { styleSeasonCode, companyCode, divisionCode };
 
           log("Executing get division assignment query (cache miss)", {
             query,
-            queryOptions,
+            parameters,
             requestId: context.requestId,
           });
 
-          const result = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await cluster.cluster.query(query, queryOptions),
-            CouchbaseErrorHandler.createQueryOperationContext(
-              "getDivisionAssignment",
-              query,
-              context.requestId,
-              "default"
-            )
-          );
+          const result = await QueryExecutor.execute(conn.cluster, query, {
+            parameters,
+            usePreparedStatement: true,
+            queryContext: "default.new_model",
+            requestId: context.requestId,
+          });
 
           debug("Get division assignment query result", {
             requestId: context.requestId,

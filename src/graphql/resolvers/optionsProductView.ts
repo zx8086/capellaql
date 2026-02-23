@@ -1,8 +1,7 @@
 /* src/graphql/resolvers/optionsProductView.ts */
 
 import { cacheEntities, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
-import { getCluster } from "$lib/clusterProvider";
-import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import { connectionManager, QueryExecutor } from "$lib/couchbase";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
@@ -37,38 +36,30 @@ const optionsProductViewResolver = withValidation(
       return await withSQLiteCache(
         cacheKey,
         async () => {
-          const cluster = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await getCluster(),
-            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
-          );
+          const conn = await connectionManager.getConnection();
 
           const query = `EXECUTE FUNCTION \`default\`.\`_default\`.get_options_product_view($BrandCode, $SalesOrganizationCode, $StyleSeasonCode, $DivisionCode, $ActiveOption, $SalesChannels)`;
-          const queryOptions = {
-            parameters: {
-              BrandCode,
-              SalesOrganizationCode,
-              StyleSeasonCode,
-              DivisionCode,
-              ActiveOption,
-              SalesChannels,
-            },
+          const parameters = {
+            BrandCode,
+            SalesOrganizationCode,
+            StyleSeasonCode,
+            DivisionCode,
+            ActiveOption,
+            SalesChannels,
           };
 
           log("Executing options product view query (cache miss)", {
             query,
-            queryOptions,
+            parameters,
             requestId: context.requestId,
           });
 
-          const result = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await cluster.cluster.query(query, queryOptions),
-            CouchbaseErrorHandler.createQueryOperationContext(
-              "get_options_product_view",
-              query,
-              context.requestId,
-              "default"
-            )
-          );
+          const result = await QueryExecutor.execute(conn.cluster, query, {
+            parameters,
+            usePreparedStatement: true,
+            queryContext: "default._default",
+            requestId: context.requestId,
+          });
 
           debug("Options product view query result", {
             requestId: context.requestId,

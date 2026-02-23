@@ -1,7 +1,7 @@
 /* src/graphql/resolvers/looksUrlCheck.ts */
 
 import { SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
-import { getCluster } from "$lib/clusterProvider";
+import { connectionManager, QueryExecutor } from "$lib/couchbase";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { debug, error as err, log } from "../../telemetry/logger";
 import type { GraphQLContext } from "../context";
@@ -28,26 +28,23 @@ const looksUrlCheckResolver = withValidation(
       return await withSQLiteCache(
         cacheKey,
         async () => {
-          const cluster = await getCluster().catch((error) => {
-            err("Error in getCluster:", { error, requestId: context.requestId });
-            throw error;
-          });
+          const conn = await connectionManager.getConnection();
 
           const query = `EXECUTE FUNCTION \`default\`.\`media_assets\`.getLooksUrlCheck($divisions, $season)`;
-          const queryOptions = {
-            parameters: {
-              divisions,
-              season,
-            },
-          };
+          const parameters = { divisions, season };
 
           log("Executing looks URL check query (cache miss)", {
             query,
-            queryOptions,
+            parameters,
             requestId: context.requestId,
           });
 
-          const result = await cluster.cluster.query(query, queryOptions);
+          const result = await QueryExecutor.execute(conn.cluster, query, {
+            parameters,
+            usePreparedStatement: true,
+            queryContext: "default.media_assets",
+            requestId: context.requestId,
+          });
 
           debug("Looks URL check query result", {
             requestId: context.requestId,

@@ -1,5 +1,5 @@
 import { metrics } from "@opentelemetry/api";
-import { pingCouchbase } from "$lib/couchbaseConnector";
+import { connectionManager } from "$lib/couchbase";
 import { debug, log, getTelemetryHealth } from "$telemetry";
 import { BunPerf } from "$utils/bunUtils";
 import { getGraphQLPerformanceStats, getRecentGraphQLPerformance } from "./graphqlPerformanceTracker";
@@ -215,7 +215,7 @@ class PerformanceMonitor {
   }
 
   private async collectDatabaseMetrics() {
-    const { result: pingResult, duration: latency } = await BunPerf.measure(() => pingCouchbase());
+    const { result: pingResult, duration: latency } = await BunPerf.measure(() => connectionManager.ping());
 
     let connectionStatus: "connected" | "disconnected" | "degraded" = "disconnected";
     if (pingResult.success) {

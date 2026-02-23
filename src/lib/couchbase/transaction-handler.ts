@@ -1,3 +1,16 @@
+/* src/lib/couchbase/transaction-handler.ts */
+
+/**
+ * Transaction Handler Module
+ *
+ * Migrated from couchbaseTransactionHandler.ts with integration to new error classifier.
+ * Features:
+ * - Comprehensive transaction error handling
+ * - Ambiguous commit tracking for manual investigation
+ * - Safe operation wrappers (get, insert, replace)
+ * - Utility methods for common transaction patterns
+ */
+
 import {
   CasMismatchError,
   DocumentExistsError,
@@ -7,9 +20,14 @@ import {
   type TransactionGetResult,
   Transactions,
 } from "couchbase";
-import { CouchbaseErrorHandler, type OperationContext } from "$lib/couchbaseErrorHandler";
-import { recordQuery } from "$lib/couchbaseMetrics";
-import { error as err, log as info, warn } from "../telemetry/logger";
+import { CouchbaseErrorClassifier } from "./errors";
+import { recordQuery } from "./metrics";
+import { error as err, log as info, warn } from "../../telemetry/logger";
+import type { OperationContext } from "./types";
+
+// =============================================================================
+// TYPES
+// =============================================================================
 
 export interface TransactionOperationContext extends OperationContext {
   transactionId?: string;
@@ -24,6 +42,19 @@ export interface TransactionConfig {
   cleanupClientAttempts?: boolean;
 }
 
+// =============================================================================
+// TRANSACTION HANDLER CLASS
+// =============================================================================
+
+/**
+ * Handles Couchbase transactions with comprehensive error handling.
+ *
+ * Features:
+ * - Automatic retry for transient failures
+ * - Ambiguous commit tracking and investigation
+ * - Safe operation wrappers with proper error classification
+ * - Utility methods for common patterns (atomic update, batch operations)
+ */
 export class CouchbaseTransactionHandler {
   private static readonly DEFAULT_CONFIG: TransactionConfig = {
     durabilityLevel: "majority",
@@ -32,6 +63,9 @@ export class CouchbaseTransactionHandler {
     cleanupClientAttempts: true,
   };
 
+  /**
+   * Execute a transaction with comprehensive error handling.
+   */
   static async executeTransaction<T>(
     transactionLogic: (ctx: TransactionAttempt) => Promise<T>,
     context: TransactionOperationContext,
@@ -39,16 +73,20 @@ export class CouchbaseTransactionHandler {
   ): Promise<T> {
     const finalConfig = { ...CouchbaseTransactionHandler.DEFAULT_CONFIG, ...config };
     const startTime = Date.now();
-    const transactionId = context.transactionId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const transactionId =
+      context.transactionId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     let attemptCount = 0;
     let _lastError: Error | null = null;
 
     try {
-      const result = await CouchbaseErrorHandler.executeWithRetry(
-        async () => {
-          attemptCount++;
+      // Execute with retry logic
+      const maxAttempts = 3;
 
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        attemptCount = attempt;
+
+        try {
           const enhancedContext: TransactionOperationContext = {
             ...context,
             transactionId,
@@ -64,7 +102,7 @@ export class CouchbaseTransactionHandler {
             config: finalConfig,
           });
 
-          // Execute transaction with comprehensive error handling
+          // Execute transaction
           const transactions = Transactions.create();
 
           const txnResult = await transactions.run(
@@ -78,7 +116,7 @@ export class CouchbaseTransactionHandler {
               }
             },
             {
-              durabilityLevel: finalConfig.durabilityLevel,
+              durabilityLevel: finalConfig.durabilityLevel as any,
               timeout: finalConfig.timeout,
             }
           );
@@ -102,16 +140,28 @@ export class CouchbaseTransactionHandler {
           });
 
           return txnResult;
-        },
-        {
-          ...context,
-          operationType: `transaction_${context.operationType}`,
-          transactionId,
-        },
-        3 // Maximum transaction retries
-      );
+        } catch (error) {
+          _lastError = error as Error;
 
-      return result;
+          // Use error classifier
+          const classification = CouchbaseErrorClassifier.classifyError(error);
+          const retryStrategy = CouchbaseErrorClassifier.getRetryStrategy(error);
+
+          if (!retryStrategy.shouldRetry || attempt === maxAttempts) {
+            throw error;
+          }
+
+          const delay = retryStrategy.baseDelayMs * Math.pow(2, attempt - 1);
+          warn(`Transaction retry attempt ${attempt}/${maxAttempts} after ${delay}ms`, {
+            transactionId,
+            errorType: (error as Error).constructor.name,
+          });
+
+          await CouchbaseTransactionHandler.sleep(delay);
+        }
+      }
+
+      throw _lastError;
     } catch (error) {
       _lastError = error as Error;
       const duration = Date.now() - startTime;
@@ -121,7 +171,7 @@ export class CouchbaseTransactionHandler {
         transactionId,
         totalAttempts: attemptCount,
         duration,
-        errorType: error.constructor.name,
+        errorType: (error as Error).constructor.name,
         classification,
         operationType: context.operationType,
         requestId: context.requestId,
@@ -131,7 +181,7 @@ export class CouchbaseTransactionHandler {
 
       // Record failed transaction metrics
       recordQuery(`transaction_${context.operationType}`, duration, false, {
-        errorType: error.constructor.name,
+        errorType: (error as Error).constructor.name,
         requestId: context.requestId,
         bucket: context.bucket,
         scope: context.scope,
@@ -140,13 +190,19 @@ export class CouchbaseTransactionHandler {
 
       // Handle specific transaction failure scenarios
       if (error instanceof TransactionCommitAmbiguousError) {
-        await CouchbaseTransactionHandler.handleAmbiguousTransaction(error, { ...context, transactionId });
+        await CouchbaseTransactionHandler.handleAmbiguousTransaction(error, {
+          ...context,
+          transactionId,
+        });
       }
 
       throw error;
     }
   }
 
+  /**
+   * Safe get operation within a transaction.
+   */
   static async safeGet(
     ctx: TransactionAttempt,
     collection: any,
@@ -163,7 +219,7 @@ export class CouchbaseTransactionHandler {
 
       // Log other errors but let them propagate
       warn("Transaction get operation failed", {
-        error: error.constructor.name,
+        error: (error as Error).constructor.name,
         key,
         transactionId: operationContext.transactionId,
         requestId: operationContext.requestId,
@@ -173,6 +229,9 @@ export class CouchbaseTransactionHandler {
     }
   }
 
+  /**
+   * Safe insert operation within a transaction.
+   */
   static async safeInsert(
     ctx: TransactionAttempt,
     collection: any,
@@ -195,6 +254,9 @@ export class CouchbaseTransactionHandler {
     }
   }
 
+  /**
+   * Safe replace operation within a transaction.
+   */
   static async safeReplace(
     ctx: TransactionAttempt,
     doc: TransactionGetResult,
@@ -215,6 +277,9 @@ export class CouchbaseTransactionHandler {
     }
   }
 
+  /**
+   * Classify transaction-specific errors.
+   */
   private static classifyTransactionError(error: any): {
     retryable: boolean;
     severity: "info" | "warning" | "critical";
@@ -223,42 +288,50 @@ export class CouchbaseTransactionHandler {
   } {
     const errorType = error.constructor.name;
 
-    const classifications = {
+    const classifications: Record<
+      string,
+      {
+        retryable: boolean;
+        severity: "info" | "warning" | "critical";
+        requiresInvestigation: boolean;
+        category: "transient" | "permanent" | "ambiguous" | "configuration";
+      }
+    > = {
       TransactionFailedError: {
         retryable: true,
-        severity: "warning" as const,
+        severity: "warning",
         requiresInvestigation: false,
-        category: "transient" as const,
+        category: "transient",
       },
       TransactionCommitAmbiguousError: {
         retryable: false,
-        severity: "critical" as const,
+        severity: "critical",
         requiresInvestigation: true,
-        category: "ambiguous" as const,
+        category: "ambiguous",
       },
       TransactionExpiredError: {
         retryable: true,
-        severity: "warning" as const,
+        severity: "warning",
         requiresInvestigation: false,
-        category: "transient" as const,
+        category: "transient",
       },
       DocumentExistsError: {
         retryable: false,
-        severity: "info" as const,
+        severity: "info",
         requiresInvestigation: false,
-        category: "permanent" as const,
+        category: "permanent",
       },
       DocumentNotFoundError: {
         retryable: false,
-        severity: "info" as const,
+        severity: "info",
         requiresInvestigation: false,
-        category: "permanent" as const,
+        category: "permanent",
       },
       CasMismatchError: {
         retryable: true,
-        severity: "info" as const,
+        severity: "info",
         requiresInvestigation: false,
-        category: "transient" as const,
+        category: "transient",
       },
     };
 
@@ -272,6 +345,9 @@ export class CouchbaseTransactionHandler {
     );
   }
 
+  /**
+   * Handle errors that occur within a transaction.
+   */
   private static handleInTransactionError(error: any, context: TransactionOperationContext): void {
     const classification = CouchbaseTransactionHandler.classifyTransactionError(error);
 
@@ -295,6 +371,9 @@ export class CouchbaseTransactionHandler {
     }
   }
 
+  /**
+   * Handle ambiguous transaction commits.
+   */
   private static async handleAmbiguousTransaction(
     error: TransactionCommitAmbiguousError,
     context: TransactionOperationContext & { transactionId: string }
@@ -323,7 +402,6 @@ export class CouchbaseTransactionHandler {
 
     // Store for investigation dashboard
     try {
-      // This could be enhanced to store in a dedicated investigation collection
       info("Stored ambiguous transaction for investigation", {
         transactionId: context.transactionId,
         operationType: context.operationType,
@@ -336,6 +414,9 @@ export class CouchbaseTransactionHandler {
     }
   }
 
+  /**
+   * Create a transaction operation context.
+   */
   static createTransactionContext(
     operationType: string,
     requestId?: string,
@@ -352,7 +433,9 @@ export class CouchbaseTransactionHandler {
     };
   }
 
-  // Utility method for common transaction patterns
+  /**
+   * Utility method for atomic updates.
+   */
   static async atomicUpdate<T>(
     collection: any,
     key: string,
@@ -364,7 +447,7 @@ export class CouchbaseTransactionHandler {
       async (ctx) => {
         // Get current document
         const currentDoc = await CouchbaseTransactionHandler.safeGet(ctx, collection, key, context);
-        const currentValue = currentDoc ? currentDoc.content : null;
+        const currentValue = currentDoc ? (currentDoc.content as T) : null;
 
         // Apply update function
         const newValue = updateFn(currentValue);
@@ -383,7 +466,9 @@ export class CouchbaseTransactionHandler {
     );
   }
 
-  // Utility method for batch operations within a transaction
+  /**
+   * Utility method for batch operations within a transaction.
+   */
   static async batchOperation<T>(
     operations: Array<(ctx: TransactionAttempt) => Promise<T>>,
     context: TransactionOperationContext,
@@ -402,7 +487,7 @@ export class CouchbaseTransactionHandler {
               operationIndex: i,
               totalOperations: operations.length,
               transactionId: context.transactionId,
-              error: error.constructor.name,
+              error: (error as Error).constructor.name,
             });
             throw error;
           }
@@ -416,5 +501,13 @@ export class CouchbaseTransactionHandler {
       },
       config
     );
+  }
+
+  private static async sleep(ms: number): Promise<void> {
+    if (typeof Bun !== "undefined") {
+      await Bun.sleep(ms);
+    } else {
+      await new Promise((resolve) => setTimeout(resolve, ms));
+    }
   }
 }

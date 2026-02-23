@@ -1,8 +1,7 @@
 /* src/graphql/resolvers/lookDetails.ts */
 
 import { cacheEntities, getEntity, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
-import { getCluster } from "$lib/clusterProvider";
-import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import { connectionManager, QueryExecutor } from "$lib/couchbase";
 import { withPerformanceTracking } from "$lib/graphqlPerformanceTracker";
 import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 import { debug, error as err, log } from "../../telemetry/logger";
@@ -44,24 +43,22 @@ const lookDetailsResolver = withValidation(
       return await withSQLiteCache(
         entityKey,
         async () => {
-          const cluster = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await getCluster(),
-            CouchbaseErrorHandler.createConnectionOperationContext("getCluster", context.requestId)
-          );
+          const conn = await connectionManager.getConnection();
 
           const query = `EXECUTE FUNCTION \`default\`.\`media_assets\`.getLookDetails($lookDocKey)`;
-          const queryOptions = { parameters: { lookDocKey } };
 
           log("Executing look details query (cache miss)", {
             query,
-            queryOptions,
+            parameters: { lookDocKey },
             requestId: context.requestId,
           });
 
-          const result = await CouchbaseErrorHandler.executeWithRetry(
-            async () => await cluster.cluster.query(query, queryOptions),
-            CouchbaseErrorHandler.createQueryOperationContext("getLookDetails", query, context.requestId, "default")
-          );
+          const result = await QueryExecutor.execute(conn.cluster, query, {
+            parameters: { lookDocKey },
+            usePreparedStatement: true,
+            queryContext: "default.media_assets",
+            requestId: context.requestId,
+          });
 
           debug("Look details query result", {
             requestId: context.requestId,
