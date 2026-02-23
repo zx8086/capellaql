@@ -3,12 +3,7 @@
 import { beforeEach, describe, expect, mock, test } from "bun:test";
 
 // Mock ping and diagnostics results for health testing
-const createMockPingResult = (serviceStates: {
-  kv?: string;
-  query?: string;
-  analytics?: string;
-  search?: string;
-}) => ({
+const createMockPingResult = (serviceStates: { kv?: string; query?: string; analytics?: string; search?: string }) => ({
   services: {
     kv: serviceStates.kv ? [{ state: serviceStates.kv }] : [],
     query: serviceStates.query ? [{ state: serviceStates.query }] : [],
@@ -236,9 +231,7 @@ describe("CouchbaseConnector", () => {
     };
 
     // Reset ping to default healthy state
-    mockPing.mockImplementation(() =>
-      Promise.resolve(createMockPingResult({ kv: "ok", query: "ok" }))
-    );
+    mockPing.mockImplementation(() => Promise.resolve(createMockPingResult({ kv: "ok", query: "ok" })));
   });
 
   test("should establish connection successfully", async () => {
@@ -320,16 +313,12 @@ describe("getCouchbaseHealth", () => {
     };
 
     // Reset ping to default healthy state
-    mockPing.mockImplementation(() =>
-      Promise.resolve(createMockPingResult({ kv: "ok", query: "ok" }))
-    );
+    mockPing.mockImplementation(() => Promise.resolve(createMockPingResult({ kv: "ok", query: "ok" })));
   });
 
   test("returns healthy status when all services are OK", async () => {
     mockPing.mockImplementation(() =>
-      Promise.resolve(
-        createMockPingResult({ kv: "ok", query: "ok", analytics: "ok", search: "ok" })
-      )
+      Promise.resolve(createMockPingResult({ kv: "ok", query: "ok", analytics: "ok", search: "ok" }))
     );
 
     const { getCouchbaseHealth } = await import("../../../src/lib/couchbaseConnector");
@@ -357,9 +346,7 @@ describe("getCouchbaseHealth", () => {
   });
 
   test("returns unhealthy status when KV service is unhealthy", async () => {
-    mockPing.mockImplementation(() =>
-      Promise.resolve(createMockPingResult({ kv: "error", query: "ok" }))
-    );
+    mockPing.mockImplementation(() => Promise.resolve(createMockPingResult({ kv: "error", query: "ok" })));
 
     const { getCouchbaseHealth } = await import("../../../src/lib/couchbaseConnector");
     const health = await getCouchbaseHealth();
@@ -370,9 +357,7 @@ describe("getCouchbaseHealth", () => {
   });
 
   test("returns unhealthy status when Query service is unhealthy", async () => {
-    mockPing.mockImplementation(() =>
-      Promise.resolve(createMockPingResult({ kv: "ok", query: "error" }))
-    );
+    mockPing.mockImplementation(() => Promise.resolve(createMockPingResult({ kv: "ok", query: "error" })));
 
     const { getCouchbaseHealth } = await import("../../../src/lib/couchbaseConnector");
     const health = await getCouchbaseHealth();
@@ -399,9 +384,7 @@ describe("getCouchbaseHealth", () => {
   });
 
   test("returns critical status when both KV and Query are unhealthy", async () => {
-    mockPing.mockImplementation(() =>
-      Promise.resolve(createMockPingResult({ kv: "error", query: "error" }))
-    );
+    mockPing.mockImplementation(() => Promise.resolve(createMockPingResult({ kv: "error", query: "error" })));
 
     const { getCouchbaseHealth } = await import("../../../src/lib/couchbaseConnector");
     const health = await getCouchbaseHealth();
@@ -412,9 +395,7 @@ describe("getCouchbaseHealth", () => {
   });
 
   test("returns critical status when connection fails", async () => {
-    mockConnect.mockImplementationOnce(() =>
-      Promise.reject(new Error("Connection refused"))
-    );
+    mockConnect.mockImplementationOnce(() => Promise.reject(new Error("Connection refused")));
 
     const { getCouchbaseHealth } = await import("../../../src/lib/couchbaseConnector");
     const health = await getCouchbaseHealth();
@@ -446,8 +427,8 @@ describe("getCouchbaseHealth", () => {
   });
 
   test("evaluates service health for unavailable services", async () => {
-    mockPing.mockImplementation(() =>
-      Promise.resolve(createMockPingResult({ kv: "ok", query: "ok" })) // analytics and search not included
+    mockPing.mockImplementation(
+      () => Promise.resolve(createMockPingResult({ kv: "ok", query: "ok" })) // analytics and search not included
     );
 
     const { getCouchbaseHealth } = await import("../../../src/lib/couchbaseConnector");
@@ -487,9 +468,7 @@ describe("pingCouchbase", () => {
     mockPing.mockClear();
 
     // Reset to healthy state
-    mockPing.mockImplementation(() =>
-      Promise.resolve(createMockPingResult({ kv: "ok", query: "ok" }))
-    );
+    mockPing.mockImplementation(() => Promise.resolve(createMockPingResult({ kv: "ok", query: "ok" })));
   });
 
   test("returns success with latency when connection succeeds", async () => {
@@ -505,9 +484,7 @@ describe("pingCouchbase", () => {
   });
 
   test("returns failure with error message when connection fails", async () => {
-    mockConnect.mockImplementationOnce(() =>
-      Promise.reject(new Error("Network unreachable"))
-    );
+    mockConnect.mockImplementationOnce(() => Promise.reject(new Error("Network unreachable")));
 
     const { pingCouchbase } = await import("../../../src/lib/couchbaseConnector");
     const result = await pingCouchbase();
@@ -519,9 +496,7 @@ describe("pingCouchbase", () => {
   });
 
   test("returns failure when ping operation fails", async () => {
-    mockPing.mockImplementation(() =>
-      Promise.reject(new Error("Ping timeout"))
-    );
+    mockPing.mockImplementation(() => Promise.reject(new Error("Ping timeout")));
 
     const { pingCouchbase } = await import("../../../src/lib/couchbaseConnector");
     const result = await pingCouchbase();

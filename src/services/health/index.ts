@@ -1,6 +1,36 @@
 /* src/services/health/index.ts */
 // Health services barrel export - matches reference format exactly
 
+// Cache health service
+export {
+  CacheHealthService,
+  cacheHealthService,
+  getCacheHealthDetails,
+  isCacheReady,
+} from "./cacheHealth";
+// Comprehensive health service
+export {
+  ComprehensiveHealthService,
+  comprehensiveHealthService,
+  getComprehensiveHealth,
+  getLivenessCheck,
+  getReadinessCheck,
+} from "./comprehensiveHealth";
+
+// Couchbase health service
+export {
+  CouchbaseHealthService,
+  couchbaseHealthService,
+  getCouchbaseHealthDetails,
+  pingCouchbaseForReadiness,
+} from "./couchbaseHealth";
+// Telemetry health service
+export {
+  getTelemetryHealthDetails,
+  isTelemetryReady,
+  TelemetryHealthService,
+  telemetryHealthService,
+} from "./telemetryHealth";
 // Types (simplified to match reference format)
 export type {
   CacheDependency,
@@ -13,39 +43,5 @@ export type {
   TelemetryHealthDetails,
   TelemetrySignalHealth,
 } from "./types";
-
 // Utility functions
 export { formatPercentage, formatResponseTime, formatUptime } from "./types";
-
-// Couchbase health service
-export {
-  couchbaseHealthService,
-  CouchbaseHealthService,
-  getCouchbaseHealthDetails,
-  pingCouchbaseForReadiness,
-} from "./couchbaseHealth";
-
-// Cache health service
-export {
-  cacheHealthService,
-  CacheHealthService,
-  getCacheHealthDetails,
-  isCacheReady,
-} from "./cacheHealth";
-
-// Telemetry health service
-export {
-  getTelemetryHealthDetails,
-  isTelemetryReady,
-  telemetryHealthService,
-  TelemetryHealthService,
-} from "./telemetryHealth";
-
-// Comprehensive health service
-export {
-  comprehensiveHealthService,
-  ComprehensiveHealthService,
-  getComprehensiveHealth,
-  getLivenessCheck,
-  getReadinessCheck,
-} from "./comprehensiveHealth";

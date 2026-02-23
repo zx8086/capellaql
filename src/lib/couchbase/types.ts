@@ -1,6 +1,6 @@
 /* src/lib/couchbase/types.ts */
 
-import type { Cluster, Bucket, Scope, Collection } from "couchbase";
+import type { Bucket, Cluster, Collection, Scope } from "couchbase";
 
 /**
  * Enhanced connection interface with all SDK features

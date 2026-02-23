@@ -1,7 +1,7 @@
 /* src/telemetry/telemetry-circuit-breaker.ts */
 /* Per-signal circuit breakers for traces, metrics, and logs */
 
-import { TelemetryCircuitBreaker, type CircuitBreakerConfig, CircuitBreakerState } from "./health/CircuitBreaker";
+import { type CircuitBreakerConfig, CircuitBreakerState, TelemetryCircuitBreaker } from "./health/CircuitBreaker";
 
 // ============================================================================
 // Types
@@ -272,9 +272,9 @@ export function shutdownTelemetryCircuitBreakers(): void {
 // Convenience Exports
 // ============================================================================
 
+export type { CircuitBreakerConfig, CircuitBreakerStats } from "./health/CircuitBreaker";
 // Re-export types and enums from CircuitBreaker
 export { CircuitBreakerState, TelemetryCircuitBreaker } from "./health/CircuitBreaker";
-export type { CircuitBreakerConfig, CircuitBreakerStats } from "./health/CircuitBreaker";
 
 // Export individual breakers for direct access if needed
 export const traceCircuitBreaker = signalCircuitBreakers.traces;

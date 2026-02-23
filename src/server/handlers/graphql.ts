@@ -57,10 +57,7 @@ const yoga = createYoga({
   maskedErrors: {
     maskError: (error, message) => {
       // Don't mask user input validation errors - they should be shown to clients
-      if (
-        error?.extensions?.code === "BAD_USER_INPUT" ||
-        error?.message?.includes("Input validation failed")
-      ) {
+      if (error?.extensions?.code === "BAD_USER_INPUT" || error?.message?.includes("Input validation failed")) {
         return error;
       }
       // Mask other errors in production
@@ -143,8 +140,7 @@ const yoga = createYoga({
       onError: ({ error }) => {
         // Check if this is a user input validation error (BAD_USER_INPUT)
         const isUserInputError =
-          error?.extensions?.code === "BAD_USER_INPUT" ||
-          error?.message?.includes("Input validation failed");
+          error?.extensions?.code === "BAD_USER_INPUT" || error?.message?.includes("Input validation failed");
 
         if (isUserInputError) {
           // Log validation errors at debug level without stack trace
@@ -184,7 +180,7 @@ const yoga = createYoga({
     },
     // Cache hit/miss logging plugin - one line per request
     {
-      onResponse({ response, request }) {
+      onResponse({ response }) {
         const cacheStatus = response.headers.get("x-yoga-cache");
         if (cacheStatus === "HIT") {
           log("Cache HIT", {});

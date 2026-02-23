@@ -14,8 +14,8 @@
 
 import type { ConnectOptions } from "couchbase";
 import centralConfig from "$config";
-import type { CouchbaseConfig, ConnectionStringMeta } from "./types";
 import { parseConnectionString } from "./config";
+import type { ConnectionStringMeta, CouchbaseConfig } from "./types";
 
 // Re-export parseConnectionString for convenience
 export { parseConnectionString };
@@ -27,10 +27,7 @@ export { parseConnectionString };
  * @param meta - Connection string metadata (from parseConnectionString)
  * @returns ConnectOptions optimized for the connection type
  */
-export function buildConnectionOptions(
-  config: CouchbaseConfig,
-  meta: ConnectionStringMeta
-): ConnectOptions {
+export function buildConnectionOptions(config: CouchbaseConfig, meta: ConnectionStringMeta): ConnectOptions {
   const isDevelopment = centralConfig.runtime.NODE_ENV !== "production";
 
   const options: ConnectOptions = {
@@ -143,17 +140,11 @@ export function getOptimizedTimeouts(meta: ConnectionStringMeta): {
 /**
  * Validate that connection options are suitable for production.
  */
-export function validateConnectionOptions(
-  options: ConnectOptions,
-  meta: ConnectionStringMeta
-): string[] {
+export function validateConnectionOptions(options: ConnectOptions, meta: ConnectionStringMeta): string[] {
   const warnings: string[] = [];
 
   // Check for disabled security in production
-  if (
-    centralConfig.runtime.NODE_ENV === "production" &&
-    options.security?.disableCertificateVerification
-  ) {
+  if (centralConfig.runtime.NODE_ENV === "production" && options.security?.disableCertificateVerification) {
     warnings.push("Certificate verification is disabled in production - security risk");
   }
 

@@ -59,7 +59,7 @@ export function initializeMetrics(): void {
     const databaseMeter = metrics.getMeter(METER_NAMES.database, "1.0.0");
     const cacheMeter = metrics.getMeter(METER_NAMES.cache, "1.0.0");
     const circuitBreakerMeter = metrics.getMeter(METER_NAMES.circuitBreaker, "1.0.0");
-    const processMeter = metrics.getMeter(METER_NAMES.process, "1.0.0");
+    const _processMeter = metrics.getMeter(METER_NAMES.process, "1.0.0");
     const gcMeter = metrics.getMeter(METER_NAMES.gc, "1.0.0");
     const telemetryMeter = metrics.getMeter(METER_NAMES.telemetry, "1.0.0");
     const errorsMeter = metrics.getMeter(METER_NAMES.errors, "1.0.0");

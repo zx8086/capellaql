@@ -1,15 +1,15 @@
 /* tests/playwright/graphql/looks.spec.ts - E2E Tests for Looks Query */
 
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   executeGraphQL,
   LOOKS_QUERY,
   LOOKS_SUMMARY_QUERY,
-  validateLookStructure,
-  validateLookSummaryStructure,
-  measureQueryTime,
   type LooksQueryResponse,
   type LooksSummaryResponse,
+  measureQueryTime,
+  validateLookStructure,
+  validateLookSummaryStructure,
 } from "../helpers/graphql-client";
 
 const TEST_CONFIG = {
@@ -62,15 +62,11 @@ test.describe("GraphQL Looks Query - TH Brand C52 Season", () => {
   }
 
   test("response time under 5 seconds for first request", async ({ request }) => {
-    const { durationMs } = await measureQueryTime<LooksQueryResponse>(
-      request,
-      LOOKS_QUERY,
-      {
-        brand: TEST_CONFIG.brand,
-        season: TEST_CONFIG.season,
-        division: TEST_CONFIG.divisions[0],
-      }
-    );
+    const { durationMs } = await measureQueryTime<LooksQueryResponse>(request, LOOKS_QUERY, {
+      brand: TEST_CONFIG.brand,
+      season: TEST_CONFIG.season,
+      division: TEST_CONFIG.divisions[0],
+    });
 
     expect(durationMs).toBeLessThan(5000);
   });
@@ -83,18 +79,10 @@ test.describe("GraphQL Looks Query - TH Brand C52 Season", () => {
     };
 
     // First request (cold cache)
-    const { durationMs: coldTime } = await measureQueryTime<LooksQueryResponse>(
-      request,
-      LOOKS_QUERY,
-      variables
-    );
+    const { durationMs: coldTime } = await measureQueryTime<LooksQueryResponse>(request, LOOKS_QUERY, variables);
 
     // Second request (warm cache)
-    const { durationMs: warmTime } = await measureQueryTime<LooksQueryResponse>(
-      request,
-      LOOKS_QUERY,
-      variables
-    );
+    const { durationMs: warmTime } = await measureQueryTime<LooksQueryResponse>(request, LOOKS_QUERY, variables);
 
     // Cached should be faster (or at least not significantly slower)
     // Allow 500ms tolerance for network variance
@@ -140,9 +128,7 @@ test.describe("GraphQL Looks Query - TH Brand C52 Season", () => {
     });
 
     // Should either return empty array or validation error
-    expect(
-      result.data?.looks !== undefined || result.errors !== undefined
-    ).toBeTruthy();
+    expect(result.data?.looks !== undefined || result.errors !== undefined).toBeTruthy();
 
     // If data returned, it should be an array
     if (result.data?.looks) {
@@ -157,9 +143,7 @@ test.describe("GraphQL Looks Query - TH Brand C52 Season", () => {
       division: TEST_CONFIG.divisions[0],
     });
 
-    expect(
-      result.data?.looks !== undefined || result.errors !== undefined
-    ).toBeTruthy();
+    expect(result.data?.looks !== undefined || result.errors !== undefined).toBeTruthy();
 
     if (result.data?.looks) {
       expect(Array.isArray(result.data.looks)).toBe(true);
@@ -252,15 +236,11 @@ test.describe("GraphQL LooksSummary Query - TH Brand C52 Season", () => {
   test.describe.configure({ retries: 2 });
 
   test("looksSummary - returns valid response structure", async ({ request }) => {
-    const result = await executeGraphQL<LooksSummaryResponse>(
-      request,
-      LOOKS_SUMMARY_QUERY,
-      {
-        brand: TEST_CONFIG.brand,
-        division: TEST_CONFIG.divisions[0],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<LooksSummaryResponse>(request, LOOKS_SUMMARY_QUERY, {
+      brand: TEST_CONFIG.brand,
+      division: TEST_CONFIG.divisions[0],
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.looksSummary).toBeDefined();
@@ -327,62 +307,42 @@ test.describe("GraphQL LooksSummary Query - TH Brand C52 Season", () => {
   }
 
   test("looksSummary - response time under 5 seconds", async ({ request }) => {
-    const { durationMs } = await measureQueryTime<LooksSummaryResponse>(
-      request,
-      LOOKS_SUMMARY_QUERY,
-      {
-        brand: TEST_CONFIG.brand,
-        division: TEST_CONFIG.divisions[0],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const { durationMs } = await measureQueryTime<LooksSummaryResponse>(request, LOOKS_SUMMARY_QUERY, {
+      brand: TEST_CONFIG.brand,
+      division: TEST_CONFIG.divisions[0],
+      season: TEST_CONFIG.season,
+    });
 
     expect(durationMs).toBeLessThan(5000);
   });
 
   test("looksSummary - handles empty brand gracefully", async ({ request }) => {
-    const result = await executeGraphQL<LooksSummaryResponse>(
-      request,
-      LOOKS_SUMMARY_QUERY,
-      {
-        brand: "",
-        division: TEST_CONFIG.divisions[0],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<LooksSummaryResponse>(request, LOOKS_SUMMARY_QUERY, {
+      brand: "",
+      division: TEST_CONFIG.divisions[0],
+      season: TEST_CONFIG.season,
+    });
 
     // Should either return valid summary or error
-    expect(
-      result.data?.looksSummary !== undefined || result.errors !== undefined
-    ).toBeTruthy();
+    expect(result.data?.looksSummary !== undefined || result.errors !== undefined).toBeTruthy();
   });
 
   test("looksSummary - handles empty season gracefully", async ({ request }) => {
-    const result = await executeGraphQL<LooksSummaryResponse>(
-      request,
-      LOOKS_SUMMARY_QUERY,
-      {
-        brand: TEST_CONFIG.brand,
-        division: TEST_CONFIG.divisions[0],
-        season: "",
-      }
-    );
+    const result = await executeGraphQL<LooksSummaryResponse>(request, LOOKS_SUMMARY_QUERY, {
+      brand: TEST_CONFIG.brand,
+      division: TEST_CONFIG.divisions[0],
+      season: "",
+    });
 
-    expect(
-      result.data?.looksSummary !== undefined || result.errors !== undefined
-    ).toBeTruthy();
+    expect(result.data?.looksSummary !== undefined || result.errors !== undefined).toBeTruthy();
   });
 
   test("looksSummary - handles invalid division gracefully", async ({ request }) => {
-    const result = await executeGraphQL<LooksSummaryResponse>(
-      request,
-      LOOKS_SUMMARY_QUERY,
-      {
-        brand: TEST_CONFIG.brand,
-        division: "99",
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<LooksSummaryResponse>(request, LOOKS_SUMMARY_QUERY, {
+      brand: TEST_CONFIG.brand,
+      division: "99",
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.looksSummary).toBeDefined();
@@ -412,15 +372,11 @@ test.describe("GraphQL LooksSummary Query - TH Brand C52 Season", () => {
   });
 
   test("looksSummary - counts are consistent with totalLooks", async ({ request }) => {
-    const result = await executeGraphQL<LooksSummaryResponse>(
-      request,
-      LOOKS_SUMMARY_QUERY,
-      {
-        brand: TEST_CONFIG.brand,
-        division: TEST_CONFIG.divisions[0],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<LooksSummaryResponse>(request, LOOKS_SUMMARY_QUERY, {
+      brand: TEST_CONFIG.brand,
+      division: TEST_CONFIG.divisions[0],
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
 

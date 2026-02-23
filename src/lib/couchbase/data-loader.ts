@@ -11,20 +11,20 @@
  * - Integration with new error classifier
  */
 
-import {
-  DocumentNotFoundError,
-  AuthenticationFailureError,
-  AmbiguousTimeoutError,
-  TemporaryFailureError,
-  ServiceNotAvailableError,
-  RateLimitedError,
-  DocumentLockedError,
-  CouchbaseError,
-  CouchbaseErrorClassifier,
-} from "./errors";
-import { connectionManager } from "./connection-manager";
 import DataLoader from "dataloader";
 import { debug, error as err, log } from "../../telemetry/logger";
+import { connectionManager } from "./connection-manager";
+import {
+  AmbiguousTimeoutError,
+  AuthenticationFailureError,
+  CouchbaseError,
+  CouchbaseErrorClassifier,
+  DocumentLockedError,
+  DocumentNotFoundError,
+  RateLimitedError,
+  ServiceNotAvailableError,
+  TemporaryFailureError,
+} from "./errors";
 
 // =============================================================================
 // TYPES
@@ -87,152 +87,150 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
     });
 
     // Process each collection's keys in parallel
-    const collectionPromises = Array.from(keysByCollection.entries()).map(
-      async ([collectionId, collectionKeys]) => {
-        const [bucket, scope, collection] = collectionId.split(".");
+    const collectionPromises = Array.from(keysByCollection.entries()).map(async ([collectionId, collectionKeys]) => {
+      const [bucket, scope, collection] = collectionId.split(".");
 
-        try {
-          const collectionRef = connection.collection(bucket, scope, collection);
+      try {
+        const collectionRef = connection.collection(bucket, scope, collection);
 
-          // Execute all gets for this collection in parallel
-          const keyPromises = collectionKeys.map(async (keyInfo) => {
-            const keyStartTime = Date.now();
+        // Execute all gets for this collection in parallel
+        const keyPromises = collectionKeys.map(async (keyInfo) => {
+          const keyStartTime = Date.now();
 
-            try {
-              if (!keyInfo.key.trim()) {
-                return {
-                  bucket: keyInfo.bucket,
-                  scope: keyInfo.scope,
-                  collection: keyInfo.collection,
-                  data: null,
-                  timeTaken: 0,
-                };
-              }
-
-              // Direct KV get - don't use circuit breaker for document fetches
-              // DocumentNotFoundError is an expected result, not a service failure
-              // The circuit breaker should only protect against connection/service issues
-              const result = await collectionRef.get(keyInfo.key);
-              const timeTaken = Date.now() - keyStartTime;
-
+          try {
+            if (!keyInfo.key.trim()) {
               return {
                 bucket: keyInfo.bucket,
                 scope: keyInfo.scope,
                 collection: keyInfo.collection,
-                data: { id: keyInfo.key, ...result.content },
+                data: null,
+                timeTaken: 0,
+              };
+            }
+
+            // Direct KV get - don't use circuit breaker for document fetches
+            // DocumentNotFoundError is an expected result, not a service failure
+            // The circuit breaker should only protect against connection/service issues
+            const result = await collectionRef.get(keyInfo.key);
+            const timeTaken = Date.now() - keyStartTime;
+
+            return {
+              bucket: keyInfo.bucket,
+              scope: keyInfo.scope,
+              collection: keyInfo.collection,
+              data: { id: keyInfo.key, ...result.content },
+              timeTaken,
+            };
+          } catch (error) {
+            const timeTaken = Date.now() - keyStartTime;
+            const _errorContext = CouchbaseErrorClassifier.extractContext(error, "get");
+
+            // Handle specific error types with proper classification
+            if (error instanceof DocumentNotFoundError) {
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
                 timeTaken,
               };
-            } catch (error) {
-              const timeTaken = Date.now() - keyStartTime;
-              const errorContext = CouchbaseErrorClassifier.extractContext(error, "get");
-
-              // Handle specific error types with proper classification
-              if (error instanceof DocumentNotFoundError) {
-                return {
-                  bucket: keyInfo.bucket,
-                  scope: keyInfo.scope,
-                  collection: keyInfo.collection,
-                  data: null,
-                  timeTaken,
-                };
-              } else if (error instanceof AuthenticationFailureError) {
-                err("Authentication/Permission error in DataLoader", {
-                  errorType: error.constructor.name,
-                  keyInfo,
-                  classification: CouchbaseErrorClassifier.classifyError(error),
-                });
-                return {
-                  bucket: keyInfo.bucket,
-                  scope: keyInfo.scope,
-                  collection: keyInfo.collection,
-                  data: null,
-                  timeTaken,
-                  error: `Access denied: ${error.message}`,
-                };
-              } else if (error instanceof AmbiguousTimeoutError) {
-                err("Ambiguous timeout in DataLoader - manual investigation required", {
-                  keyInfo,
-                  errorMessage: error.message,
-                  requiresInvestigation: true,
-                });
-                return {
-                  bucket: keyInfo.bucket,
-                  scope: keyInfo.scope,
-                  collection: keyInfo.collection,
-                  data: null,
-                  timeTaken,
-                  error: `Ambiguous timeout: ${error.message}`,
-                };
-              } else if (
-                error instanceof TemporaryFailureError ||
-                error instanceof ServiceNotAvailableError ||
-                error instanceof RateLimitedError
-              ) {
-                debug("Retryable error occurred in DataLoader", {
-                  errorType: error.constructor.name,
-                  keyInfo,
-                  classification: CouchbaseErrorClassifier.classifyError(error),
-                });
-                return {
-                  bucket: keyInfo.bucket,
-                  scope: keyInfo.scope,
-                  collection: keyInfo.collection,
-                  data: null,
-                  timeTaken,
-                  error: `Service error: ${error.message}`,
-                };
-              } else if (error instanceof DocumentLockedError) {
-                return {
-                  bucket: keyInfo.bucket,
-                  scope: keyInfo.scope,
-                  collection: keyInfo.collection,
-                  data: null,
-                  timeTaken,
-                  error: `Document locked: ${error.message}`,
-                };
-              } else if (error instanceof CouchbaseError) {
-                return {
-                  bucket: keyInfo.bucket,
-                  scope: keyInfo.scope,
-                  collection: keyInfo.collection,
-                  data: null,
-                  timeTaken,
-                  error: `Couchbase error: ${error.message}`,
-                };
-              } else {
-                err("Unexpected error in DataLoader", {
-                  error: (error as Error).message,
-                  keyInfo,
-                  errorType: (error as Error).constructor.name,
-                });
-                return {
-                  bucket: keyInfo.bucket,
-                  scope: keyInfo.scope,
-                  collection: keyInfo.collection,
-                  data: null,
-                  timeTaken,
-                  error: "Unexpected error occurred",
-                };
-              }
+            } else if (error instanceof AuthenticationFailureError) {
+              err("Authentication/Permission error in DataLoader", {
+                errorType: error.constructor.name,
+                keyInfo,
+                classification: CouchbaseErrorClassifier.classifyError(error),
+              });
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Access denied: ${error.message}`,
+              };
+            } else if (error instanceof AmbiguousTimeoutError) {
+              err("Ambiguous timeout in DataLoader - manual investigation required", {
+                keyInfo,
+                errorMessage: error.message,
+                requiresInvestigation: true,
+              });
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Ambiguous timeout: ${error.message}`,
+              };
+            } else if (
+              error instanceof TemporaryFailureError ||
+              error instanceof ServiceNotAvailableError ||
+              error instanceof RateLimitedError
+            ) {
+              debug("Retryable error occurred in DataLoader", {
+                errorType: error.constructor.name,
+                keyInfo,
+                classification: CouchbaseErrorClassifier.classifyError(error),
+              });
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Service error: ${error.message}`,
+              };
+            } else if (error instanceof DocumentLockedError) {
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Document locked: ${error.message}`,
+              };
+            } else if (error instanceof CouchbaseError) {
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: `Couchbase error: ${error.message}`,
+              };
+            } else {
+              err("Unexpected error in DataLoader", {
+                error: (error as Error).message,
+                keyInfo,
+                errorType: (error as Error).constructor.name,
+              });
+              return {
+                bucket: keyInfo.bucket,
+                scope: keyInfo.scope,
+                collection: keyInfo.collection,
+                data: null,
+                timeTaken,
+                error: "Unexpected error occurred",
+              };
             }
-          });
+          }
+        });
 
-          return await Promise.all(keyPromises);
-        } catch (error) {
-          err(`Error processing collection ${collectionId}:`, error);
+        return await Promise.all(keyPromises);
+      } catch (error) {
+        err(`Error processing collection ${collectionId}:`, error);
 
-          // Return error results for all keys in this collection
-          return collectionKeys.map((keyInfo) => ({
-            bucket: keyInfo.bucket,
-            scope: keyInfo.scope,
-            collection: keyInfo.collection,
-            data: null,
-            timeTaken: Date.now() - startTime,
-            error: "Collection processing failed",
-          }));
-        }
+        // Return error results for all keys in this collection
+        return collectionKeys.map((keyInfo) => ({
+          bucket: keyInfo.bucket,
+          scope: keyInfo.scope,
+          collection: keyInfo.collection,
+          data: null,
+          timeTaken: Date.now() - startTime,
+          error: "Collection processing failed",
+        }));
       }
-    );
+    });
 
     // Wait for all collections to complete
     const collectionResults = await Promise.all(collectionPromises);

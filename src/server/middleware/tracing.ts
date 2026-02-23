@@ -34,9 +34,7 @@ function extractOperationNameFromQuery(query: string): string | undefined {
 
   // Match: query/mutation/subscription followed by optional operation name
   // Patterns: "query OpName {", "query OpName(", "query {"
-  const operationMatch = query.match(
-    /^\s*(?:query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[({]/
-  );
+  const operationMatch = query.match(/^\s*(?:query|mutation|subscription)\s+([A-Za-z_][A-Za-z0-9_]*)\s*[({]/);
 
   if (operationMatch?.[1]) {
     return operationMatch[1];
@@ -70,8 +68,7 @@ async function extractGraphQLOperation(request: Request): Promise<{
     const body = JSON.parse(text);
     if (body && typeof body === "object") {
       // Use explicit operationName if provided, otherwise extract from query
-      const operationName =
-        body.operationName || extractOperationNameFromQuery(body.query);
+      const operationName = body.operationName || extractOperationNameFromQuery(body.query);
 
       return {
         operationName,

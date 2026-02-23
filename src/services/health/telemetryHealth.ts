@@ -2,15 +2,14 @@
 // Telemetry health check service - matches reference format exactly
 
 import { loadConfig } from "$config";
+import { err } from "../../telemetry";
 import {
   getLogExportStats,
   getMetricsExportStats,
   getTraceExportStats,
   isTelemetryInitialized,
 } from "../../telemetry/instrumentation";
-import { err } from "../../telemetry";
 import {
-  formatPercentage,
   formatResponseTime,
   type HealthStatus,
   type TelemetryHealthDetails,
@@ -62,9 +61,7 @@ export class TelemetryHealthService {
       // Get signal health in parallel
       const [tracesHealth, metricsHealth, logsHealth] = await Promise.all([
         this.checkSignalHealth("traces", telemetryCfg.TRACES_ENDPOINT, getTraceExportStats),
-        this.checkSignalHealth("metrics", telemetryCfg.METRICS_ENDPOINT, () =>
-          getMetricsExportStats().getStats()
-        ),
+        this.checkSignalHealth("metrics", telemetryCfg.METRICS_ENDPOINT, () => getMetricsExportStats().getStats()),
         this.checkSignalHealth("logs", telemetryCfg.LOGS_ENDPOINT, getLogExportStats),
       ]);
 

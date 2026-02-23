@@ -2,7 +2,7 @@
 // Metric instrument definitions per monitoring-updated.md line 38
 // Centralized metric definitions for consistent naming and descriptions
 
-import type { Counter, Histogram, UpDownCounter, ObservableGauge } from "@opentelemetry/api";
+import type { Counter, Histogram, ObservableGauge, UpDownCounter } from "@opentelemetry/api";
 
 // ============================================================================
 // Instrument Registry Types

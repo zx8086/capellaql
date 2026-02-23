@@ -1,6 +1,6 @@
 /* tests/playwright/helpers/graphql-client.ts - GraphQL Test Utilities */
 
-import { expect, type APIRequestContext } from "@playwright/test";
+import { type APIRequestContext, expect } from "@playwright/test";
 
 export interface GraphQLResponse<T = unknown> {
   data?: T;

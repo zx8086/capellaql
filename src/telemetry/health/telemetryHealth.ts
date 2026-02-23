@@ -3,7 +3,12 @@
 // Now uses loadConfig() for 4-pillar lazy initialization pattern
 
 import { loadConfig } from "$config";
-import { getTraceExportStats, getLogExportStats, getMetricsExportStats, isTelemetryInitialized } from "../instrumentation";
+import {
+  getLogExportStats,
+  getMetricsExportStats,
+  getTraceExportStats,
+  isTelemetryInitialized,
+} from "../instrumentation";
 import { getAvailableMetricNames, INSTRUMENT_COUNT } from "../metrics/instruments";
 import { CircuitBreakerState, TelemetryCircuitBreaker } from "./CircuitBreaker";
 
@@ -249,12 +254,7 @@ class TelemetryHealthMonitor {
     const configStatus = this.determineConfigStatus(telemetryCfg);
 
     // Determine overall status
-    const componentStatuses = [
-      isInitialized ? "healthy" : "critical",
-      exportsStatus,
-      cbStatus,
-      configStatus,
-    ];
+    const componentStatuses = [isInitialized ? "healthy" : "critical", exportsStatus, cbStatus, configStatus];
 
     let overall: "healthy" | "degraded" | "critical";
     if (componentStatuses.includes("critical")) {
@@ -304,11 +304,7 @@ class TelemetryHealthMonitor {
     }
 
     // Collect recent errors
-    const recentErrors = [
-      ...traceStats.recentErrors,
-      ...metricStats.recentErrors,
-      ...logStats.recentErrors,
-    ].slice(-10);
+    const recentErrors = [...traceStats.recentErrors, ...metricStats.recentErrors, ...logStats.recentErrors].slice(-10);
 
     // Available metrics from centralized instrument definitions
     const availableMetrics = getAvailableMetricNames();
@@ -430,7 +426,10 @@ class TelemetryHealthMonitor {
     return "critical";
   }
 
-  private determineCircuitBreakerStatus(summary: { open: number; halfOpen: number }): "healthy" | "degraded" | "critical" {
+  private determineCircuitBreakerStatus(summary: {
+    open: number;
+    halfOpen: number;
+  }): "healthy" | "degraded" | "critical" {
     if (summary.open > 0) return "critical";
     if (summary.halfOpen > 0) return "degraded";
     return "healthy";

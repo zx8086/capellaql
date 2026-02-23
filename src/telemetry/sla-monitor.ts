@@ -1,9 +1,9 @@
 /* src/telemetry/sla-monitor.ts */
 /* SLA monitoring with percentile calculation using Float64Array rolling buffers */
 
-import { metrics, type Counter, type Histogram } from "@opentelemetry/api";
-import { warn, log } from "./winston-logger";
+import { type Counter, type Histogram, metrics } from "@opentelemetry/api";
 import { triggerSLAViolationProfiling } from "./profiling-metrics";
+import { log, warn } from "./winston-logger";
 
 // ============================================================================
 // Types
@@ -288,11 +288,7 @@ class SlaMonitor {
   /**
    * Check for SLA violations.
    */
-  private async checkSlaViolation(
-    endpoint: string,
-    buffer: RollingBuffer,
-    threshold: SlaThreshold,
-  ): Promise<void> {
+  private async checkSlaViolation(endpoint: string, buffer: RollingBuffer, threshold: SlaThreshold): Promise<void> {
     const percentileMetrics = buffer.calculatePercentiles();
 
     const isP95Violation = percentileMetrics.p95 > threshold.p95;
@@ -315,11 +311,7 @@ class SlaMonitor {
 
       if (canTrigger) {
         // Trigger profiling
-        const sessionId = triggerSLAViolationProfiling(
-          endpoint,
-          percentileMetrics.p95,
-          threshold.p95,
-        );
+        const sessionId = triggerSLAViolationProfiling(endpoint, percentileMetrics.p95, threshold.p95);
 
         if (sessionId) {
           this.recordViolation(endpoint, percentileMetrics, threshold, true);
@@ -394,7 +386,7 @@ class SlaMonitor {
     percentileMetrics: PercentileMetrics,
     threshold: SlaThreshold,
     profilingTriggered: boolean,
-    reason?: string,
+    reason?: string
   ): void {
     const violation: SlaViolation = {
       endpoint,

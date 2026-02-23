@@ -255,6 +255,30 @@ tests/
 - Always show the user what will be committed and wait for confirmation
 - The `/commit-push` command still requires user to initiate it, but Claude must ask for confirmation before executing
 
+### Planning Workflow - MANDATORY Linear Issue Creation
+**Every approved plan MUST have an accompanying Linear issue.**
+
+When entering Plan Mode and creating implementation plans:
+1. **Create the plan file** at the specified path (e.g., `~/.claude/plans/*.md`)
+2. **IMMEDIATELY after plan approval**, create a Linear issue with:
+   - Title matching the plan's main objective
+   - Full plan details in the issue description (problem, root cause, implementation phases, critical files, testing steps)
+   - Appropriate priority and labels
+3. **Reference the Linear issue** (e.g., SIO-XXX) when starting implementation
+4. **Update the Linear issue** as work progresses
+
+**Why this matters:**
+- Provides traceability between plans and implementation
+- Enables team visibility into planned work
+- Creates audit trail for technical decisions
+- Allows async review of implementation plans
+- Integrates with existing project management workflow
+
+**Workflow:**
+```
+Plan Mode → Create Plan File → User Approves → Create Linear Issue → Begin Implementation
+```
+
 ## Important Notes
 
 - This codebase extensively uses Bun-specific features and APIs

@@ -1,13 +1,13 @@
 /* tests/playwright/graphql/documentSearch.spec.ts - E2E Tests for Document Search Query */
 
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
-  executeGraphQL,
-  SEARCH_DOCUMENTS_QUERY,
-  validateDocumentResultStructure,
-  measureQueryTime,
-  type SearchDocumentsResponse,
   type BucketScopeCollection,
+  executeGraphQL,
+  measureQueryTime,
+  SEARCH_DOCUMENTS_QUERY,
+  type SearchDocumentsResponse,
+  validateDocumentResultStructure,
 } from "../helpers/graphql-client";
 
 // All 43 collections from live production logs
@@ -139,14 +139,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
 
   test("search documents - returns valid response structure for all 43 collections", async ({ request }) => {
     // Use all 43 collections for comprehensive testing
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: ["test-document-key-001"],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: ["test-document-key-001"],
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -162,14 +158,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
   });
 
   test("search documents - returns results for each collection", async ({ request }) => {
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: TEST_COLLECTIONS,
-        keys: ["sample-key"],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: TEST_COLLECTIONS,
+      keys: ["sample-key"],
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -192,14 +184,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
   test("search documents - handles multiple keys across all 43 collections", async ({ request }) => {
     const multipleKeys = ["key-001", "key-002", "key-003"];
 
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: multipleKeys,
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: multipleKeys,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -210,14 +198,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
   });
 
   test("search documents - performance under 5 seconds", async ({ request }) => {
-    const { durationMs } = await measureQueryTime<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: TEST_COLLECTIONS,
-        keys: ["perf-test-key"],
-      }
-    );
+    const { durationMs } = await measureQueryTime<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: TEST_COLLECTIONS,
+      keys: ["perf-test-key"],
+    });
 
     // Should complete within 5 seconds even when searching across many collections
     expect(durationMs).toBeLessThan(5000);
@@ -250,38 +234,27 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
 
   test("search documents - validates collection input", async ({ request }) => {
     // Test with empty collections array - should return error or empty
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: [],
-        keys: ["test-key"],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: [],
+      keys: ["test-key"],
+    });
 
     // Should either return validation error or empty results
     expect(
       result.errors !== undefined ||
-      (result.data?.searchDocuments !== undefined && result.data.searchDocuments.length === 0)
+        (result.data?.searchDocuments !== undefined && result.data.searchDocuments.length === 0)
     ).toBeTruthy();
   });
 
   test("search documents - validates keys input with all 43 collections", async ({ request }) => {
     // Test with empty keys array - should return error or empty
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: [],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: [],
+    });
 
     // Should either return validation error or empty results
-    expect(
-      result.errors !== undefined ||
-      result.data?.searchDocuments !== undefined
-    ).toBeTruthy();
+    expect(result.errors !== undefined || result.data?.searchDocuments !== undefined).toBeTruthy();
   });
 
   test("search documents - handles non-existent collection gracefully", async ({ request }) => {
@@ -289,30 +262,20 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
       { bucket: "default", scope: "nonexistent", collection: "fake" },
     ];
 
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: nonExistentCollections,
-        keys: ["test-key"],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: nonExistentCollections,
+      keys: ["test-key"],
+    });
 
     // Should not crash - returns error in results or errors array
-    expect(
-      result.errors !== undefined || result.data?.searchDocuments !== undefined
-    ).toBeTruthy();
+    expect(result.errors !== undefined || result.data?.searchDocuments !== undefined).toBeTruthy();
   });
 
   test("search documents - timeTaken is reasonable for all 43 collections", async ({ request }) => {
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: ["time-test-key"],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: ["time-test-key"],
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -355,14 +318,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
 
   test("search documents - all 43 collections performance", async ({ request }) => {
     // Test with all 43 collections from production logs
-    const { durationMs, result } = await measureQueryTime<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: TEST_COLLECTIONS,
-        keys: ["full-collection-test-key"],
-      }
-    );
+    const { durationMs, result } = await measureQueryTime<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: TEST_COLLECTIONS,
+      keys: ["full-collection-test-key"],
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -404,14 +363,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
 
   test("search documents - real article key search across collections", async ({ request }) => {
     // Test with a production article key pattern
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: TEST_COLLECTIONS,
-        keys: ["ARTICLE_2025WISPSP_AM0AM13354PN6007"],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: TEST_COLLECTIONS,
+      keys: ["ARTICLE_2025WISPSP_AM0AM13354PN6007"],
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -426,9 +381,7 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
     }
   });
 
-  test("search documents - scoped collection search (article collections only)", async ({
-    request,
-  }) => {
+  test("search documents - scoped collection search (article collections only)", async ({ request }) => {
     // Test searching only article-related collections
     const articleCollections: BucketScopeCollection[] = [
       { bucket: "default", scope: "styles", collection: "article" },
@@ -436,14 +389,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
       { bucket: "default", scope: "styles_stibo", collection: "article" },
     ];
 
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: articleCollections,
-        keys: ["ARTICLE_2025WISPSP_AM0AM13354PN6007"],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: articleCollections,
+      keys: ["ARTICLE_2025WISPSP_AM0AM13354PN6007"],
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -467,14 +416,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
       { bucket: "default", scope: "styles_stibo", collection: "product2g" },
     ];
 
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: variantCollections,
-        keys: ["test-variant-key"],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: variantCollections,
+      keys: ["test-variant-key"],
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -486,14 +431,10 @@ test.describe("GraphQL Document Search Query - Multi-Collection Search", () => {
 
 test.describe("GraphQL Document Search - Production Document Keys", () => {
   test("search with all 50 production document keys across 43 collections", async ({ request }) => {
-    const { durationMs, result } = await measureQueryTime<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: PRODUCTION_DOCUMENT_KEYS,
-      }
-    );
+    const { durationMs, result } = await measureQueryTime<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: PRODUCTION_DOCUMENT_KEYS,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -513,14 +454,10 @@ test.describe("GraphQL Document Search - Production Document Keys", () => {
   test("search first 10 production document keys", async ({ request }) => {
     const first10Keys = PRODUCTION_DOCUMENT_KEYS.slice(0, 10);
 
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: first10Keys,
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: first10Keys,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -530,14 +467,10 @@ test.describe("GraphQL Document Search - Production Document Keys", () => {
   test("search last 10 production document keys", async ({ request }) => {
     const last10Keys = PRODUCTION_DOCUMENT_KEYS.slice(-10);
 
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: last10Keys,
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: last10Keys,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -547,14 +480,10 @@ test.describe("GraphQL Document Search - Production Document Keys", () => {
   test("search single production document key across all collections", async ({ request }) => {
     const singleKey = PRODUCTION_DOCUMENT_KEYS[0];
 
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: [singleKey],
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: [singleKey],
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();
@@ -598,14 +527,10 @@ test.describe("GraphQL Document Search - Production Document Keys", () => {
     // Run 3 sequential searches with different key sets
     for (let i = 0; i < 3; i++) {
       const keys = PRODUCTION_DOCUMENT_KEYS.slice(i * 10, (i + 1) * 10);
-      const result = await executeGraphQL<SearchDocumentsResponse>(
-        request,
-        SEARCH_DOCUMENTS_QUERY,
-        {
-          collections: FULL_COLLECTIONS,
-          keys,
-        }
-      );
+      const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+        collections: FULL_COLLECTIONS,
+        keys,
+      });
 
       expect(result.errors).toBeUndefined();
       expect(result.data?.searchDocuments.length).toBe(43);
@@ -618,14 +543,10 @@ test.describe("GraphQL Document Search - Production Document Keys", () => {
   });
 
   test("verify all 43 collections are searched with production keys", async ({ request }) => {
-    const result = await executeGraphQL<SearchDocumentsResponse>(
-      request,
-      SEARCH_DOCUMENTS_QUERY,
-      {
-        collections: FULL_COLLECTIONS,
-        keys: PRODUCTION_DOCUMENT_KEYS.slice(0, 5),
-      }
-    );
+    const result = await executeGraphQL<SearchDocumentsResponse>(request, SEARCH_DOCUMENTS_QUERY, {
+      collections: FULL_COLLECTIONS,
+      keys: PRODUCTION_DOCUMENT_KEYS.slice(0, 5),
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.searchDocuments).toBeDefined();

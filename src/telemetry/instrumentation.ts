@@ -2,19 +2,25 @@
 // Implementation follows migrate/telemetry/instrumentation.ts EXACTLY
 
 import os from "node:os";
-import { logs } from "@opentelemetry/api-logs";
 import { DiagConsoleLogger, DiagLogLevel, diag } from "@opentelemetry/api";
+import { logs } from "@opentelemetry/api-logs";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import type { ExportResult } from "@opentelemetry/core";
 import { CompositePropagator, W3CBaggagePropagator, W3CTraceContextPropagator } from "@opentelemetry/core";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { HostMetrics } from "@opentelemetry/host-metrics";
+import { DataloaderInstrumentation } from "@opentelemetry/instrumentation-dataloader";
 import { GraphQLInstrumentation } from "@opentelemetry/instrumentation-graphql";
 import { RedisInstrumentation } from "@opentelemetry/instrumentation-redis-4";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchLogRecordProcessor, LoggerProvider } from "@opentelemetry/sdk-logs";
-import { PeriodicExportingMetricReader, type PushMetricExporter, type ResourceMetrics } from "@opentelemetry/sdk-metrics";
+import {
+  PeriodicExportingMetricReader,
+  type PushMetricExporter,
+  type ResourceMetrics,
+} from "@opentelemetry/sdk-metrics";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import {
@@ -27,7 +33,6 @@ import {
   SEMRESATTRS_SERVICE_INSTANCE_ID,
   SEMRESATTRS_SERVICE_NAMESPACE,
 } from "@opentelemetry/semantic-conventions";
-import type { ExportResult } from "@opentelemetry/core";
 import { type TelemetryConfig, telemetryConfig } from "$config";
 import { BunPerf } from "$utils/bunUtils";
 import {
@@ -73,6 +78,9 @@ const resetInitialized = (): void => {
 const traceExportStats = createExportStatsTracker();
 const metricExportStats = createExportStatsTracker();
 const logExportStats = createExportStatsTracker();
+
+// Shutdown idempotency guard - prevents "shutdown may only be called once" errors
+let telemetryShutdownInProgress = false;
 
 export async function initializeTelemetry(): Promise<void> {
   if (isInitialized()) {
@@ -220,7 +228,14 @@ export async function initializeTelemetry(): Promise<void> {
       },
     });
 
-    const instrumentations = [...baseInstrumentations, graphqlInstrumentation, redisInstrumentation];
+    const dataloaderInstrumentation = new DataloaderInstrumentation();
+
+    const instrumentations = [
+      ...baseInstrumentations,
+      graphqlInstrumentation,
+      redisInstrumentation,
+      dataloaderInstrumentation,
+    ];
 
     // Initialize NodeSDK per migrate/telemetry/instrumentation.ts lines 201-208
     sdk = new NodeSDK({
@@ -260,8 +275,9 @@ export async function initializeTelemetry(): Promise<void> {
       });
     }
 
-    // Set up graceful shutdown
-    setupGracefulShutdown();
+    // Note: Graceful shutdown is handled centrally in src/index.ts
+    // to avoid multiple signal handler registrations causing
+    // "shutdown may only be called once" errors
   } catch (err) {
     console.error("Failed to initialize OpenTelemetry SDK:", err);
     throw err;
@@ -298,29 +314,18 @@ function createResource(config: TelemetryConfig) {
   return resourceFromAttributes(attributes);
 }
 
-function setupGracefulShutdown(): void {
-  const gracefulShutdown = async (signal: string) => {
-    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      console.debug(`Received ${signal}, shutting down OpenTelemetry SDK gracefully...`);
-    }
-
-    try {
-      await shutdownTelemetry();
-      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        console.debug("OpenTelemetry SDK shut down successfully");
-      }
-    } catch (err) {
-      console.error("Error during OpenTelemetry SDK shutdown:", err);
-    }
-  };
-
-  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-  process.on("SIGQUIT", () => gracefulShutdown("SIGQUIT"));
-}
-
 // Per migrate/telemetry/instrumentation.ts lines 223-243
+// Modified with idempotency guard to support centralized shutdown orchestration
 export async function shutdownTelemetry(): Promise<void> {
+  // Idempotency guard - prevent multiple shutdown calls
+  if (telemetryShutdownInProgress) {
+    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+      console.debug("shutdownTelemetry already in progress, skipping duplicate call");
+    }
+    return;
+  }
+  telemetryShutdownInProgress = true;
+
   if (hostMetrics) {
     hostMetrics = undefined;
   }
@@ -328,8 +333,13 @@ export async function shutdownTelemetry(): Promise<void> {
   if (loggerProvider) {
     try {
       await loggerProvider.shutdown();
+      loggerProvider = undefined;
     } catch (error) {
-      console.warn("Error shutting down LoggerProvider:", error);
+      // Only warn if not "already shutdown" error
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("shutdown may only be called once")) {
+        console.warn("Error shutting down LoggerProvider:", error);
+      }
     }
   }
 
@@ -339,7 +349,11 @@ export async function shutdownTelemetry(): Promise<void> {
       sdk = undefined;
       resetInitialized();
     } catch (error) {
-      console.warn("Error shutting down OpenTelemetry:", error);
+      // Only warn if not "already shutdown" error
+      const message = error instanceof Error ? error.message : String(error);
+      if (!message.includes("shutdown may only be called once")) {
+        console.warn("Error shutting down OpenTelemetry:", error);
+      }
     }
   }
 }

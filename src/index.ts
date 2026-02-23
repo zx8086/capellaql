@@ -7,25 +7,56 @@ import { ulid } from "ulid";
 import { fileURLToPath } from "url";
 
 // Initialize telemetry FIRST - before any modules that need instrumentation
-import { err, initializeHttpMetrics, initializeTelemetry, log, telemetryLogger, warn } from "./telemetry";
+import {
+  err,
+  initializeHttpMetrics,
+  initializeTelemetry,
+  log,
+  shutdownTelemetry,
+  telemetryLogger,
+  warn,
+} from "./telemetry";
+
+// Early shutdown flag - allows interrupting initialization
+let earlyShutdownRequested = false;
+
+// Register early signal handlers BEFORE any blocking initialization
+// This ensures Ctrl+C works even during Couchbase connection retries
+const earlyShutdownHandler = (signal: string) => {
+  // Guard against multiple calls
+  if (earlyShutdownRequested) return;
+  earlyShutdownRequested = true;
+
+  console.log(`\nReceived ${signal} during initialization, forcing immediate exit...`);
+  // Force immediate exit - Couchbase SDK blocks the event loop so setTimeout won't work
+  process.exit(0);
+};
+
+process.on("SIGINT", () => earlyShutdownHandler("SIGINT"));
+process.on("SIGTERM", () => earlyShutdownHandler("SIGTERM"));
 
 // Initialize telemetry early (before graphql/dataloader imports)
 await initializeTelemetry();
 
+if (earlyShutdownRequested) {
+  console.log("Shutdown requested, exiting before Couchbase initialization");
+  process.exit(0);
+}
+
 // Initialize Couchbase connection (after telemetry for proper instrumentation)
 import { connectionManager } from "./lib/couchbase";
+
 await connectionManager.initialize();
+
+if (earlyShutdownRequested) {
+  console.log("Shutdown requested, exiting before server start");
+  await connectionManager.close();
+  process.exit(0);
+}
 
 // Dynamic imports for modules that need instrumentation
 // This ensures they're loaded AFTER telemetry is initialized
-const [
-  { default: config },
-  { graphqlHandler },
-  { healthHandlers },
-  middleware,
-  types,
-  websocket,
-] = await Promise.all([
+const [{ default: config }, { graphqlHandler }, { healthHandlers }, middleware, types, websocket] = await Promise.all([
   import("./config"),
   import("./server/handlers/graphql"),
   import("./server/handlers/health"),
@@ -45,8 +76,16 @@ const {
 } = middleware;
 
 const { StaticResponses } = types;
-type RequestContext = typeof types.RequestContext extends new (...args: infer _) => infer R ? R : typeof types.RequestContext;
-type WebSocketData = typeof types.WebSocketData extends new (...args: infer _) => infer R ? R : typeof types.WebSocketData;
+type RequestContext = typeof types.RequestContext extends new (
+  ...args: infer _
+) => infer R
+  ? R
+  : typeof types.RequestContext;
+type WebSocketData = typeof types.WebSocketData extends new (
+  ...args: infer _
+) => infer R
+  ? R
+  : typeof types.WebSocketData;
 
 const { shouldUpgradeWebSocket, websocketHandlers } = websocket;
 
@@ -306,7 +345,21 @@ async function createServer(): Promise<Server> {
 }
 
 /**
- * Setup graceful shutdown handlers
+ * Centralized graceful shutdown orchestrator.
+ *
+ * Consolidates ALL shutdown logic into ONE location to prevent:
+ * - Multiple shutdown calls to OpenTelemetry providers
+ * - Race conditions between concurrent handlers
+ * - "shutdown may only be called once" errors
+ *
+ * Shutdown sequence follows correct dependency ordering:
+ * 1. Stop accepting requests
+ * 2. Cleanup rate limit store
+ * 3. Flush telemetry buffers
+ * 4. Close database connections
+ * 5. Shutdown telemetry providers (ONCE)
+ * 6. Cleanup remaining resources
+ * 7. Exit process
  */
 function setupGracefulShutdown(): void {
   const gracefulShutdown = async (signal: string) => {
@@ -319,6 +372,8 @@ function setupGracefulShutdown(): void {
     }
 
     isShuttingDown = true;
+    const shutdownStartTime = Date.now();
+
     log("Graceful shutdown initiated", {
       signal,
       timestamp: new Date().toISOString(),
@@ -326,48 +381,101 @@ function setupGracefulShutdown(): void {
     });
 
     try {
+      // Dynamic imports to avoid circular dependencies
       const { shutdownPerformanceMonitor } = await import("./lib/performanceMonitor");
       const { shutdownBatchCoordinator } = await import("./telemetry/coordinator/BatchCoordinator");
       // connectionManager already imported at top level
 
-      const shutdownStartTime = Date.now();
-
-      // Cleanup rate limit store
-      cleanupRateLimitStore();
-
-      // Shutdown telemetry batch coordinator first
-      await shutdownBatchCoordinator();
-
-      // Close database connection using new connection manager
-      await connectionManager.close();
-
-      // Shutdown performance monitor
-      shutdownPerformanceMonitor();
-
-      // Stop server
+      // Phase 1: Stop accepting new requests
+      log("Shutdown Phase 1: Stopping server", { phase: 1 });
       if (server) {
         server.stop();
       }
 
+      // Phase 2: Cleanup rate limit store
+      log("Shutdown Phase 2: Cleaning up rate limit store", { phase: 2 });
+      cleanupRateLimitStore();
+
+      // Phase 3: Flush telemetry buffers before closing connections
+      log("Shutdown Phase 3: Flushing telemetry batch coordinator", { phase: 3 });
+      try {
+        await Promise.race([
+          shutdownBatchCoordinator(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("BatchCoordinator shutdown timeout")), 5000)),
+        ]);
+      } catch (batchError) {
+        warn("BatchCoordinator shutdown issue (continuing)", {
+          error: batchError instanceof Error ? batchError.message : String(batchError),
+        });
+      }
+
+      // Phase 4: Close database connections
+      log("Shutdown Phase 4: Closing database connections", { phase: 4 });
+      try {
+        await Promise.race([
+          connectionManager.close(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Database close timeout")), 10000)),
+        ]);
+      } catch (dbError) {
+        warn("Database close issue (continuing)", {
+          error: dbError instanceof Error ? dbError.message : String(dbError),
+        });
+      }
+
+      // Phase 5: Shutdown telemetry providers (ONCE - idempotent)
+      log("Shutdown Phase 5: Shutting down telemetry providers", { phase: 5 });
+      try {
+        await Promise.race([
+          shutdownTelemetry(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error("Telemetry shutdown timeout")), 5000)),
+        ]);
+      } catch (telemetryError) {
+        warn("Telemetry shutdown issue (continuing)", {
+          error: telemetryError instanceof Error ? telemetryError.message : String(telemetryError),
+        });
+      }
+
+      // Phase 6: Cleanup remaining resources
+      log("Shutdown Phase 6: Cleaning up remaining resources", { phase: 6 });
+      shutdownPerformanceMonitor();
+
       const shutdownDuration = Date.now() - shutdownStartTime;
-      log("Graceful shutdown completed", {
-        signal,
-        shutdownDurationMs: shutdownDuration,
-        uptime: process.uptime(),
-        timestamp: new Date().toISOString(),
-      });
+
+      // Use console.log for final message since telemetry may be down
+      console.log(
+        JSON.stringify({
+          message: "Graceful shutdown completed",
+          signal,
+          shutdownDurationMs: shutdownDuration,
+          uptime: process.uptime(),
+          timestamp: new Date().toISOString(),
+        })
+      );
 
       process.exit(0);
     } catch (error) {
-      err("Error during graceful shutdown - forcing exit", {
-        error: error instanceof Error ? error.message : String(error),
-        signal,
-        uptime: process.uptime(),
-      });
+      const shutdownDuration = Date.now() - shutdownStartTime;
+
+      console.error(
+        JSON.stringify({
+          message: "Error during graceful shutdown - forcing exit",
+          error: error instanceof Error ? error.message : String(error),
+          signal,
+          shutdownDurationMs: shutdownDuration,
+          uptime: process.uptime(),
+        })
+      );
+
       process.exit(1);
     }
   };
 
+  // Remove early shutdown handlers and register full graceful shutdown
+  // The early handlers were registered before initialization to allow Ctrl+C during startup
+  process.removeAllListeners("SIGINT");
+  process.removeAllListeners("SIGTERM");
+
+  // Register full graceful shutdown handlers
   ["SIGINT", "SIGTERM", "SIGQUIT"].forEach((signal) => {
     process.on(signal, () => gracefulShutdown(signal));
   });

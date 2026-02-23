@@ -99,7 +99,8 @@ export const EnvironmentType = z.enum(["development", "staging", "production", "
 // Application schema - validation rules only
 export const ApplicationConfigSchema = z.strictObject({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).describe("Application log level"),
-  YOGA_RESPONSE_CACHE_TTL: z.number()
+  YOGA_RESPONSE_CACHE_TTL: z
+    .number()
     .min(0, "Cache TTL must be non-negative")
     .max(3600000, "Cache TTL should not exceed 1 hour")
     .refine((val) => !Number.isNaN(val), "Cache TTL cannot be NaN")
@@ -118,31 +119,38 @@ export const CapellaConfigSchema = z.strictObject({
   COUCHBASE_SCOPE: NonEmptyString.describe("Couchbase scope name"),
   COUCHBASE_COLLECTION: NonEmptyString.describe("Couchbase collection name"),
   // SDK timeout configurations with validation only
-  COUCHBASE_KV_TIMEOUT: z.number()
+  COUCHBASE_KV_TIMEOUT: z
+    .number()
     .min(1000, "KV timeout must be at least 1 second")
     .max(30000, "KV timeout should not exceed 30 seconds")
     .describe("Key-value operation timeout"),
-  COUCHBASE_KV_DURABLE_TIMEOUT: z.number()
+  COUCHBASE_KV_DURABLE_TIMEOUT: z
+    .number()
     .min(5000, "KV durable timeout must be at least 5 seconds")
     .max(60000, "KV durable timeout should not exceed 60 seconds")
     .describe("Durable key-value operation timeout"),
-  COUCHBASE_QUERY_TIMEOUT: z.number()
+  COUCHBASE_QUERY_TIMEOUT: z
+    .number()
     .min(5000, "Query timeout must be at least 5 seconds")
     .max(120000, "Query timeout should not exceed 2 minutes")
     .describe("N1QL query timeout"),
-  COUCHBASE_ANALYTICS_TIMEOUT: z.number()
+  COUCHBASE_ANALYTICS_TIMEOUT: z
+    .number()
     .min(10000, "Analytics timeout must be at least 10 seconds")
     .max(300000, "Analytics timeout should not exceed 5 minutes")
     .describe("Analytics query timeout"),
-  COUCHBASE_SEARCH_TIMEOUT: z.number()
+  COUCHBASE_SEARCH_TIMEOUT: z
+    .number()
     .min(5000, "Search timeout must be at least 5 seconds")
     .max(120000, "Search timeout should not exceed 2 minutes")
     .describe("Full-text search timeout"),
-  COUCHBASE_CONNECT_TIMEOUT: z.number()
+  COUCHBASE_CONNECT_TIMEOUT: z
+    .number()
     .min(5000, "Connect timeout must be at least 5 seconds")
     .max(60000, "Connect timeout should not exceed 60 seconds")
     .describe("Connection timeout"),
-  COUCHBASE_BOOTSTRAP_TIMEOUT: z.number()
+  COUCHBASE_BOOTSTRAP_TIMEOUT: z
+    .number()
     .min(10000, "Bootstrap timeout must be at least 10 seconds")
     .max(120000, "Bootstrap timeout should not exceed 2 minutes")
     .describe("Cluster bootstrap timeout"),
@@ -155,7 +163,8 @@ export const RuntimeConfigSchema = z.strictObject({
   CN_CXXCBC_CACHE_DIR: z.string().optional().describe("Couchbase C++ SDK cache directory"),
   SOURCE_MAP_SUPPORT: z.boolean().describe("Enable source map support"),
   PRESERVE_SOURCE_MAPS: z.boolean().describe("Preserve source maps in production"),
-  BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: z.number()
+  BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: z
+    .number()
     .min(0, "DNS TTL must be non-negative")
     .max(3600, "DNS TTL should not exceed 1 hour")
     .refine((val) => !Number.isNaN(val), "DNS TTL cannot be NaN")
@@ -181,34 +190,41 @@ export const TelemetryConfigSchema = z.strictObject({
   TRACES_ENDPOINT: z.string().url("TRACES_ENDPOINT must be a valid URL").describe("OTLP traces endpoint"),
   METRICS_ENDPOINT: z.string().url("METRICS_ENDPOINT must be a valid URL").describe("OTLP metrics endpoint"),
   LOGS_ENDPOINT: z.string().url("LOGS_ENDPOINT must be a valid URL").describe("OTLP logs endpoint"),
-  METRIC_READER_INTERVAL: z.number()
+  METRIC_READER_INTERVAL: z
+    .number()
     .min(1000, "METRIC_READER_INTERVAL must be at least 1000ms")
     .max(300000, "METRIC_READER_INTERVAL should not exceed 5 minutes")
     .refine((val) => !Number.isNaN(val), "METRIC_READER_INTERVAL cannot be NaN")
     .describe("Metric reader interval in milliseconds"),
-  SUMMARY_LOG_INTERVAL: z.number()
+  SUMMARY_LOG_INTERVAL: z
+    .number()
     .min(10000, "SUMMARY_LOG_INTERVAL must be at least 10 seconds")
     .max(3600000, "SUMMARY_LOG_INTERVAL should not exceed 1 hour")
     .refine((val) => !Number.isNaN(val), "SUMMARY_LOG_INTERVAL cannot be NaN")
     .describe("Summary log interval in milliseconds"),
   // 2025 compliance settings with strict validation
-  EXPORT_TIMEOUT_MS: z.number()
+  EXPORT_TIMEOUT_MS: z
+    .number()
     .min(5000, "EXPORT_TIMEOUT_MS must be at least 5 seconds")
     .max(30000, "EXPORT_TIMEOUT_MS must not exceed 30 seconds (2025 standard)")
     .describe("Telemetry export timeout"),
-  BATCH_SIZE: z.number()
+  BATCH_SIZE: z
+    .number()
     .min(1, "BATCH_SIZE must be at least 1")
     .max(4096, "BATCH_SIZE should not exceed 4096")
     .describe("Telemetry batch size"),
-  MAX_QUEUE_SIZE: z.number()
+  MAX_QUEUE_SIZE: z
+    .number()
     .min(100, "MAX_QUEUE_SIZE must be at least 100")
     .max(20000, "MAX_QUEUE_SIZE should not exceed 20000")
     .describe("Maximum telemetry queue size"),
-  CIRCUIT_BREAKER_THRESHOLD: z.number()
+  CIRCUIT_BREAKER_THRESHOLD: z
+    .number()
     .min(1, "CIRCUIT_BREAKER_THRESHOLD must be at least 1")
     .max(20, "CIRCUIT_BREAKER_THRESHOLD should not exceed 20")
     .describe("Circuit breaker failure threshold"),
-  CIRCUIT_BREAKER_TIMEOUT_MS: z.number()
+  CIRCUIT_BREAKER_TIMEOUT_MS: z
+    .number()
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
     .describe("Circuit breaker timeout"),
@@ -228,13 +244,8 @@ export const TelemetryConfigSchema = z.strictObject({
  * These run ONLY in the ConfigSchema superRefine — the single validation
  * boundary. They are never duplicated in env-level validation.
  */
-function addProductionSecurityValidation(
-  data: Config,
-  ctx: z.RefinementCtx
-): void {
-  const isProduction =
-    data.runtime.NODE_ENV === "production" ||
-    data.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): void {
+  const isProduction = data.runtime.NODE_ENV === "production" || data.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   if (!isProduction) return;
 

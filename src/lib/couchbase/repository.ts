@@ -10,8 +10,8 @@
  * - Prepared statements for query operations
  */
 
-import type { Collection, Cluster } from "couchbase";
-import { DocumentNotFoundError, CasMismatchError, CouchbaseErrorClassifier } from "./errors";
+import type { Cluster, Collection } from "couchbase";
+import { CasMismatchError, DocumentNotFoundError } from "./errors";
 import { KVOperations } from "./kv-operations";
 import { QueryExecutor } from "./query-executor";
 
@@ -122,7 +122,7 @@ export class CouchbaseRepository<T extends Record<string, any>> {
         // Handle CAS conflicts with retry
         if (error instanceof CasMismatchError) {
           if (attempt < maxAttempts) {
-            const delay = 100 * Math.pow(2, attempt - 1);
+            const delay = 100 * 2 ** (attempt - 1);
             await this.sleep(delay);
 
             // Get fresh CAS value
@@ -167,11 +167,7 @@ export class CouchbaseRepository<T extends Record<string, any>> {
   /**
    * Update multiple fields using subdocument operations.
    */
-  async updateFields(
-    id: string,
-    updates: Record<string, any>,
-    cas?: string
-  ): Promise<void> {
+  async updateFields(id: string, updates: Record<string, any>, cas?: string): Promise<void> {
     const operations = Object.entries(updates).map(([path, value]) => ({
       type: "upsert" as const,
       path,
@@ -243,12 +239,7 @@ export class CouchbaseRepository<T extends Record<string, any>> {
   /**
    * Find one document by a field value using N1QL.
    */
-  async findOneBy(
-    cluster: Cluster,
-    field: string,
-    value: any,
-    queryContext?: string
-  ): Promise<T | null> {
+  async findOneBy(cluster: Cluster, field: string, value: any, queryContext?: string): Promise<T | null> {
     const results = await this.findByFilter(cluster, field, value, {
       limit: 1,
       queryContext,
@@ -259,12 +250,7 @@ export class CouchbaseRepository<T extends Record<string, any>> {
   /**
    * Count documents matching a filter.
    */
-  async count(
-    cluster: Cluster,
-    filterField?: string,
-    filterValue?: any,
-    queryContext?: string
-  ): Promise<number> {
+  async count(cluster: Cluster, filterField?: string, filterValue?: any, queryContext?: string): Promise<number> {
     const collectionName = (this.collection as any).name || "_default";
 
     let statement = `SELECT COUNT(*) as count FROM \`${collectionName}\``;

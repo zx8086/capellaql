@@ -7,61 +7,51 @@
  */
 
 import {
-  // Core error
-  CouchbaseError,
-
+  AmbiguousTimeoutError,
   // Authentication & Authorization
   AuthenticationFailureError,
   BucketNotFoundError,
-  ScopeNotFoundError,
+  CasMismatchError,
   CollectionNotFoundError,
-
-  // Document errors
-  DocumentNotFoundError,
+  // Core error
+  CouchbaseError,
+  DmlFailureError,
   DocumentExistsError,
   DocumentLockedError,
+  // Document errors
+  DocumentNotFoundError,
   DocumentNotLockedError,
-
-  // Value errors
-  ValueTooLargeError,
-  CasMismatchError,
-
-  // Timeout errors
-  TimeoutError,
-  AmbiguousTimeoutError,
-  UnambiguousTimeoutError,
-
-  // Network errors
-  RequestCanceledError,
-  ServiceNotAvailableError,
-
-  // Query errors
-  ParsingFailureError,
-  IndexNotFoundError,
-  IndexExistsError,
-  PreparedStatementFailureError,
-  DmlFailureError,
-
-  // Temporary failures
-  TemporaryFailureError,
-  DurabilityImpossibleError,
   DurabilityAmbiguousError,
-  DurableWriteInProgressError,
+  DurabilityImpossibleError,
   DurabilityLevelNotAvailableError,
-
-  // Path errors (subdocument)
-  PathNotFoundError,
-  PathExistsError,
-  PathMismatchError,
-  PathInvalidError,
-
-  // Rate limiting
-  RateLimitedError,
-  QuotaLimitedError,
-
+  DurableWriteInProgressError,
   // Feature availability
   FeatureNotAvailableError,
+  IndexExistsError,
+  IndexNotFoundError,
+  // Query errors
+  ParsingFailureError,
+  PathExistsError,
+  PathInvalidError,
+  PathMismatchError,
+  // Path errors (subdocument)
+  PathNotFoundError,
+  PreparedStatementFailureError,
+  QuotaLimitedError,
+  // Rate limiting
+  RateLimitedError,
+  // Network errors
+  RequestCanceledError,
+  ScopeNotFoundError,
+  ServiceNotAvailableError,
+  // Temporary failures
+  TemporaryFailureError,
+  // Timeout errors
+  TimeoutError,
+  UnambiguousTimeoutError,
   UnsupportedOperationError,
+  // Value errors
+  ValueTooLargeError,
 } from "couchbase";
 
 import type { CouchbaseErrorContext, ErrorClassification } from "./types";
@@ -180,7 +170,14 @@ export class CouchbaseErrorClassifier {
     ],
     [
       "PreparedStatementFailureError",
-      { retryable: true, severity: "warning", category: "application", shouldLog: true, shouldAlert: false, maxRetries: 2 },
+      {
+        retryable: true,
+        severity: "warning",
+        category: "application",
+        shouldLog: true,
+        shouldAlert: false,
+        maxRetries: 2,
+      },
     ],
     [
       "DmlFailureError",
@@ -251,7 +248,7 @@ export class CouchbaseErrorClassifier {
       error instanceof DocumentLockedError ||
       error instanceof RateLimitedError ||
       error instanceof PreparedStatementFailureError ||
-      this.isNetworkError(error)
+      CouchbaseErrorClassifier.isNetworkError(error)
     );
   }
 
@@ -292,7 +289,7 @@ export class CouchbaseErrorClassifier {
    */
   static isPermanentFailure(error: unknown): boolean {
     return (
-      this.isAuthError(error) ||
+      CouchbaseErrorClassifier.isAuthError(error) ||
       error instanceof ParsingFailureError ||
       error instanceof PathInvalidError ||
       error instanceof PathMismatchError ||
@@ -310,9 +307,7 @@ export class CouchbaseErrorClassifier {
    */
   static isConflictError(error: unknown): boolean {
     return (
-      error instanceof CasMismatchError ||
-      error instanceof DocumentExistsError ||
-      error instanceof DocumentLockedError
+      error instanceof CasMismatchError || error instanceof DocumentExistsError || error instanceof DocumentLockedError
     );
   }
 
@@ -331,10 +326,7 @@ export class CouchbaseErrorClassifier {
    * Check if error is an ambiguous timeout (requires manual investigation)
    */
   static isAmbiguousError(error: unknown): boolean {
-    return (
-      error instanceof AmbiguousTimeoutError ||
-      error instanceof DurabilityAmbiguousError
-    );
+    return error instanceof AmbiguousTimeoutError || error instanceof DurabilityAmbiguousError;
   }
 
   /**
@@ -342,7 +334,7 @@ export class CouchbaseErrorClassifier {
    */
   static classifyError(error: any): ErrorClassification {
     const errorType = error.constructor.name;
-    const classification = this.ERROR_CLASSIFICATIONS.get(errorType);
+    const classification = CouchbaseErrorClassifier.ERROR_CLASSIFICATIONS.get(errorType);
 
     if (classification) {
       return classification;
@@ -377,9 +369,9 @@ export class CouchbaseErrorClassifier {
       message: error instanceof Error ? error.message : String(error),
       cause: error instanceof Error ? error : undefined,
       operation,
-      isRetryable: this.isRetryable(error),
-      isCritical: this.isPermanentFailure(error),
-      isTransient: this.isNetworkError(error),
+      isRetryable: CouchbaseErrorClassifier.isRetryable(error),
+      isCritical: CouchbaseErrorClassifier.isPermanentFailure(error),
+      isTransient: CouchbaseErrorClassifier.isNetworkError(error),
     };
 
     // Extract SDK-specific context
@@ -404,16 +396,16 @@ export class CouchbaseErrorClassifier {
     maxAttempts: number;
     baseDelayMs: number;
   } {
-    if (this.isPermanentFailure(error)) {
+    if (CouchbaseErrorClassifier.isPermanentFailure(error)) {
       return { shouldRetry: false, maxAttempts: 0, baseDelayMs: 0 };
     }
 
-    if (this.isConflictError(error)) {
+    if (CouchbaseErrorClassifier.isConflictError(error)) {
       // Quick retries for CAS conflicts
       return { shouldRetry: true, maxAttempts: 5, baseDelayMs: 100 };
     }
 
-    if (this.isNetworkError(error) || error instanceof TemporaryFailureError) {
+    if (CouchbaseErrorClassifier.isNetworkError(error) || error instanceof TemporaryFailureError) {
       // Exponential backoff for network issues
       return { shouldRetry: true, maxAttempts: 3, baseDelayMs: 1000 };
     }
@@ -441,7 +433,7 @@ export class CouchbaseErrorClassifier {
    * Get the error classifications map (for inspection/testing)
    */
   static getErrorClassifications(): Map<string, ErrorClassification> {
-    return new Map(this.ERROR_CLASSIFICATIONS);
+    return new Map(CouchbaseErrorClassifier.ERROR_CLASSIFICATIONS);
   }
 }
 
@@ -451,13 +443,11 @@ export class CouchbaseErrorClassifier {
 export {
   // Core
   CouchbaseError,
-
   // Auth
   AuthenticationFailureError,
   BucketNotFoundError,
   ScopeNotFoundError,
   CollectionNotFoundError,
-
   // Document
   DocumentNotFoundError,
   DocumentExistsError,
@@ -465,40 +455,33 @@ export {
   DocumentNotLockedError,
   ValueTooLargeError,
   CasMismatchError,
-
   // Timeout
   TimeoutError,
   AmbiguousTimeoutError,
   UnambiguousTimeoutError,
-
   // Network
   RequestCanceledError,
   ServiceNotAvailableError,
-
   // Query
   ParsingFailureError,
   IndexNotFoundError,
   IndexExistsError,
   PreparedStatementFailureError,
   DmlFailureError,
-
   // Temporary
   TemporaryFailureError,
   DurabilityImpossibleError,
   DurabilityAmbiguousError,
   DurableWriteInProgressError,
   DurabilityLevelNotAvailableError,
-
   // Subdocument
   PathNotFoundError,
   PathExistsError,
   PathMismatchError,
   PathInvalidError,
-
   // Rate limiting
   RateLimitedError,
   QuotaLimitedError,
-
   // Feature
   FeatureNotAvailableError,
   UnsupportedOperationError,

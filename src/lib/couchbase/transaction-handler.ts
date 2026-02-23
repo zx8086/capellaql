@@ -20,9 +20,9 @@ import {
   type TransactionGetResult,
   Transactions,
 } from "couchbase";
+import { error as err, log as info, warn } from "../../telemetry/logger";
 import { CouchbaseErrorClassifier } from "./errors";
 import { recordQuery } from "./metrics";
-import { error as err, log as info, warn } from "../../telemetry/logger";
 import type { OperationContext } from "./types";
 
 // =============================================================================
@@ -73,8 +73,7 @@ export class CouchbaseTransactionHandler {
   ): Promise<T> {
     const finalConfig = { ...CouchbaseTransactionHandler.DEFAULT_CONFIG, ...config };
     const startTime = Date.now();
-    const transactionId =
-      context.transactionId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const transactionId = context.transactionId || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     let attemptCount = 0;
     let _lastError: Error | null = null;
@@ -144,14 +143,14 @@ export class CouchbaseTransactionHandler {
           _lastError = error as Error;
 
           // Use error classifier
-          const classification = CouchbaseErrorClassifier.classifyError(error);
+          const _classification = CouchbaseErrorClassifier.classifyError(error);
           const retryStrategy = CouchbaseErrorClassifier.getRetryStrategy(error);
 
           if (!retryStrategy.shouldRetry || attempt === maxAttempts) {
             throw error;
           }
 
-          const delay = retryStrategy.baseDelayMs * Math.pow(2, attempt - 1);
+          const delay = retryStrategy.baseDelayMs * 2 ** (attempt - 1);
           warn(`Transaction retry attempt ${attempt}/${maxAttempts} after ${delay}ms`, {
             transactionId,
             errorType: (error as Error).constructor.name,

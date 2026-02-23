@@ -129,10 +129,7 @@ export function loadTelemetryConfigFromEnv(): Readonly<TelemetryConfig> {
  */
 export function isProduction(): boolean {
   const cfg = getConfig();
-  return (
-    cfg.runtime.NODE_ENV === "production" ||
-    cfg.telemetry.DEPLOYMENT_ENVIRONMENT === "production"
-  );
+  return cfg.runtime.NODE_ENV === "production" || cfg.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 }
 
 /**

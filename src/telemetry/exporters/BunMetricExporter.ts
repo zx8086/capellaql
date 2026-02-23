@@ -123,12 +123,8 @@ export class BunMetricExporter extends BunOTLPExporter<ResourceMetrics> implemen
       timeUnixNano: timeUnixNano.toString(),
       count: (dataPoint.value?.count ?? 0).toString(),
       sum: ensureFinite(dataPoint.value?.sum, 0),
-      bucketCounts: (dataPoint.value?.buckets?.counts || []).map((c: number) =>
-        ensureFinite(c, 0).toString()
-      ),
-      explicitBounds: (dataPoint.value?.buckets?.boundaries || []).map((b: number) =>
-        ensureFinite(b, 0)
-      ),
+      bucketCounts: (dataPoint.value?.buckets?.counts || []).map((c: number) => ensureFinite(c, 0).toString()),
+      explicitBounds: (dataPoint.value?.buckets?.boundaries || []).map((b: number) => ensureFinite(b, 0)),
       min: ensureFinite(dataPoint.value?.min, 0),
       max: ensureFinite(dataPoint.value?.max, 0),
     };

@@ -21,7 +21,9 @@ class ConfigurationWatcher {
    * Start watching configuration files
    */
   startWatching(files: string[]): void {
-    files.forEach((file) => this.watchFile(file));
+    for (const file of files) {
+      this.watchFile(file);
+    }
     log(`Configuration watcher started for ${files.length} files`, { files });
   }
 

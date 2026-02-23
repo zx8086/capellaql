@@ -1,7 +1,7 @@
 /* src/telemetry/profiling-metrics.ts */
 /* OpenTelemetry profiling metrics integration */
 
-import { metrics, type Counter, type Histogram, type ObservableGauge } from "@opentelemetry/api";
+import { type Counter, type Histogram, metrics, type ObservableGauge } from "@opentelemetry/api";
 
 // ============================================================================
 // Types
@@ -33,8 +33,8 @@ export interface ProfilingMetricsState {
 // ============================================================================
 
 let isInitialized = false;
-let activeSessions: Map<string, ProfilingSession> = new Map();
-let metricsState: ProfilingMetricsState = {
+const activeSessions: Map<string, ProfilingSession> = new Map();
+const metricsState: ProfilingMetricsState = {
   totalTriggersCount: 0,
   activeSessionsCount: 0,
   completedSessionsCount: 0,
@@ -266,11 +266,7 @@ export function failProfilingSession(sessionId: string, error?: Error): void {
  * @param threshold - SLA threshold that was violated
  * @returns Session ID if profiling was started, null if throttled
  */
-export function triggerSLAViolationProfiling(
-  endpoint: string,
-  p95Latency: number,
-  threshold: number,
-): string | null {
+export function triggerSLAViolationProfiling(endpoint: string, p95Latency: number, threshold: number): string | null {
   // Check if we have too many active sessions (overhead limit)
   if (activeSessions.size >= 3) {
     console.warn("Profiling trigger skipped: overhead limit reached", {

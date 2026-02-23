@@ -28,9 +28,7 @@ export function toBool(value: string | boolean | undefined): boolean | undefined
   if (TRUTHY.has(normalized)) return true;
   if (FALSY.has(normalized)) return false;
 
-  throw new Error(
-    `Cannot convert "${value}" to boolean. Expected one of: ${[...TRUTHY, ...FALSY].join(", ")}`
-  );
+  throw new Error(`Cannot convert "${value}" to boolean. Expected one of: ${[...TRUTHY, ...FALSY].join(", ")}`);
 }
 
 // =============================================================================
@@ -163,8 +161,7 @@ export function describeConfig(config: Config): Record<string, unknown> {
 export function validateCrossConfiguration(config: Config): string[] {
   const warnings: string[] = [];
   const isProduction =
-    config.runtime.NODE_ENV === "production" ||
-    config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+    config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   // Runtime safety validations (all environments)
   if (Number.isNaN(config.application.YOGA_RESPONSE_CACHE_TTL)) {
@@ -220,21 +217,15 @@ export function validateConfigHealth(config: Config): {
   const warnings: string[] = [];
 
   const isProduction =
-    config.runtime.NODE_ENV === "production" ||
-    config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+    config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   // Application section validation
   if (Number.isNaN(config.application.YOGA_RESPONSE_CACHE_TTL)) {
     issues.push("YOGA_RESPONSE_CACHE_TTL is NaN - will cause runtime errors");
   }
 
-  if (
-    config.application.YOGA_RESPONSE_CACHE_TTL <= 0 ||
-    config.application.YOGA_RESPONSE_CACHE_TTL > 3600000
-  ) {
-    issues.push(
-      `YOGA_RESPONSE_CACHE_TTL value is unreasonable: ${config.application.YOGA_RESPONSE_CACHE_TTL}ms`
-    );
+  if (config.application.YOGA_RESPONSE_CACHE_TTL <= 0 || config.application.YOGA_RESPONSE_CACHE_TTL > 3600000) {
+    issues.push(`YOGA_RESPONSE_CACHE_TTL value is unreasonable: ${config.application.YOGA_RESPONSE_CACHE_TTL}ms`);
   }
 
   // Production-specific security checks
@@ -291,8 +282,7 @@ export function validateConfigHealth(config: Config): {
 export function generateConfigHealthReport(config: Config): string {
   const health = validateConfigHealth(config);
   const isProduction =
-    config.runtime.NODE_ENV === "production" ||
-    config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+    config.runtime.NODE_ENV === "production" || config.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   let report = "\n=== CONFIGURATION HEALTH REPORT ===\n";
 

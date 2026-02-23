@@ -44,29 +44,26 @@ export {
 // =============================================================================
 
 export type {
-  // Connection types
-  CouchbaseConnection,
-  HealthStatus,
-  ConnectionMetrics,
-  RetryContext,
-
-  // Configuration types
-  CouchbaseConfig,
-  ConnectionStringMeta,
-
-  // Operation types
-  OperationContext,
-  CouchbaseErrorContext,
-  ErrorClassification,
-  QueryExecutionOptions,
-  KVGetOptions,
-  KVUpsertOptions,
-  SubdocOperation,
-
   // Health types
   CircuitBreakerStats,
+  ConnectionMetrics,
+  ConnectionStringMeta,
+  // Configuration types
+  CouchbaseConfig,
+  // Connection types
+  CouchbaseConnection,
+  CouchbaseErrorContext,
+  ErrorClassification,
+  HealthStatus,
+  KVGetOptions,
+  KVUpsertOptions,
+  // Operation types
+  OperationContext,
   PerformanceDetails,
+  QueryExecutionOptions,
+  RetryContext,
   ServiceHealthDetails,
+  SubdocOperation,
 } from "./types";
 
 // =============================================================================
@@ -74,44 +71,43 @@ export type {
 // =============================================================================
 
 export {
-  // Error classifier
-  CouchbaseErrorClassifier,
-
-  // SDK error types (re-exported from couchbase)
-  CouchbaseError,
+  AmbiguousTimeoutError,
   AuthenticationFailureError,
   BucketNotFoundError,
-  ScopeNotFoundError,
+  CasMismatchError,
   CollectionNotFoundError,
-  DocumentNotFoundError,
+  // SDK error types (re-exported from couchbase)
+  CouchbaseError,
+  // Error classifier
+  CouchbaseErrorClassifier,
+  DmlFailureError,
   DocumentExistsError,
   DocumentLockedError,
+  DocumentNotFoundError,
   DocumentNotLockedError,
-  ValueTooLargeError,
-  CasMismatchError,
-  TimeoutError,
-  AmbiguousTimeoutError,
-  UnambiguousTimeoutError,
-  RequestCanceledError,
-  ServiceNotAvailableError,
-  ParsingFailureError,
-  IndexNotFoundError,
-  IndexExistsError,
-  PreparedStatementFailureError,
-  DmlFailureError,
-  TemporaryFailureError,
-  DurabilityImpossibleError,
   DurabilityAmbiguousError,
-  DurableWriteInProgressError,
+  DurabilityImpossibleError,
   DurabilityLevelNotAvailableError,
-  PathNotFoundError,
-  PathExistsError,
-  PathMismatchError,
-  PathInvalidError,
-  RateLimitedError,
-  QuotaLimitedError,
+  DurableWriteInProgressError,
   FeatureNotAvailableError,
+  IndexExistsError,
+  IndexNotFoundError,
+  ParsingFailureError,
+  PathExistsError,
+  PathInvalidError,
+  PathMismatchError,
+  PathNotFoundError,
+  PreparedStatementFailureError,
+  QuotaLimitedError,
+  RateLimitedError,
+  RequestCanceledError,
+  ScopeNotFoundError,
+  ServiceNotAvailableError,
+  TemporaryFailureError,
+  TimeoutError,
+  UnambiguousTimeoutError,
   UnsupportedOperationError,
+  ValueTooLargeError,
 } from "./errors";
 
 // =============================================================================
@@ -121,8 +117,8 @@ export {
 export {
   CouchbaseConfigSchema,
   loadCouchbaseConfig,
-  validateProductionConfig,
   parseConnectionString,
+  validateProductionConfig,
 } from "./config";
 
 // =============================================================================
@@ -139,6 +135,7 @@ export {
 // CIRCUIT BREAKER
 // =============================================================================
 
+export type { CircuitBreakerConfig } from "./circuit-breaker";
 export {
   CircuitBreaker,
   CircuitBreakerOpenError,
@@ -146,16 +143,14 @@ export {
   DEFAULT_CIRCUIT_BREAKER_CONFIG,
 } from "./circuit-breaker";
 
-export type { CircuitBreakerConfig } from "./circuit-breaker";
-
 // =============================================================================
 // QUERY EXECUTOR
 // =============================================================================
 
 export {
-  QueryExecutor,
   buildParameterizedQuery,
   createQueryContext,
+  QueryExecutor,
 } from "./query-executor";
 
 // =============================================================================
@@ -174,39 +169,34 @@ export { CouchbaseRepository, createRepository } from "./repository";
 // METRICS
 // =============================================================================
 
+export type { PerformanceStats, QueryMetric } from "./metrics";
 export {
   couchbaseMetrics,
-  recordQuery,
-  getPerformanceStats,
-  getSlowQueries,
-  getErrorBreakdown,
-  getQueryTypeBreakdown,
-  resetMetrics,
   getDiagnosticInfo,
+  getErrorBreakdown,
+  getPerformanceStats,
+  getQueryTypeBreakdown,
+  getSlowQueries,
+  recordQuery,
+  resetMetrics,
 } from "./metrics";
-
-export type { QueryMetric, PerformanceStats } from "./metrics";
 
 // =============================================================================
 // DATA LOADER
 // =============================================================================
 
-export {
-  createDocumentDataLoader,
-  batchLoadDocuments,
-} from "./data-loader";
-
 export type { CollectionKey, DocumentResult } from "./data-loader";
+export {
+  batchLoadDocuments,
+  createDocumentDataLoader,
+} from "./data-loader";
 
 // =============================================================================
 // TRANSACTION HANDLER
 // =============================================================================
 
-export {
-  CouchbaseTransactionHandler,
-} from "./transaction-handler";
-
 export type {
-  TransactionOperationContext,
   TransactionConfig,
+  TransactionOperationContext,
 } from "./transaction-handler";
+export { CouchbaseTransactionHandler } from "./transaction-handler";

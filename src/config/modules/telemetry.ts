@@ -165,16 +165,25 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
 
     // Use specific endpoint if set, otherwise derive from base endpoint, otherwise use default
     TRACES_ENDPOINT:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.TRACES_ENDPOINT), "string", "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT") as string) ||
-      deriveEndpoint(baseOtlpEndpoint, "/v1/traces", telemetryDefaults.TRACES_ENDPOINT),
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.TRACES_ENDPOINT),
+        "string",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"
+      ) as string) || deriveEndpoint(baseOtlpEndpoint, "/v1/traces", telemetryDefaults.TRACES_ENDPOINT),
 
     METRICS_ENDPOINT:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.METRICS_ENDPOINT), "string", "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT") as string) ||
-      deriveEndpoint(baseOtlpEndpoint, "/v1/metrics", telemetryDefaults.METRICS_ENDPOINT),
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.METRICS_ENDPOINT),
+        "string",
+        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT"
+      ) as string) || deriveEndpoint(baseOtlpEndpoint, "/v1/metrics", telemetryDefaults.METRICS_ENDPOINT),
 
     LOGS_ENDPOINT:
-      (parseEnvVar(getEnvVar(telemetryEnvMapping.LOGS_ENDPOINT), "string", "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT") as string) ||
-      deriveEndpoint(baseOtlpEndpoint, "/v1/logs", telemetryDefaults.LOGS_ENDPOINT),
+      (parseEnvVar(
+        getEnvVar(telemetryEnvMapping.LOGS_ENDPOINT),
+        "string",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT"
+      ) as string) || deriveEndpoint(baseOtlpEndpoint, "/v1/logs", telemetryDefaults.LOGS_ENDPOINT),
 
     METRIC_READER_INTERVAL:
       (parseEnvVar(

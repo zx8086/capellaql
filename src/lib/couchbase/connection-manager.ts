@@ -27,35 +27,21 @@
  *   - DNS SRV support
  */
 
-import {
-  type Cluster,
-  type Bucket,
-  type Collection,
-  type Scope,
-  connect,
-  ServiceType,
-} from "couchbase";
-
-import {
-  CouchbaseError,
-  DocumentNotFoundError,
-  TimeoutError,
-  AuthenticationFailureError,
-  CasMismatchError,
-  TemporaryFailureError,
-  CouchbaseErrorClassifier,
-} from "./errors";
+import { type Bucket, type Cluster, type Collection, connect, type Scope, ServiceType } from "couchbase";
+import { err, log, warn } from "../../telemetry/logger";
+import { type CircuitBreaker, createCouchbaseCircuitBreaker } from "./circuit-breaker";
 import { loadCouchbaseConfig, parseConnectionString, validateProductionConfig } from "./config";
 import { buildConnectionOptions } from "./connection-options";
-import { CircuitBreaker, createCouchbaseCircuitBreaker } from "./circuit-breaker";
-import { log, warn, err } from "../../telemetry/logger";
-import type {
-  CouchbaseConfig,
-  CouchbaseConnection,
-  HealthStatus,
-  ConnectionMetrics,
-  RetryContext,
-} from "./types";
+import {
+  AuthenticationFailureError,
+  CasMismatchError,
+  CouchbaseError,
+  CouchbaseErrorClassifier,
+  DocumentNotFoundError,
+  TemporaryFailureError,
+  TimeoutError,
+} from "./errors";
+import type { ConnectionMetrics, CouchbaseConfig, CouchbaseConnection, HealthStatus, RetryContext } from "./types";
 
 // =============================================================================
 // CONNECTION MANAGER CLASS
@@ -77,9 +63,9 @@ export class CouchbaseConnectionManager {
   private collections: Map<string, Collection> = new Map();
 
   private isHealthy = false;
-  private lastHealthCheck: Date | null = null;
   private healthCheckInterval: ReturnType<typeof setInterval> | null = null;
   private connectionAttempts = 0;
+  private isClosing = false;
 
   private circuitBreaker: CircuitBreaker;
 
@@ -200,7 +186,11 @@ export class CouchbaseConnectionManager {
         const endTime = typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
         const connectTime = (endTime - startTime) / 1_000_000;
 
-        log("Couchbase connected", { component: "couchbase", operation: "connected", durationMs: connectTime.toFixed(2) });
+        log("Couchbase connected", {
+          component: "couchbase",
+          operation: "connected",
+          durationMs: connectTime.toFixed(2),
+        });
 
         this.metrics.totalConnections++;
         return cluster;
@@ -257,7 +247,11 @@ export class CouchbaseConnectionManager {
     }
 
     const intervalMs = 60000; // 60 seconds
-    log("Couchbase starting health monitoring", { component: "couchbase", operation: "health_monitor_start", intervalMs });
+    log("Couchbase starting health monitoring", {
+      component: "couchbase",
+      operation: "health_monitor_start",
+      intervalMs,
+    });
 
     this.healthCheckInterval = setInterval(async () => {
       try {
@@ -269,7 +263,11 @@ export class CouchbaseConnectionManager {
           warn("Couchbase unhealthy connection detected", { component: "couchbase", operation: "health_check" });
         }
       } catch (error) {
-        err("Couchbase health check failed", { component: "couchbase", operation: "health_check", error: String(error) });
+        err("Couchbase health check failed", {
+          component: "couchbase",
+          operation: "health_check",
+          error: String(error),
+        });
         this.isHealthy = false;
       }
     }, intervalMs);
@@ -438,11 +436,7 @@ export class CouchbaseConnectionManager {
   /**
    * LOW PRIORITY FIX: Get or create cached collection.
    */
-  public getCollection(
-    bucketName?: string,
-    scopeName?: string,
-    collectionName?: string
-  ): Collection {
+  public getCollection(bucketName?: string, scopeName?: string, collectionName?: string): Collection {
     if (!this.bucket || !this.cluster) {
       throw new Error("Couchbase not initialized");
     }
@@ -499,9 +493,9 @@ export class CouchbaseConnectionManager {
       cluster: this.cluster,
       bucket: (name?: string) => this.cluster!.bucket(name || this.config!.bucketName),
       scope: (bucketName?: string, scopeName?: string) =>
-        this.cluster!
-          .bucket(bucketName || this.config!.bucketName)
-          .scope(scopeName || this.config!.scopeName || "_default"),
+        this.cluster!.bucket(bucketName || this.config!.bucketName).scope(
+          scopeName || this.config!.scopeName || "_default"
+        ),
       collection: (bucketName?: string, scopeName?: string, collectionName?: string) =>
         this.getCollection(bucketName, scopeName, collectionName),
       defaultBucket: this.bucket,
@@ -530,69 +524,61 @@ export class CouchbaseConnectionManager {
   /**
    * Execute operation with retry logic and circuit breaker.
    */
-  public async executeWithRetry<T>(
-    operation: () => Promise<T>,
-    context?: RetryContext
-  ): Promise<T> {
+  public async executeWithRetry<T>(operation: () => Promise<T>, context?: RetryContext): Promise<T> {
     const retryStrategy = context || { maxAttempts: 3, baseDelayMs: 1000 };
     const fallback = retryStrategy.fallback;
 
-    return await this.circuitBreaker.execute(
-      async () => {
-        let lastError: Error | null = null;
-        const maxAttempts = retryStrategy.maxAttempts || 3;
+    return await this.circuitBreaker.execute(async () => {
+      let lastError: Error | null = null;
+      const maxAttempts = retryStrategy.maxAttempts || 3;
 
-        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-          try {
-            const startTime =
-              typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+          const startTime = typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
 
-            const result = await operation();
+          const result = await operation();
 
-            const endTime =
-              typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
-            const duration = (endTime - startTime) / 1_000_000;
+          const endTime = typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
+          const duration = (endTime - startTime) / 1_000_000;
 
-            this.metrics.totalQueries++;
-            this.metrics.lastQueryTime = new Date();
-            this.updateAverageQueryTime(duration);
+          this.metrics.totalQueries++;
+          this.metrics.lastQueryTime = new Date();
+          this.updateAverageQueryTime(duration);
 
-            return result;
-          } catch (error) {
-            lastError = error instanceof Error ? error : new Error(String(error));
+          return result;
+        } catch (error) {
+          lastError = error instanceof Error ? error : new Error(String(error));
 
-            // HIGH PRIORITY FIX: Use SDK error classifier
-            const errorContext = CouchbaseErrorClassifier.extractContext(error);
-            const strategy = CouchbaseErrorClassifier.getRetryStrategy(error);
+          // HIGH PRIORITY FIX: Use SDK error classifier
+          const errorContext = CouchbaseErrorClassifier.extractContext(error);
+          const strategy = CouchbaseErrorClassifier.getRetryStrategy(error);
 
-            if (!strategy.shouldRetry || attempt === maxAttempts) {
-              this.metrics.failedQueries++;
-              throw lastError;
-            }
-
-            const delayMs = strategy.baseDelayMs * Math.pow(2, attempt - 1);
-
-            if (retryStrategy.onRetry) {
-              retryStrategy.onRetry(attempt, lastError, delayMs);
-            } else {
-              warn("Couchbase retry attempt", {
-                component: "couchbase",
-                operation: "retry",
-                attempt,
-                maxAttempts,
-                delayMs,
-                error: errorContext.message,
-              });
-            }
-
-            await this.sleep(delayMs);
+          if (!strategy.shouldRetry || attempt === maxAttempts) {
+            this.metrics.failedQueries++;
+            throw lastError;
           }
-        }
 
-        throw lastError;
-      },
-      fallback
-    );
+          const delayMs = strategy.baseDelayMs * 2 ** (attempt - 1);
+
+          if (retryStrategy.onRetry) {
+            retryStrategy.onRetry(attempt, lastError, delayMs);
+          } else {
+            warn("Couchbase retry attempt", {
+              component: "couchbase",
+              operation: "retry",
+              attempt,
+              maxAttempts,
+              delayMs,
+              error: errorContext.message,
+            });
+          }
+
+          await this.sleep(delayMs);
+        }
+      }
+
+      throw lastError;
+    }, fallback);
   }
 
   // =============================================================================
@@ -636,8 +622,19 @@ export class CouchbaseConnectionManager {
 
   /**
    * Close connection.
+   * Idempotent - safe to call multiple times.
    */
   public async close(): Promise<void> {
+    // Idempotency guard - prevent multiple close calls
+    if (this.isClosing) {
+      log("Couchbase close already in progress, skipping duplicate call", {
+        component: "couchbase",
+        operation: "close",
+      });
+      return;
+    }
+    this.isClosing = true;
+
     log("Couchbase closing connection", { component: "couchbase", operation: "close" });
 
     if (this.healthCheckInterval) {
@@ -659,6 +656,7 @@ export class CouchbaseConnectionManager {
     this.collections.clear();
     this.config = null;
     this.isHealthy = false;
+    // Note: Don't reset isClosing - connection is permanently closed
   }
 
   // =============================================================================
@@ -668,7 +666,7 @@ export class CouchbaseConnectionManager {
   private calculateBackoff(attempt: number): number {
     const baseDelay = 1000;
     const maxDelay = 8000;
-    const delay = Math.min(baseDelay * Math.pow(2, attempt - 1), maxDelay);
+    const delay = Math.min(baseDelay * 2 ** (attempt - 1), maxDelay);
     const jitter = delay * 0.25;
     return Math.floor(delay + (Math.random() * jitter * 2 - jitter));
   }
@@ -683,8 +681,7 @@ export class CouchbaseConnectionManager {
 
   private updateAverageQueryTime(duration: number): void {
     const totalQueries = this.metrics.totalQueries;
-    this.metrics.avgQueryTime =
-      (this.metrics.avgQueryTime * (totalQueries - 1) + duration) / totalQueries;
+    this.metrics.avgQueryTime = (this.metrics.avgQueryTime * (totalQueries - 1) + duration) / totalQueries;
   }
 }
 
@@ -698,21 +695,6 @@ export class CouchbaseConnectionManager {
  */
 export const connectionManager = CouchbaseConnectionManager.getInstance();
 
-// =============================================================================
-// PROCESS CLEANUP HANDLERS
-// =============================================================================
-
-// Note: These handlers are registered when this module is imported
-// They ensure graceful shutdown on SIGINT/SIGTERM
-
-if (typeof process !== "undefined") {
-  process.on("SIGINT", async () => {
-    log("Couchbase received SIGINT, closing connections", { component: "couchbase", operation: "signal", signal: "SIGINT" });
-    await connectionManager.close();
-  });
-
-  process.on("SIGTERM", async () => {
-    log("Couchbase received SIGTERM, closing connections", { component: "couchbase", operation: "signal", signal: "SIGTERM" });
-    await connectionManager.close();
-  });
-}
+// Note: Signal handlers (SIGINT/SIGTERM) are handled centrally in src/index.ts
+// to avoid multiple handler registrations causing duplicate shutdown calls.
+// The connectionManager.close() method is idempotent and safe to call multiple times.

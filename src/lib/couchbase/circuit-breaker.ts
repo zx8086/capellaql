@@ -15,17 +15,17 @@
  * - timeout: 60s before transitioning from OPEN → HALF-OPEN
  */
 
-import type { CircuitBreakerStats } from "./types";
-import {
-  DocumentNotFoundError,
-  DocumentExistsError,
-  CasMismatchError,
-  DocumentLockedError,
-  PathNotFoundError,
-  PathExistsError,
-  ParsingFailureError,
-} from "./errors";
 import { log, warn } from "../../telemetry/logger";
+import {
+  CasMismatchError,
+  DocumentExistsError,
+  DocumentLockedError,
+  DocumentNotFoundError,
+  ParsingFailureError,
+  PathExistsError,
+  PathNotFoundError,
+} from "./errors";
+import type { CircuitBreakerStats } from "./types";
 
 // =============================================================================
 // CONFIGURATION INTERFACE
@@ -334,9 +334,7 @@ export class CircuitBreakerOpenError extends Error {
 /**
  * Create a circuit breaker with Couchbase-optimized defaults.
  */
-export function createCouchbaseCircuitBreaker(
-  overrides?: Partial<CircuitBreakerConfig>
-): CircuitBreaker {
+export function createCouchbaseCircuitBreaker(overrides?: Partial<CircuitBreakerConfig>): CircuitBreaker {
   return new CircuitBreaker({
     failureThreshold: 5,
     successThreshold: 3,

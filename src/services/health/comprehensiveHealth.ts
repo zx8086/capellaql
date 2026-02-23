@@ -3,8 +3,8 @@
 
 import config from "$config";
 import { err } from "../../telemetry";
-import { couchbaseHealthService } from "./couchbaseHealth";
 import { cacheHealthService } from "./cacheHealth";
+import { couchbaseHealthService } from "./couchbaseHealth";
 import { telemetryHealthService } from "./telemetryHealth";
 import {
   type CircuitBreakerState,
@@ -74,8 +74,7 @@ export class ComprehensiveHealthService {
       );
 
       // Determine circuit breaker state based on Couchbase health
-      const circuitBreakerState: CircuitBreakerState =
-        couchbaseHealth.status === "unhealthy" ? "open" : "closed";
+      const circuitBreakerState: CircuitBreakerState = couchbaseHealth.status === "unhealthy" ? "open" : "closed";
 
       // Check high availability (all critical services healthy)
       const highAvailability =

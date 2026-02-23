@@ -112,10 +112,7 @@ export function createExportStatsTracker(): ExportStatsTracker {
   return tracker;
 }
 
-export function wrapSpanExporter(
-  exporter: SpanExporter,
-  tracker: ExportStatsTracker
-): SpanExporter {
+export function wrapSpanExporter(exporter: SpanExporter, tracker: ExportStatsTracker): SpanExporter {
   return {
     export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
       tracker.recordExportAttempt();
@@ -134,10 +131,7 @@ export function wrapSpanExporter(
   };
 }
 
-export function wrapLogRecordExporter(
-  exporter: LogRecordExporter,
-  tracker: ExportStatsTracker
-): LogRecordExporter {
+export function wrapLogRecordExporter(exporter: LogRecordExporter, tracker: ExportStatsTracker): LogRecordExporter {
   return {
     export(logs: ReadableLogRecord[], resultCallback: (result: ExportResult) => void): void {
       tracker.recordExportAttempt();
@@ -155,10 +149,7 @@ export function wrapLogRecordExporter(
   };
 }
 
-export function wrapMetricExporter(
-  exporter: PushMetricExporter,
-  tracker: ExportStatsTracker
-): PushMetricExporter {
+export function wrapMetricExporter(exporter: PushMetricExporter, tracker: ExportStatsTracker): PushMetricExporter {
   return {
     export(metrics: ResourceMetrics, resultCallback: (result: ExportResult) => void): void {
       tracker.recordExportAttempt();

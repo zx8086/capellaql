@@ -11,18 +11,10 @@
  * - Batch operations with parallel execution
  */
 
-import type {
-  Collection,
-  GetOptions,
-  GetResult,
-  UpsertOptions,
-  MutationResult,
-  DurabilityLevel,
-  LookupInMacro,
-} from "couchbase";
+import type { Collection, DurabilityLevel, GetOptions, GetResult, MutationResult, UpsertOptions } from "couchbase";
+import { warn } from "../../telemetry/logger";
 import { DocumentNotFoundError } from "./errors";
 import type { KVGetOptions, KVUpsertOptions, SubdocOperation } from "./types";
-import { warn } from "../../telemetry/logger";
 
 // Re-export types
 export type { KVGetOptions, KVUpsertOptions, SubdocOperation };
@@ -207,11 +199,7 @@ export class KVOperations {
   /**
    * Touch a document to update its expiry.
    */
-  static async touch(
-    collection: Collection,
-    id: string,
-    expiry: number
-  ): Promise<MutationResult> {
+  static async touch(collection: Collection, id: string, expiry: number): Promise<MutationResult> {
     return await collection.touch(id, expiry);
   }
 
@@ -338,7 +326,7 @@ export class KVOperations {
 
       const promises = batch.map(async (id) => {
         try {
-          const result = await this.get<T>(collection, id, options);
+          const result = await KVOperations.get<T>(collection, id, options);
           if (result) {
             return { id, value: result.value };
           }
@@ -382,7 +370,7 @@ export class KVOperations {
 
       const promises = batch.map(async ({ id, document }) => {
         try {
-          await this.upsert(collection, id, document, options);
+          await KVOperations.upsert(collection, id, document, options);
           return { id, success: true };
         } catch (error) {
           return { id, success: false, error: error as Error };

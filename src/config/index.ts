@@ -26,10 +26,11 @@ export {
   resetConfigCache,
   telemetryConfig,
 } from "./config";
-
-// Loader (for advanced usage)
-export { initializeConfig } from "./loader";
-
+// Defaults (for reference/testing)
+export { defaultConfig } from "./defaults";
+export type { EnvVarEntry, EnvVarMapping, EnvVarType } from "./envMapping";
+// Env mapping (for documentation/tooling)
+export { envVarMapping, getEnvVarForPath, getEnvVarPath } from "./envMapping";
 // Helpers
 export {
   describeConfig,
@@ -39,7 +40,16 @@ export {
   validateConfigHealth,
   validateCrossConfiguration,
 } from "./helpers";
-
+// Loader (for advanced usage)
+export { initializeConfig } from "./loader";
+export type {
+  ApplicationConfig,
+  CapellaConfig,
+  Config,
+  DeploymentConfig,
+  RuntimeConfig,
+  TelemetryConfig,
+} from "./schemas";
 // Schemas and types
 export {
   ApplicationConfigSchema,
@@ -51,22 +61,6 @@ export {
   SchemaRegistry,
   TelemetryConfigSchema,
 } from "./schemas";
-
-export type {
-  ApplicationConfig,
-  CapellaConfig,
-  Config,
-  DeploymentConfig,
-  RuntimeConfig,
-  TelemetryConfig,
-} from "./schemas";
-
-// Env mapping (for documentation/tooling)
-export { envVarMapping, getEnvVarForPath, getEnvVarPath } from "./envMapping";
-export type { EnvVarEntry, EnvVarMapping, EnvVarType } from "./envMapping";
-
-// Defaults (for reference/testing)
-export { defaultConfig } from "./defaults";
 
 // =============================================================================
 // DEFAULT EXPORT

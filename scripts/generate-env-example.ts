@@ -1,4 +1,5 @@
 #!/usr/bin/env bun
+
 /**
  * Generate .env.example from envVarMapping
  *
@@ -10,8 +11,8 @@
  *   bun run generate:env
  */
 
-import { envVarMapping, type EnvVarEntry } from "../src/config/envMapping";
 import { defaultConfig } from "../src/config/defaults";
+import { type EnvVarEntry, envVarMapping } from "../src/config/envMapping";
 
 // =============================================================================
 // CONFIGURATION
@@ -20,16 +21,10 @@ import { defaultConfig } from "../src/config/defaults";
 const OUTPUT_FILE = ".env.example";
 
 // Environment variables that should be uncommented (required or commonly set)
-const REQUIRED_VARS = new Set([
-  "COUCHBASE_URL",
-  "COUCHBASE_USERNAME",
-  "COUCHBASE_PASSWORD",
-]);
+const REQUIRED_VARS = new Set(["COUCHBASE_URL", "COUCHBASE_USERNAME", "COUCHBASE_PASSWORD"]);
 
 // Environment variables that contain secrets (show placeholder instead of default)
-const SECRET_VARS = new Set([
-  "COUCHBASE_PASSWORD",
-]);
+const SECRET_VARS = new Set(["COUCHBASE_PASSWORD"]);
 
 // =============================================================================
 // HELPERS

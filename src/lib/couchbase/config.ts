@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 import centralConfig from "$config";
-import type { CouchbaseConfig, ConnectionStringMeta } from "./types";
+import type { ConnectionStringMeta, CouchbaseConfig } from "./types";
 
 // =============================================================================
 // ZOD VALIDATION SCHEMA
@@ -21,10 +21,7 @@ export const CouchbaseConfigSchema = z.object({
   // Connection details
   connectionString: z
     .string()
-    .regex(
-      /^couchbases?:\/\/.+/,
-      "Must be a valid Couchbase connection string (couchbase:// or couchbases://)"
-    )
+    .regex(/^couchbases?:\/\/.+/, "Must be a valid Couchbase connection string (couchbase:// or couchbases://)")
     .describe("Couchbase cluster connection URL"),
 
   username: z.string().min(1, "Username is required").describe("Database username"),
@@ -149,9 +146,7 @@ export function loadCouchbaseConfig(): CouchbaseConfig {
     return CouchbaseConfigSchema.parse(rawConfig);
   } catch (error) {
     if (error instanceof z.ZodError) {
-      const errorMessages = error.issues
-        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-        .join("\n  ");
+      const errorMessages = error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("\n  ");
 
       throw new Error(`Couchbase configuration validation failed:\n  ${errorMessages}`);
     }
@@ -169,8 +164,7 @@ export function loadCouchbaseConfig(): CouchbaseConfig {
  */
 export function validateProductionConfig(config: CouchbaseConfig): void {
   const isProduction =
-    centralConfig.runtime.NODE_ENV === "production" ||
-    centralConfig.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
+    centralConfig.runtime.NODE_ENV === "production" || centralConfig.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   if (!isProduction) {
     return;
@@ -193,10 +187,7 @@ export function validateProductionConfig(config: CouchbaseConfig): void {
   }
 
   // Check for localhost in production
-  if (
-    config.connectionString.includes("localhost") ||
-    config.connectionString.includes("127.0.0.1")
-  ) {
+  if (config.connectionString.includes("localhost") || config.connectionString.includes("127.0.0.1")) {
     issues.push("Production database cannot use localhost");
   }
 

@@ -12,9 +12,9 @@
  */
 
 import type { Cluster, QueryOptions, QueryResult } from "couchbase";
+import { log, warn } from "../../telemetry/logger";
 import { CouchbaseErrorClassifier } from "./errors";
 import type { QueryExecutionOptions } from "./types";
-import { log, warn } from "../../telemetry/logger";
 
 // Re-export the options type
 export type { QueryExecutionOptions };
@@ -50,7 +50,7 @@ export class QueryExecutor {
     options: QueryExecutionOptions = {}
   ): Promise<QueryResult<T>> {
     const maxRetries = options.maxRetries ?? 3;
-    const queryOptions = this.buildQueryOptions(options);
+    const queryOptions = QueryExecutor.buildQueryOptions(options);
 
     let lastError: Error | null = null;
 
@@ -100,7 +100,7 @@ export class QueryExecutor {
           throw error;
         }
 
-        const delay = retryStrategy.baseDelayMs * Math.pow(2, attempt - 1);
+        const delay = retryStrategy.baseDelayMs * 2 ** (attempt - 1);
         warn("Query retry attempt", {
           component: "couchbase",
           operation: "query",
@@ -110,7 +110,7 @@ export class QueryExecutor {
           error: errorContext.message,
         });
 
-        await this.sleep(delay);
+        await QueryExecutor.sleep(delay);
       }
     }
 
@@ -135,7 +135,7 @@ export class QueryExecutor {
     scopeName: string,
     options: QueryExecutionOptions = {}
   ): Promise<QueryResult<T>> {
-    return this.execute<T>(cluster, statement, {
+    return QueryExecutor.execute<T>(cluster, statement, {
       ...options,
       queryContext: `${bucketName}.${scopeName}`,
     });
@@ -167,7 +167,7 @@ export class QueryExecutor {
       metrics: options.metrics !== false,
 
       // Client context ID for tracing
-      clientContextId: options.clientContextId || this.generateClientContextId(),
+      clientContextId: options.clientContextId || QueryExecutor.generateClientContextId(),
 
       readonly: options.readonly,
     };

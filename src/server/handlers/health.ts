@@ -3,11 +3,7 @@
 import { getGraphQLPerformanceStats, getRecentGraphQLPerformance } from "../../lib/graphqlPerformanceTracker";
 import { getPerformanceHistory, getPerformanceMetrics, getPerformanceTrends } from "../../lib/performanceMonitor";
 import { getSystemHealth, getSystemHealthSummary } from "../../lib/systemHealth";
-import {
-  getComprehensiveHealth,
-  getLivenessCheck,
-  getReadinessCheck,
-} from "../../services/health";
+import { getComprehensiveHealth, getLivenessCheck, getReadinessCheck } from "../../services/health";
 import { err, getTelemetryHealth } from "../../telemetry";
 import { createHealthcheck } from "../../utils/bunUtils";
 import type { RouteHandler } from "../types";

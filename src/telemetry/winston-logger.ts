@@ -2,10 +2,10 @@
 /* Structured logging with OTLP transport and ECS field mapping */
 /* Per monitoring-updated.md: Uses @elastic/ecs-winston-format with colorize + simple console */
 
-import { context, trace, type SpanContext } from "@opentelemetry/api";
+import ecsFormat from "@elastic/ecs-winston-format";
+import { context, type SpanContext, trace } from "@opentelemetry/api";
 import * as apiLogs from "@opentelemetry/api-logs";
 import { OpenTelemetryTransportV3 } from "@opentelemetry/winston-transport";
-import ecsFormat from "@elastic/ecs-winston-format";
 import winston from "winston";
 import { applicationConfig, telemetryConfig } from "$config";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
@@ -175,14 +175,11 @@ class WinstonTelemetryLogger {
           serviceName: localConfig.serviceName,
           serviceVersion: localConfig.serviceVersion,
           serviceEnvironment: localConfig.environment,
-        }),
+        })
       ),
       transports: [
         new winston.transports.Console({
-          format: winston.format.combine(
-            winston.format.colorize({ all: true }),
-            winston.format.simple(),
-          ),
+          format: winston.format.combine(winston.format.colorize({ all: true }), winston.format.simple()),
         }),
       ],
     });

@@ -1,7 +1,7 @@
 /* src/telemetry/metrics/process-metrics.ts */
 /* Memory, CPU, and GC metrics with OpenTelemetry instruments */
 
-import { metrics, type Counter, type Histogram, type ObservableGauge } from "@opentelemetry/api";
+import { type Counter, type Histogram, metrics, type ObservableGauge } from "@opentelemetry/api";
 import type { GCEvent, GCType } from "../gc-metrics";
 
 // ============================================================================
@@ -190,7 +190,7 @@ export function recordGCHeapSizes(
   oldGenBefore: number,
   oldGenAfter: number,
   _youngGenBefore = 0,
-  _youngGenAfter = 0,
+  _youngGenAfter = 0
 ): void {
   lastGCHeapBefore = oldGenBefore;
   lastGCHeapAfter = oldGenAfter;

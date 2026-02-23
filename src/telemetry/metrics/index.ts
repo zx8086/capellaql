@@ -67,12 +67,12 @@ export {
 // ============================================================================
 
 export {
+  type DatabaseMetricsLabels,
   getDatabaseMetricsStatus,
   initializeDatabaseMetrics,
   recordConnectionChange,
   recordDatabaseOperation,
   recordSLIMetric,
-  type DatabaseMetricsLabels,
 } from "./databaseMetrics";
 
 // ============================================================================
@@ -87,12 +87,12 @@ export {
   initializeProcessMetrics,
   isMemoryPressureCritical,
   isMemoryPressureElevated,
+  type MemoryPressureLevel,
+  type MemoryPressureState,
+  type ProcessMetricsStatus,
   recordGCCollection,
   recordGCDuration,
   recordGCHeapSizes,
   startMemoryPressureMonitoring,
   stopMemoryPressureMonitoring,
-  type MemoryPressureLevel,
-  type MemoryPressureState,
-  type ProcessMetricsStatus,
 } from "./process-metrics";

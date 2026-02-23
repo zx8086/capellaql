@@ -86,7 +86,7 @@ export class LifecycleObservabilityLogger {
   public logLifecycleEvent(
     message: string,
     eventType: "startup" | "shutdown" | "health_check" | "config_reload",
-    metadata?: Record<string, unknown>,
+    metadata?: Record<string, unknown>
   ): void {
     winstonTelemetryLogger.info(message, {
       component: "lifecycle",
@@ -266,7 +266,7 @@ export function generateStartupSequence(): ShutdownMessage[] {
 export function logLifecycleEvent(
   message: string,
   eventType: "startup" | "shutdown" | "health_check" | "config_reload",
-  metadata?: Record<string, unknown>,
+  metadata?: Record<string, unknown>
 ): void {
   lifecycleLogger.logLifecycleEvent(message, eventType, metadata);
 }

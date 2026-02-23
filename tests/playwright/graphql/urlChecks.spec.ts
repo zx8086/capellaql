@@ -1,14 +1,14 @@
 /* tests/playwright/graphql/urlChecks.spec.ts - E2E Tests for URL Check Queries */
 
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   executeGraphQL,
-  GET_LOOKS_URL_CHECK_QUERY,
   GET_IMAGE_URL_CHECK_QUERY,
-  validateUrlSuffixesResultStructure,
-  measureQueryTime,
-  type GetLooksUrlCheckResponse,
+  GET_LOOKS_URL_CHECK_QUERY,
   type GetImageUrlCheckResponse,
+  type GetLooksUrlCheckResponse,
+  measureQueryTime,
+  validateUrlSuffixesResultStructure,
 } from "../helpers/graphql-client";
 
 const TEST_CONFIG = {
@@ -26,17 +26,11 @@ test.describe("GraphQL getLooksUrlCheck Query - C52 Season", () => {
     expect(health).toHaveProperty("status");
   });
 
-  test("getLooksUrlCheck - returns valid response structure for single division", async ({
-    request,
-  }) => {
-    const result = await executeGraphQL<GetLooksUrlCheckResponse>(
-      request,
-      GET_LOOKS_URL_CHECK_QUERY,
-      {
-        divisions: [TEST_CONFIG.singleDivision],
-        season: TEST_CONFIG.season,
-      }
-    );
+  test("getLooksUrlCheck - returns valid response structure for single division", async ({ request }) => {
+    const result = await executeGraphQL<GetLooksUrlCheckResponse>(request, GET_LOOKS_URL_CHECK_QUERY, {
+      divisions: [TEST_CONFIG.singleDivision],
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.getLooksUrlCheck).toBeDefined();
@@ -51,14 +45,10 @@ test.describe("GraphQL getLooksUrlCheck Query - C52 Season", () => {
   });
 
   test("getLooksUrlCheck - returns results for multiple divisions", async ({ request }) => {
-    const result = await executeGraphQL<GetLooksUrlCheckResponse>(
-      request,
-      GET_LOOKS_URL_CHECK_QUERY,
-      {
-        divisions: TEST_CONFIG.divisions,
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<GetLooksUrlCheckResponse>(request, GET_LOOKS_URL_CHECK_QUERY, {
+      divisions: TEST_CONFIG.divisions,
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.getLooksUrlCheck).toBeDefined();
@@ -76,27 +66,19 @@ test.describe("GraphQL getLooksUrlCheck Query - C52 Season", () => {
   });
 
   test("getLooksUrlCheck - response time under 5 seconds", async ({ request }) => {
-    const { durationMs } = await measureQueryTime<GetLooksUrlCheckResponse>(
-      request,
-      GET_LOOKS_URL_CHECK_QUERY,
-      {
-        divisions: [TEST_CONFIG.singleDivision],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const { durationMs } = await measureQueryTime<GetLooksUrlCheckResponse>(request, GET_LOOKS_URL_CHECK_QUERY, {
+      divisions: [TEST_CONFIG.singleDivision],
+      season: TEST_CONFIG.season,
+    });
 
     expect(durationMs).toBeLessThan(5000);
   });
 
   test("getLooksUrlCheck - handles empty divisions array", async ({ request }) => {
-    const result = await executeGraphQL<GetLooksUrlCheckResponse>(
-      request,
-      GET_LOOKS_URL_CHECK_QUERY,
-      {
-        divisions: [],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<GetLooksUrlCheckResponse>(request, GET_LOOKS_URL_CHECK_QUERY, {
+      divisions: [],
+      season: TEST_CONFIG.season,
+    });
 
     // Should either return validation error or empty results
     expect(
@@ -106,18 +88,12 @@ test.describe("GraphQL getLooksUrlCheck Query - C52 Season", () => {
   });
 
   test("getLooksUrlCheck - handles empty season gracefully", async ({ request }) => {
-    const result = await executeGraphQL<GetLooksUrlCheckResponse>(
-      request,
-      GET_LOOKS_URL_CHECK_QUERY,
-      {
-        divisions: [TEST_CONFIG.singleDivision],
-        season: "",
-      }
-    );
+    const result = await executeGraphQL<GetLooksUrlCheckResponse>(request, GET_LOOKS_URL_CHECK_QUERY, {
+      divisions: [TEST_CONFIG.singleDivision],
+      season: "",
+    });
 
-    expect(
-      result.errors !== undefined || result.data?.getLooksUrlCheck !== undefined
-    ).toBeTruthy();
+    expect(result.errors !== undefined || result.data?.getLooksUrlCheck !== undefined).toBeTruthy();
 
     if (result.data?.getLooksUrlCheck) {
       expect(Array.isArray(result.data.getLooksUrlCheck)).toBe(true);
@@ -125,14 +101,10 @@ test.describe("GraphQL getLooksUrlCheck Query - C52 Season", () => {
   });
 
   test("getLooksUrlCheck - handles invalid division gracefully", async ({ request }) => {
-    const result = await executeGraphQL<GetLooksUrlCheckResponse>(
-      request,
-      GET_LOOKS_URL_CHECK_QUERY,
-      {
-        divisions: ["99"],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<GetLooksUrlCheckResponse>(request, GET_LOOKS_URL_CHECK_QUERY, {
+      divisions: ["99"],
+      season: TEST_CONFIG.season,
+    });
 
     // Should return empty results for non-existent division
     expect(result.errors).toBeUndefined();
@@ -183,14 +155,10 @@ test.describe("GraphQL getLooksUrlCheck Query - C52 Season", () => {
   });
 
   test("getLooksUrlCheck - URLs are valid strings", async ({ request }) => {
-    const result = await executeGraphQL<GetLooksUrlCheckResponse>(
-      request,
-      GET_LOOKS_URL_CHECK_QUERY,
-      {
-        divisions: [TEST_CONFIG.singleDivision],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<GetLooksUrlCheckResponse>(request, GET_LOOKS_URL_CHECK_QUERY, {
+      divisions: [TEST_CONFIG.singleDivision],
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
 
@@ -207,17 +175,11 @@ test.describe("GraphQL getLooksUrlCheck Query - C52 Season", () => {
 });
 
 test.describe("GraphQL getImageUrlCheck Query - C52 Season", () => {
-  test("getImageUrlCheck - returns valid response structure for single division", async ({
-    request,
-  }) => {
-    const result = await executeGraphQL<GetImageUrlCheckResponse>(
-      request,
-      GET_IMAGE_URL_CHECK_QUERY,
-      {
-        divisions: [TEST_CONFIG.singleDivision],
-        season: TEST_CONFIG.season,
-      }
-    );
+  test("getImageUrlCheck - returns valid response structure for single division", async ({ request }) => {
+    const result = await executeGraphQL<GetImageUrlCheckResponse>(request, GET_IMAGE_URL_CHECK_QUERY, {
+      divisions: [TEST_CONFIG.singleDivision],
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.getImageUrlCheck).toBeDefined();
@@ -232,14 +194,10 @@ test.describe("GraphQL getImageUrlCheck Query - C52 Season", () => {
   });
 
   test("getImageUrlCheck - returns results for multiple divisions", async ({ request }) => {
-    const result = await executeGraphQL<GetImageUrlCheckResponse>(
-      request,
-      GET_IMAGE_URL_CHECK_QUERY,
-      {
-        divisions: TEST_CONFIG.divisions,
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<GetImageUrlCheckResponse>(request, GET_IMAGE_URL_CHECK_QUERY, {
+      divisions: TEST_CONFIG.divisions,
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
     expect(result.data?.getImageUrlCheck).toBeDefined();
@@ -257,27 +215,19 @@ test.describe("GraphQL getImageUrlCheck Query - C52 Season", () => {
   });
 
   test("getImageUrlCheck - response time under 5 seconds", async ({ request }) => {
-    const { durationMs } = await measureQueryTime<GetImageUrlCheckResponse>(
-      request,
-      GET_IMAGE_URL_CHECK_QUERY,
-      {
-        divisions: [TEST_CONFIG.singleDivision],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const { durationMs } = await measureQueryTime<GetImageUrlCheckResponse>(request, GET_IMAGE_URL_CHECK_QUERY, {
+      divisions: [TEST_CONFIG.singleDivision],
+      season: TEST_CONFIG.season,
+    });
 
     expect(durationMs).toBeLessThan(5000);
   });
 
   test("getImageUrlCheck - handles empty divisions array", async ({ request }) => {
-    const result = await executeGraphQL<GetImageUrlCheckResponse>(
-      request,
-      GET_IMAGE_URL_CHECK_QUERY,
-      {
-        divisions: [],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<GetImageUrlCheckResponse>(request, GET_IMAGE_URL_CHECK_QUERY, {
+      divisions: [],
+      season: TEST_CONFIG.season,
+    });
 
     // Should either return validation error or empty results
     expect(
@@ -287,18 +237,12 @@ test.describe("GraphQL getImageUrlCheck Query - C52 Season", () => {
   });
 
   test("getImageUrlCheck - handles empty season gracefully", async ({ request }) => {
-    const result = await executeGraphQL<GetImageUrlCheckResponse>(
-      request,
-      GET_IMAGE_URL_CHECK_QUERY,
-      {
-        divisions: [TEST_CONFIG.singleDivision],
-        season: "",
-      }
-    );
+    const result = await executeGraphQL<GetImageUrlCheckResponse>(request, GET_IMAGE_URL_CHECK_QUERY, {
+      divisions: [TEST_CONFIG.singleDivision],
+      season: "",
+    });
 
-    expect(
-      result.errors !== undefined || result.data?.getImageUrlCheck !== undefined
-    ).toBeTruthy();
+    expect(result.errors !== undefined || result.data?.getImageUrlCheck !== undefined).toBeTruthy();
 
     if (result.data?.getImageUrlCheck) {
       expect(Array.isArray(result.data.getImageUrlCheck)).toBe(true);
@@ -306,14 +250,10 @@ test.describe("GraphQL getImageUrlCheck Query - C52 Season", () => {
   });
 
   test("getImageUrlCheck - handles invalid division gracefully", async ({ request }) => {
-    const result = await executeGraphQL<GetImageUrlCheckResponse>(
-      request,
-      GET_IMAGE_URL_CHECK_QUERY,
-      {
-        divisions: ["99"],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<GetImageUrlCheckResponse>(request, GET_IMAGE_URL_CHECK_QUERY, {
+      divisions: ["99"],
+      season: TEST_CONFIG.season,
+    });
 
     // Should return empty results for non-existent division
     expect(result.errors).toBeUndefined();
@@ -364,14 +304,10 @@ test.describe("GraphQL getImageUrlCheck Query - C52 Season", () => {
   });
 
   test("getImageUrlCheck - URLs are valid strings", async ({ request }) => {
-    const result = await executeGraphQL<GetImageUrlCheckResponse>(
-      request,
-      GET_IMAGE_URL_CHECK_QUERY,
-      {
-        divisions: [TEST_CONFIG.singleDivision],
-        season: TEST_CONFIG.season,
-      }
-    );
+    const result = await executeGraphQL<GetImageUrlCheckResponse>(request, GET_IMAGE_URL_CHECK_QUERY, {
+      divisions: [TEST_CONFIG.singleDivision],
+      season: TEST_CONFIG.season,
+    });
 
     expect(result.errors).toBeUndefined();
 
@@ -387,14 +323,10 @@ test.describe("GraphQL getImageUrlCheck Query - C52 Season", () => {
   });
 
   test("getImageUrlCheck - all divisions performance test", async ({ request }) => {
-    const { durationMs } = await measureQueryTime<GetImageUrlCheckResponse>(
-      request,
-      GET_IMAGE_URL_CHECK_QUERY,
-      {
-        divisions: TEST_CONFIG.divisions,
-        season: TEST_CONFIG.season,
-      }
-    );
+    const { durationMs } = await measureQueryTime<GetImageUrlCheckResponse>(request, GET_IMAGE_URL_CHECK_QUERY, {
+      divisions: TEST_CONFIG.divisions,
+      season: TEST_CONFIG.season,
+    });
 
     // All divisions should complete in reasonable time
     expect(durationMs).toBeLessThan(10000);

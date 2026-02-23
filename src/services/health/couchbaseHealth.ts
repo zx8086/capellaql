@@ -170,7 +170,7 @@ export class CouchbaseHealthService {
       const masked = url.replace(/(:\/\/[^:]+:)[^@]+(@)/, "$1****$2");
       // Truncate if too long
       if (masked.length > 50) {
-        return masked.substring(0, 47) + "...";
+        return `${masked.substring(0, 47)}...`;
       }
       return masked;
     } catch {

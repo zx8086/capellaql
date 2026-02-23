@@ -29,27 +29,21 @@ export async function skipIfServiceUnavailable(
  * Skip test if Couchbase database is unavailable
  * Checks via the application's health endpoint
  */
-export async function skipIfCouchbaseUnavailable(
-  appBaseUrl: string = "http://localhost:4000"
-): Promise<void> {
+export async function skipIfCouchbaseUnavailable(appBaseUrl: string = "http://localhost:4000"): Promise<void> {
   await skipIfServiceUnavailable("Couchbase", `${appBaseUrl}/health/database`);
 }
 
 /**
  * Skip test if the GraphQL server is unavailable
  */
-export async function skipIfGraphQLUnavailable(
-  appBaseUrl: string = "http://localhost:4000"
-): Promise<void> {
+export async function skipIfGraphQLUnavailable(appBaseUrl: string = "http://localhost:4000"): Promise<void> {
   await skipIfServiceUnavailable("GraphQL Server", `${appBaseUrl}/health`);
 }
 
 /**
  * Skip test if Redis is unavailable
  */
-export async function skipIfRedisUnavailable(
-  redisUrl: string = "redis://localhost:6379"
-): Promise<void> {
+export async function skipIfRedisUnavailable(redisUrl: string = "redis://localhost:6379"): Promise<void> {
   await skipIfServiceUnavailable("Redis", redisUrl);
 }
 
@@ -57,10 +51,7 @@ export async function skipIfRedisUnavailable(
  * Utility to check if a service is available without skipping
  * Returns true if available, false otherwise
  */
-export async function isServiceAvailable(
-  healthUrl: string,
-  timeout: number = 5000
-): Promise<boolean> {
+export async function isServiceAvailable(healthUrl: string, timeout: number = 5000): Promise<boolean> {
   try {
     const response = await fetch(healthUrl, {
       signal: AbortSignal.timeout(timeout),

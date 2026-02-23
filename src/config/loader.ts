@@ -3,7 +3,7 @@
 // Per 4-pillar pattern: Walks mapping, merges, validates once, freezes
 
 import { defaultConfig } from "./defaults";
-import { envVarMapping, getEnvVarForPath, type EnvVarType } from "./envMapping";
+import { type EnvVarType, envVarMapping, getEnvVarForPath } from "./envMapping";
 import { deriveOtlpEndpoint, toBool } from "./helpers";
 import type { Config } from "./schemas";
 import { ConfigSchema, ConfigurationError } from "./schemas";
@@ -99,9 +99,7 @@ function deepFreeze<T extends object>(obj: T): Readonly<T> {
  * Per 4-pillar pattern principle #5:
  * "The env mapping drives the loader"
  */
-function readEnvValues(
-  env: (key: string) => string | undefined
-): Record<string, Record<string, unknown>> {
+function readEnvValues(env: (key: string) => string | undefined): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {};
 
   for (const [section, fields] of Object.entries(envVarMapping)) {
@@ -118,9 +116,7 @@ function readEnvValues(
         }
       } catch (error) {
         // Re-throw with context
-        throw new Error(
-          `Error parsing ${entry.envVar}: ${error instanceof Error ? error.message : String(error)}`
-        );
+        throw new Error(`Error parsing ${entry.envVar}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
@@ -140,9 +136,7 @@ function readEnvValues(
  * Handle OTLP endpoint derivation (telemetry-specific logic).
  * If specific endpoints aren't set, derive from base endpoint.
  */
-function deriveOtlpEndpoints(
-  envValues: Record<string, Record<string, unknown>>
-): void {
+function deriveOtlpEndpoints(envValues: Record<string, Record<string, unknown>>): void {
   const telemetry = envValues.telemetry || {};
 
   // Get base OTLP endpoint for fallback derivation
@@ -240,11 +234,7 @@ export function initializeConfig(): Readonly<Config> {
   const result = ConfigSchema.safeParse(merged);
 
   if (!result.success) {
-    const configError = new ModularConfigurationError(
-      "Configuration validation failed",
-      result.error,
-      merged
-    );
+    const configError = new ModularConfigurationError("Configuration validation failed", result.error, merged);
 
     // Enhanced error reporting
     process.stderr.write(`\n=== CONFIGURATION VALIDATION FAILED ===\n`);
@@ -252,9 +242,7 @@ export function initializeConfig(): Readonly<Config> {
 
     // Check for critical security issues
     const criticalIssues = result.error.issues.filter(
-      (issue) =>
-        issue.message.includes("CRITICAL") ||
-        issue.path.includes("COUCHBASE_PASSWORD")
+      (issue) => issue.message.includes("CRITICAL") || issue.path.includes("COUCHBASE_PASSWORD")
     );
 
     if (criticalIssues.length > 0) {
@@ -286,15 +274,9 @@ export function initializeConfig(): Readonly<Config> {
         : "Development mode: Using development defaults where applicable\n"
     );
     process.stderr.write("4-pillar configuration pattern active\n");
-    process.stderr.write(
-      `Configuration domains: ${sections.join(", ")}\n`
-    );
-    process.stderr.write(
-      `Telemetry: ${validatedConfig.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`
-    );
-    process.stderr.write(
-      `Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`
-    );
+    process.stderr.write(`Configuration domains: ${sections.join(", ")}\n`);
+    process.stderr.write(`Telemetry: ${validatedConfig.telemetry.ENABLE_OPENTELEMETRY ? "ENABLED" : "DISABLED"}\n`);
+    process.stderr.write(`Runtime: ${typeof Bun !== "undefined" ? `Bun ${Bun.version}` : "Node.js"}\n`);
     process.stderr.write("=== CONFIGURATION INITIALIZATION COMPLETE ===\n\n");
   }
 

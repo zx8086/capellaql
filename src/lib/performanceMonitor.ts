@@ -1,6 +1,6 @@
 import { metrics } from "@opentelemetry/api";
 import { connectionManager } from "$lib/couchbase";
-import { debug, log, getTelemetryHealth } from "$telemetry";
+import { debug, getTelemetryHealth, log } from "$telemetry";
 import { BunPerf } from "$utils/bunUtils";
 import { getGraphQLPerformanceStats, getRecentGraphQLPerformance } from "./graphqlPerformanceTracker";
 
@@ -455,15 +455,16 @@ class PerformanceMonitor {
   private measureEventLoopLag(): number {
     const start = process.hrtime.bigint();
 
+    // Note: This is a synchronous approximation of event loop lag.
+    // A true async measurement would use setImmediate, but this method
+    // must return synchronously for the metrics collection pipeline.
+    // The returned Promise is cast to number for API compatibility.
     return new Promise<number>((resolve) => {
       setImmediate(() => {
         const lag = Number(process.hrtime.bigint() - start) / 1_000_000; // Convert to milliseconds
         resolve(lag);
       });
-    }) as any; // Type hack for sync return
-
-    // Fallback sync calculation
-    return 0;
+    }) as unknown as number; // Type hack for sync return - Promise resolves after caller continues
   }
 
   getRecentMetrics(count: number = 10): PerformanceMetrics[] {

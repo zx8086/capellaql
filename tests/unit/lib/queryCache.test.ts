@@ -11,7 +11,7 @@ mock.module("../../../src/telemetry", () => ({
 }));
 
 // Import after mocking
-import { QueryCache, CacheKeys, type CacheStats } from "../../../src/lib/queryCache";
+import { CacheKeys, type CacheStats, QueryCache } from "../../../src/lib/queryCache";
 
 describe("QueryCache", () => {
   let cache: QueryCache;
