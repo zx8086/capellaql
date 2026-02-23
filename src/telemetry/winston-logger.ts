@@ -359,7 +359,12 @@ class WinstonTelemetryLogger {
 
   private flushFallbackLogs(): void {
     if (this.fallbackLogs.length > 0 && this.isInitialized) {
-      console.info(`Flushing ${this.fallbackLogs.length} fallback logs to OTLP`);
+      // Use direct Winston logger to avoid recursion while still getting structured output
+      this.logger.info("Flushing fallback logs to OTLP", {
+        component: "telemetry",
+        operation: "flush_fallback",
+        count: this.fallbackLogs.length,
+      });
 
       for (const logData of this.fallbackLogs) {
         this.emit(logData);

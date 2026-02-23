@@ -64,8 +64,13 @@ const optionsProductViewResolver = withValidation(
           debug("Options product view query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2),
+            result: result.rows?.[0] ? JSON.stringify(result.rows[0], null, 2) : "empty",
           });
+
+          // Handle empty results gracefully - return empty array
+          if (!result.rows?.length || !result.rows[0]) {
+            return [];
+          }
 
           const data = result.rows[0];
 

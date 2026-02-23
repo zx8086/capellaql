@@ -14,6 +14,7 @@
 import type { Cluster, QueryOptions, QueryResult } from "couchbase";
 import { CouchbaseErrorClassifier } from "./errors";
 import type { QueryExecutionOptions } from "./types";
+import { log, warn } from "../../telemetry/logger";
 
 // Re-export the options type
 export type { QueryExecutionOptions };
@@ -64,16 +65,20 @@ export class QueryExecutor {
 
         // Log slow queries
         if (duration > 1000) {
-          console.warn(`[Query] Slow query detected (${duration.toFixed(2)}ms):`, {
+          warn("Slow query detected", {
+            component: "couchbase",
+            operation: "query",
+            durationMs: Number(duration.toFixed(2)),
             statement: statement.substring(0, 100),
-            duration,
             queryContext: options.queryContext,
           });
         }
 
         // Log metrics if requested
         if (options.metrics && result.meta?.metrics) {
-          console.log("[Query] Metrics:", {
+          log("Query metrics", {
+            component: "couchbase",
+            operation: "query",
             executionTime: result.meta.metrics.executionTime,
             resultCount: result.meta.metrics.resultCount,
           });
@@ -96,10 +101,14 @@ export class QueryExecutor {
         }
 
         const delay = retryStrategy.baseDelayMs * Math.pow(2, attempt - 1);
-        console.warn(
-          `[Query] Retry attempt ${attempt}/${maxRetries} after ${delay}ms:`,
-          errorContext.message
-        );
+        warn("Query retry attempt", {
+          component: "couchbase",
+          operation: "query",
+          attempt,
+          maxRetries,
+          delayMs: delay,
+          error: errorContext.message,
+        });
 
         await this.sleep(delay);
       }

@@ -62,8 +62,18 @@ const optionsSummaryResolver = withValidation(
           debug("Options summary query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2),
+            result: result.rows?.[0] ? JSON.stringify(result.rows[0], null, 2) : "empty",
           });
+
+          // Handle empty results gracefully - return default summary
+          if (!result.rows?.length || !result.rows[0]?.[0]) {
+            return {
+              totalOptions: 0,
+              totalUnits: 0,
+              totalWholesale: 0,
+              totalRetail: 0,
+            };
+          }
 
           return result.rows[0][0];
         },

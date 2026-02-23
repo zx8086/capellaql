@@ -41,7 +41,7 @@ const looksUrlCheckResolver = withValidation(
 
           const result = await QueryExecutor.execute(conn.cluster, query, {
             parameters,
-            usePreparedStatement: true,
+            usePreparedStatement: false, // Disabled - causes race condition under high concurrency
             queryContext: "default.media_assets",
             requestId: context.requestId,
           });
@@ -49,10 +49,11 @@ const looksUrlCheckResolver = withValidation(
           debug("Looks URL check query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2),
+            result: result.rows?.[0] ? JSON.stringify(result.rows[0], null, 2) : "empty",
           });
 
-          return result.rows[0];
+          // Handle empty results gracefully - return empty array
+          return result.rows?.[0] || [];
         },
         2 * 60 * 1000 // 2-minute TTL
       );

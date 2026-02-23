@@ -64,7 +64,7 @@ const looksResolver = withValidation(
             cacheStatus: "populated",
           });
 
-          const data = result.rows[0];
+          const data = result.rows?.[0];
 
           // Handle empty results (e.g., invalid division)
           if (!data || !Array.isArray(data) || data.length === 0) {

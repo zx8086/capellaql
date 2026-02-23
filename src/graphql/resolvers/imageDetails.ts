@@ -68,8 +68,13 @@ const imageDetailsResolver = withValidation(
           debug("Image details query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2),
+            result: result.rows?.[0] ? JSON.stringify(result.rows[0], null, 2) : "empty",
           });
+
+          // Handle empty results gracefully - return null for missing image
+          if (!result.rows?.length || !result.rows[0]?.[0]) {
+            return null;
+          }
 
           const data = result.rows[0][0];
 

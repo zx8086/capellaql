@@ -22,6 +22,7 @@ import type {
 } from "couchbase";
 import { DocumentNotFoundError } from "./errors";
 import type { KVGetOptions, KVUpsertOptions, SubdocOperation } from "./types";
+import { warn } from "../../telemetry/logger";
 
 // Re-export types
 export type { KVGetOptions, KVUpsertOptions, SubdocOperation };
@@ -342,7 +343,12 @@ export class KVOperations {
             return { id, value: result.value };
           }
         } catch (error) {
-          console.warn(`[KV] Failed to get ${id}:`, error);
+          warn("KV batch get failed for document", {
+            component: "couchbase",
+            operation: "kv_get_many",
+            documentId: id,
+            error: String(error),
+          });
         }
         return null;
       });

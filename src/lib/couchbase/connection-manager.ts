@@ -48,6 +48,7 @@ import {
 import { loadCouchbaseConfig, parseConnectionString, validateProductionConfig } from "./config";
 import { buildConnectionOptions } from "./connection-options";
 import { CircuitBreaker, createCouchbaseCircuitBreaker } from "./circuit-breaker";
+import { log, warn, err } from "../../telemetry/logger";
 import type {
   CouchbaseConfig,
   CouchbaseConnection,
@@ -128,7 +129,7 @@ export class CouchbaseConnectionManager {
     }
 
     if (this.cluster && this.config?.connectionString === effectiveConfig.connectionString) {
-      console.log("[Couchbase] Already initialized, reusing connection");
+      log("Couchbase already initialized, reusing connection", { component: "couchbase", operation: "initialize" });
       return;
     }
 
@@ -142,7 +143,7 @@ export class CouchbaseConnectionManager {
       this.bucket = this.cluster.bucket(effectiveConfig.bucketName);
 
       // Verify bucket is accessible by getting scopes
-      console.log("[Couchbase] Verifying bucket access...");
+      log("Couchbase verifying bucket access", { component: "couchbase", operation: "bucket_verify" });
       await this.waitForBucketReady(this.bucket, 5000);
 
       this.isHealthy = true;
@@ -150,7 +151,7 @@ export class CouchbaseConnectionManager {
       this.metrics.successfulConnections++;
       this.metrics.lastConnectionTime = new Date();
 
-      console.log("[Couchbase] Connection initialized successfully");
+      log("Couchbase connection initialized successfully", { component: "couchbase", operation: "connection_ready" });
 
       // Start health monitoring with SDK diagnostics
       this.startHealthMonitoring();
@@ -159,7 +160,9 @@ export class CouchbaseConnectionManager {
       this.isHealthy = false;
 
       const errorContext = CouchbaseErrorClassifier.extractContext(error, "initialize");
-      console.error("[Couchbase] Initialization failed:", {
+      err("Couchbase initialization failed", {
+        component: "couchbase",
+        operation: "initialize",
         ...errorContext,
         attempt: this.connectionAttempts,
       });
@@ -181,7 +184,7 @@ export class CouchbaseConnectionManager {
       this.connectionAttempts = attempt;
 
       try {
-        console.log(`[Couchbase] Connection attempt ${attempt}/${maxAttempts}...`);
+        log("Couchbase connection attempt", { component: "couchbase", operation: "connect", attempt, maxAttempts });
 
         const startTime = typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
 
@@ -197,7 +200,7 @@ export class CouchbaseConnectionManager {
         const endTime = typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
         const connectTime = (endTime - startTime) / 1_000_000;
 
-        console.log(`[Couchbase] Connected in ${connectTime.toFixed(2)}ms`);
+        log("Couchbase connected", { component: "couchbase", operation: "connected", durationMs: connectTime.toFixed(2) });
 
         this.metrics.totalConnections++;
         return cluster;
@@ -206,13 +209,13 @@ export class CouchbaseConnectionManager {
 
         // Don't retry on authentication errors
         if (CouchbaseErrorClassifier.isAuthError(error)) {
-          console.error("[Couchbase] Authentication failed - not retrying");
+          err("Couchbase authentication failed - not retrying", { component: "couchbase", operation: "connect" });
           throw lastError;
         }
 
         if (attempt < maxAttempts) {
           const delayMs = this.calculateBackoff(attempt);
-          console.log(`[Couchbase] Retrying in ${delayMs}ms...`);
+          log("Couchbase connection retry scheduled", { component: "couchbase", operation: "retry", delayMs });
           await this.sleep(delayMs);
         }
       }
@@ -231,7 +234,7 @@ export class CouchbaseConnectionManager {
       try {
         // SDK BEST PRACTICE: Use collections API to verify bucket readiness
         await bucket.collections().getAllScopes();
-        console.log("[Couchbase] Bucket is ready");
+        log("Couchbase bucket is ready", { component: "couchbase", operation: "bucket_ready" });
         return;
       } catch {
         await this.sleep(500);
@@ -254,7 +257,7 @@ export class CouchbaseConnectionManager {
     }
 
     const intervalMs = 60000; // 60 seconds
-    console.log(`[Couchbase] Starting health monitoring (${intervalMs}ms interval)`);
+    log("Couchbase starting health monitoring", { component: "couchbase", operation: "health_monitor_start", intervalMs });
 
     this.healthCheckInterval = setInterval(async () => {
       try {
@@ -263,10 +266,10 @@ export class CouchbaseConnectionManager {
         this.lastHealthCheck = new Date();
 
         if (!this.isHealthy && this.config) {
-          console.warn("[Couchbase] Unhealthy connection detected");
+          warn("Couchbase unhealthy connection detected", { component: "couchbase", operation: "health_check" });
         }
       } catch (error) {
-        console.error("[Couchbase] Health check failed:", error);
+        err("Couchbase health check failed", { component: "couchbase", operation: "health_check", error: String(error) });
         this.isHealthy = false;
       }
     }, intervalMs);
@@ -572,7 +575,12 @@ export class CouchbaseConnectionManager {
             if (retryStrategy.onRetry) {
               retryStrategy.onRetry(attempt, lastError, delayMs);
             } else {
-              console.warn(`[Couchbase] Retry attempt ${attempt}/${maxAttempts} after ${delayMs}ms`, {
+              warn("Couchbase retry attempt", {
+                component: "couchbase",
+                operation: "retry",
+                attempt,
+                maxAttempts,
+                delayMs,
                 error: errorContext.message,
               });
             }
@@ -630,7 +638,7 @@ export class CouchbaseConnectionManager {
    * Close connection.
    */
   public async close(): Promise<void> {
-    console.log("[Couchbase] Closing connection...");
+    log("Couchbase closing connection", { component: "couchbase", operation: "close" });
 
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
@@ -640,9 +648,9 @@ export class CouchbaseConnectionManager {
     if (this.cluster) {
       try {
         await this.cluster.close();
-        console.log("[Couchbase] Connection closed successfully");
+        log("Couchbase connection closed successfully", { component: "couchbase", operation: "close_complete" });
       } catch (error) {
-        console.error("[Couchbase] Error closing connection:", error);
+        err("Couchbase error closing connection", { component: "couchbase", operation: "close", error: String(error) });
       }
     }
 
@@ -699,12 +707,12 @@ export const connectionManager = CouchbaseConnectionManager.getInstance();
 
 if (typeof process !== "undefined") {
   process.on("SIGINT", async () => {
-    console.log("[Couchbase] Received SIGINT, closing connections...");
+    log("Couchbase received SIGINT, closing connections", { component: "couchbase", operation: "signal", signal: "SIGINT" });
     await connectionManager.close();
   });
 
   process.on("SIGTERM", async () => {
-    console.log("[Couchbase] Received SIGTERM, closing connections...");
+    log("Couchbase received SIGTERM, closing connections", { component: "couchbase", operation: "signal", signal: "SIGTERM" });
     await connectionManager.close();
   });
 }

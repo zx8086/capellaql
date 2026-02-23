@@ -61,18 +61,22 @@ const getAllSeasonalAssignmentsResolver = withValidation(
           debug("Get all seasonal assignments query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0], null, 2),
+            result: result.rows?.[0] ? JSON.stringify(result.rows[0], null, 2) : "empty",
           });
 
-          // Filter divisions based on isActive if it's provided
-          if (isActive !== undefined) {
-            result.rows[0] = result.rows[0].map((assignment: { divisions: any[] }) => ({
-              ...assignment,
-              divisions: assignment.divisions.filter((div) => div.isActive === isActive),
-            }));
+          // Handle empty results gracefully - return empty array
+          if (!result.rows?.length || !result.rows[0]) {
+            return [];
           }
 
-          const data = result.rows[0];
+          // Filter divisions based on isActive if it's provided
+          let data = result.rows[0];
+          if (isActive !== undefined) {
+            data = data.map((assignment: { divisions: any[] }) => ({
+              ...assignment,
+              divisions: assignment.divisions?.filter((div) => div.isActive === isActive) || [],
+            }));
+          }
 
           // Cache individual division assignments for getDivisionAssignment reuse
           // This iterates through assignments and their divisions

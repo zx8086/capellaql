@@ -45,7 +45,7 @@ const looksSummaryResolver = withValidation(
 
           const result = await QueryExecutor.execute(conn.cluster, query, {
             parameters: { brand, season, division },
-            usePreparedStatement: true,
+            usePreparedStatement: false, // Disabled - causes race condition under high concurrency
             queryContext: "default.media_assets",
             requestId: context.requestId,
           });
@@ -53,8 +53,22 @@ const looksSummaryResolver = withValidation(
           debug("Looks summary query result", {
             requestId: context.requestId,
             rowCount: result.rows?.length || 0,
-            result: JSON.stringify(result.rows[0][0], null, 2),
+            result: result.rows?.[0]?.[0] ? JSON.stringify(result.rows[0][0], null, 2) : "empty",
           });
+
+          // Handle empty results gracefully - return zero counts
+          if (!result.rows?.length || !result.rows[0]?.[0]) {
+            return {
+              totalLooks: 0,
+              hasTitle: 0,
+              hasTrend: 0,
+              hasTag: 0,
+              hasDescription: 0,
+              hasDeliveryName: 0,
+              hasGender: 0,
+              hasRelatedStyles: 0,
+            };
+          }
 
           return result.rows[0][0];
         },

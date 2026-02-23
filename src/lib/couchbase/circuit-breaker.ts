@@ -25,6 +25,7 @@ import {
   PathExistsError,
   ParsingFailureError,
 } from "./errors";
+import { log, warn } from "../../telemetry/logger";
 
 // =============================================================================
 // CONFIGURATION INTERFACE
@@ -198,10 +199,13 @@ export class CircuitBreaker {
     this.state = "open";
     this.nextAttemptTime = Date.now() + this.config.timeout;
 
-    console.warn(
-      `[CircuitBreaker] Circuit OPENED after ${this.failures} failures. ` +
-        `Will retry at ${new Date(this.nextAttemptTime).toISOString()}`
-    );
+    warn("Circuit breaker OPENED", {
+      component: "couchbase",
+      operation: "circuit_breaker",
+      state: "open",
+      failures: this.failures,
+      nextAttemptTime: new Date(this.nextAttemptTime).toISOString(),
+    });
   }
 
   /**
@@ -211,7 +215,11 @@ export class CircuitBreaker {
     this.state = "half-open";
     this.successes = 0;
 
-    console.log("[CircuitBreaker] Transitioning to HALF-OPEN state - testing recovery");
+    log("Circuit breaker transitioning to HALF-OPEN state - testing recovery", {
+      component: "couchbase",
+      operation: "circuit_breaker",
+      state: "half-open",
+    });
   }
 
   /**
@@ -223,7 +231,11 @@ export class CircuitBreaker {
     this.successes = 0;
     this.nextAttemptTime = null;
 
-    console.log("[CircuitBreaker] Circuit CLOSED after successful recovery");
+    log("Circuit breaker CLOSED after successful recovery", {
+      component: "couchbase",
+      operation: "circuit_breaker",
+      state: "closed",
+    });
   }
 
   /**
@@ -275,7 +287,12 @@ export class CircuitBreaker {
     this.lastFailureTime = null;
     this.nextAttemptTime = null;
 
-    console.log("[CircuitBreaker] Manually reset to CLOSED state");
+    log("Circuit breaker manually reset to CLOSED state", {
+      component: "couchbase",
+      operation: "circuit_breaker",
+      state: "closed",
+      action: "manual_reset",
+    });
   }
 
   /**
@@ -286,7 +303,13 @@ export class CircuitBreaker {
     this.state = "open";
     this.nextAttemptTime = Date.now() + this.config.timeout;
 
-    console.warn(`[CircuitBreaker] Forced OPEN${reason ? `: ${reason}` : ""}`);
+    warn("Circuit breaker forced OPEN", {
+      component: "couchbase",
+      operation: "circuit_breaker",
+      state: "open",
+      action: "force_open",
+      reason: reason || "no reason provided",
+    });
   }
 }
 

@@ -74,27 +74,57 @@ export interface GetImageUrlCheckResponse {
 }
 
 /**
- * Execute a GraphQL query against the API
+ * Execute a GraphQL query against the API with retry logic
  */
 export async function executeGraphQL<T>(
   request: APIRequestContext,
   query: string,
   variables?: Record<string, unknown>,
-  options?: { skipCache?: boolean }
+  options?: { skipCache?: boolean; maxRetries?: number; retryDelayMs?: number }
 ): Promise<GraphQLResponse<T>> {
   const headers: Record<string, string> = {};
+  const maxRetries = options?.maxRetries ?? 3;
+  const retryDelayMs = options?.retryDelayMs ?? 100;
 
   // Add cache bypass header for testing - ensures requests always hit the backend
   if (options?.skipCache !== false) {
     headers["x-no-cache"] = "true";
   }
 
-  const response = await request.post("/graphql", {
-    data: { query, variables },
-    headers,
-  });
-  expect(response.status()).toBe(200);
-  return response.json();
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await request.post("/graphql", {
+        data: { query, variables },
+        headers,
+      });
+      expect(response.status()).toBe(200);
+      const result: GraphQLResponse<T> = await response.json();
+
+      // Retry on internal server failure (transient errors)
+      if (result.errors?.some((e) => e.message === "internal server failure") && attempt < maxRetries) {
+        await sleep(retryDelayMs * attempt);
+        continue;
+      }
+
+      return result;
+    } catch (error) {
+      lastError = error as Error;
+      if (attempt < maxRetries) {
+        await sleep(retryDelayMs * attempt);
+      }
+    }
+  }
+
+  throw lastError || new Error("GraphQL request failed after retries");
+}
+
+/**
+ * Sleep helper for retry delays
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
