@@ -1,0 +1,36 @@
+{
+  "$schema": "https://raw.githubusercontent.com/stryker-mutator/stryker/master/packages/core/schema/stryker-schema.json",
+  "mutate": [
+    "src/lib/queryCache.ts",
+    "src/lib/metricsCardinalityManager.ts",
+    "src/lib/memoryGuardian.ts",
+    "src/lib/couchbase/circuit-breaker.ts",
+    "src/graphql/resolvers/**/*.ts",
+    "src/server/middleware/**/*.ts",
+    "src/errors/**/*.ts",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts"
+  ],
+  "ignorePatterns": [".bun-cache", "dist", "docs", "migrate", "public", "patches", "test-results", "playwright-report", "coverage"],
+  "testRunner": "command",
+  "commandRunner": {
+    "command": "bun test tests/bun/unit"
+  },
+  "reporters": ["html", "clear-text", "progress"],
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "coverageAnalysis": "off",
+  "timeoutMS": 30000,
+  "timeoutFactor": 2,
+  "concurrency": 2,
+  "incremental": true,
+  "incrementalFile": ".stryker-tmp/incremental.json",
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": 50
+  },
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": "always"
+}

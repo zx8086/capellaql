@@ -1,0 +1,142 @@
+diff --git a/build/src/sdk.js b/build/src/sdk.js
+index c4375bbae5a37f6c8ac7b3d5e2970ad5d02131b4..c91dadd95b4dd53eff880f6bd9c88f210bbca8f0 100644
+--- a/build/src/sdk.js
++++ b/build/src/sdk.js
+@@ -14,6 +14,8 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
++// PATCHED: Lazy-load grpc/proto log exporters to prevent protobufjs buffer pool allocation
++// when only http/json protocol is used. This saves ~50-70MB of Uint8Array memory.
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.NodeSDK = void 0;
+ const api_1 = require("@opentelemetry/api");
+@@ -22,8 +24,17 @@ const instrumentation_1 = require("@opentelemetry/instrumentation");
+ const resources_1 = require("@opentelemetry/resources");
+ const sdk_logs_1 = require("@opentelemetry/sdk-logs");
+ const exporter_logs_otlp_http_1 = require("@opentelemetry/exporter-logs-otlp-http");
+-const exporter_logs_otlp_grpc_1 = require("@opentelemetry/exporter-logs-otlp-grpc");
+-const exporter_logs_otlp_proto_1 = require("@opentelemetry/exporter-logs-otlp-proto");
++// Lazy-load grpc/proto exporters - only loaded when actually needed
++let _exporter_logs_otlp_grpc_1;
++let _exporter_logs_otlp_proto_1;
++function getLogsGrpcExporter() {
++    if (!_exporter_logs_otlp_grpc_1) _exporter_logs_otlp_grpc_1 = require("@opentelemetry/exporter-logs-otlp-grpc");
++    return _exporter_logs_otlp_grpc_1;
++}
++function getLogsProtoExporter() {
++    if (!_exporter_logs_otlp_proto_1) _exporter_logs_otlp_proto_1 = require("@opentelemetry/exporter-logs-otlp-proto");
++    return _exporter_logs_otlp_proto_1;
++}
+ const exporter_prometheus_1 = require("@opentelemetry/exporter-prometheus");
+ const sdk_metrics_1 = require("@opentelemetry/sdk-metrics");
+ const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
+@@ -285,17 +296,17 @@ class NodeSDK {
+                     (0, core_1.getStringFromEnv)('OTEL_EXPORTER_OTLP_PROTOCOL'))?.trim() || 'http/protobuf'; // Using || to also fall back on empty string
+                 switch (protocol) {
+                     case 'grpc':
+-                        exporters.push(new exporter_logs_otlp_grpc_1.OTLPLogExporter());
++                        exporters.push(new (getLogsGrpcExporter().OTLPLogExporter)());
+                         break;
+                     case 'http/json':
+                         exporters.push(new exporter_logs_otlp_http_1.OTLPLogExporter());
+                         break;
+                     case 'http/protobuf':
+-                        exporters.push(new exporter_logs_otlp_proto_1.OTLPLogExporter());
++                        exporters.push(new (getLogsProtoExporter().OTLPLogExporter)());
+                         break;
+                     default:
+                         api_1.diag.warn(`Unsupported OTLP logs protocol: "${protocol}". Using http/protobuf.`);
+-                        exporters.push(new exporter_logs_otlp_proto_1.OTLPLogExporter());
++                        exporters.push(new (getLogsProtoExporter().OTLPLogExporter)());
+                 }
+             }
+             else if (exporter === 'console') {
+diff --git a/build/src/utils.js b/build/src/utils.js
+index 1663e22a597645d48afe3fe9fd3a0c61b37cb8f6..3ee73192c74954fc6f7cdf6487bd4265ea1f93a4 100644
+--- a/build/src/utils.js
++++ b/build/src/utils.js
+@@ -14,13 +14,24 @@
+  * See the License for the specific language governing permissions and
+  * limitations under the License.
+  */
++// PATCHED: Lazy-load grpc/proto exporters to prevent protobufjs buffer pool allocation
++// when only http/json protocol is used. This saves ~50-70MB of Uint8Array memory.
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.getBatchLogRecordProcessorFromEnv = exports.getBatchLogRecordProcessorConfigFromEnv = exports.getLoggerProviderConfigFromEnv = exports.getOtlpMetricExporterFromEnv = exports.getPeriodicExportingMetricReaderFromEnv = exports.getNonNegativeNumberFromEnv = exports.getKeyListFromObjectArray = exports.setupPropagator = exports.setupDefaultContextManager = exports.setupContextManager = exports.getPropagatorFromConfiguration = exports.getPropagatorFromEnv = exports.getSpanProcessorsFromEnv = exports.getOtlpProtocolFromEnv = exports.getResourceDetectorsFromEnv = void 0;
+ const api_1 = require("@opentelemetry/api");
+ const core_1 = require("@opentelemetry/core");
+-const exporter_trace_otlp_proto_1 = require("@opentelemetry/exporter-trace-otlp-proto");
++// Lazy-load grpc/proto trace exporters - only loaded when actually needed
++let _exporter_trace_otlp_proto_1;
++let _exporter_trace_otlp_grpc_1;
++function getTraceProtoExporter() {
++    if (!_exporter_trace_otlp_proto_1) _exporter_trace_otlp_proto_1 = require("@opentelemetry/exporter-trace-otlp-proto");
++    return _exporter_trace_otlp_proto_1;
++}
++function getTraceGrpcExporter() {
++    if (!_exporter_trace_otlp_grpc_1) _exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
++    return _exporter_trace_otlp_grpc_1;
++}
+ const exporter_trace_otlp_http_1 = require("@opentelemetry/exporter-trace-otlp-http");
+-const exporter_trace_otlp_grpc_1 = require("@opentelemetry/exporter-trace-otlp-grpc");
+ const exporter_zipkin_1 = require("@opentelemetry/exporter-zipkin");
+ const resources_1 = require("@opentelemetry/resources");
+ const sdk_trace_base_1 = require("@opentelemetry/sdk-trace-base");
+@@ -28,9 +39,18 @@ const propagator_b3_1 = require("@opentelemetry/propagator-b3");
+ const propagator_jaeger_1 = require("@opentelemetry/propagator-jaeger");
+ const context_async_hooks_1 = require("@opentelemetry/context-async-hooks");
+ const sdk_metrics_1 = require("@opentelemetry/sdk-metrics");
+-const exporter_metrics_otlp_grpc_1 = require("@opentelemetry/exporter-metrics-otlp-grpc");
++// Lazy-load grpc/proto metrics exporters - only loaded when actually needed
++let _exporter_metrics_otlp_grpc_1;
++let _exporter_metrics_otlp_proto_1;
++function getMetricsGrpcExporter() {
++    if (!_exporter_metrics_otlp_grpc_1) _exporter_metrics_otlp_grpc_1 = require("@opentelemetry/exporter-metrics-otlp-grpc");
++    return _exporter_metrics_otlp_grpc_1;
++}
++function getMetricsProtoExporter() {
++    if (!_exporter_metrics_otlp_proto_1) _exporter_metrics_otlp_proto_1 = require("@opentelemetry/exporter-metrics-otlp-proto");
++    return _exporter_metrics_otlp_proto_1;
++}
+ const exporter_metrics_otlp_http_1 = require("@opentelemetry/exporter-metrics-otlp-http");
+-const exporter_metrics_otlp_proto_1 = require("@opentelemetry/exporter-metrics-otlp-proto");
+ const sdk_logs_1 = require("@opentelemetry/sdk-logs");
+ const RESOURCE_DETECTOR_ENVIRONMENT = 'env';
+ const RESOURCE_DETECTOR_HOST = 'host';
+@@ -72,14 +92,14 @@ function getOtlpExporterFromEnv() {
+     const protocol = getOtlpProtocolFromEnv();
+     switch (protocol) {
+         case 'grpc':
+-            return new exporter_trace_otlp_grpc_1.OTLPTraceExporter();
++            return new (getTraceGrpcExporter().OTLPTraceExporter)();
+         case 'http/json':
+             return new exporter_trace_otlp_http_1.OTLPTraceExporter();
+         case 'http/protobuf':
+-            return new exporter_trace_otlp_proto_1.OTLPTraceExporter();
++            return new (getTraceProtoExporter().OTLPTraceExporter)();
+         default:
+             api_1.diag.warn(`Unsupported OTLP traces protocol: ${protocol}. Using http/protobuf.`);
+-            return new exporter_trace_otlp_proto_1.OTLPTraceExporter();
++            return new (getTraceProtoExporter().OTLPTraceExporter)();
+     }
+ }
+ function getSpanProcessorsFromEnv() {
+@@ -324,14 +344,14 @@ function getOtlpMetricExporterFromEnv() {
+         (0, core_1.getStringFromEnv)('OTEL_EXPORTER_OTLP_PROTOCOL'))?.trim() || 'http/protobuf'; // Using || to also fall back on empty string
+     switch (protocol) {
+         case 'grpc':
+-            return new exporter_metrics_otlp_grpc_1.OTLPMetricExporter();
++            return new (getMetricsGrpcExporter().OTLPMetricExporter)();
+         case 'http/json':
+             return new exporter_metrics_otlp_http_1.OTLPMetricExporter();
+         case 'http/protobuf':
+-            return new exporter_metrics_otlp_proto_1.OTLPMetricExporter();
++            return new (getMetricsProtoExporter().OTLPMetricExporter)();
+     }
+     api_1.diag.warn(`Unsupported OTLP metrics protocol: "${protocol}". Using http/protobuf.`);
+-    return new exporter_metrics_otlp_proto_1.OTLPMetricExporter();
++    return new (getMetricsProtoExporter().OTLPMetricExporter)();
+ }
+ exports.getOtlpMetricExporterFromEnv = getOtlpMetricExporterFromEnv;
+ /**

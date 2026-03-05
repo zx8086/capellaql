@@ -4,7 +4,7 @@
 
 import { defaultConfig } from "./defaults";
 import { type EnvVarType, envVarMapping, getEnvVarForPath } from "./envMapping";
-import { deriveOtlpEndpoint, toBool } from "./helpers";
+import { deriveOtlpEndpoint, generateConfigHealthReport, toBool, validateConfigHealth } from "./helpers";
 import type { Config } from "./schemas";
 import { ConfigSchema, ConfigurationError } from "./schemas";
 
@@ -184,7 +184,7 @@ function mergeWithDefaults<T extends object>(defaults: T, env: Partial<T>): T {
 // =============================================================================
 
 class ModularConfigurationError extends ConfigurationError {
-  toDetailedString(): string {
+  override toDetailedString(): string {
     const issues = this.errors.issues
       ?.map((issue) => {
         const path = issue.path.join(".");
@@ -259,6 +259,42 @@ export function initializeConfig(): Readonly<Config> {
   }
 
   const validatedConfig = result.data;
+
+  // =========================================================================
+  // FAIL-FAST HEALTH VALIDATION (per 4-pillar pattern enhancement)
+  // =========================================================================
+  // After schema validation passes, run additional health checks.
+  // Critical issues block startup; warnings are logged but allowed.
+  const health = validateConfigHealth(validatedConfig);
+
+  if (!health.healthy) {
+    const report = generateConfigHealthReport(validatedConfig);
+    process.stderr.write(report);
+
+    // Create a synthetic Zod error for the health issues
+    const healthError = new ModularConfigurationError(
+      "Configuration health check failed - critical issues detected",
+      {
+        issues: health.issues.map((issue, index) => ({
+          code: "custom" as const,
+          path: ["health", `issue_${index}`],
+          message: issue,
+        })),
+      } as import("zod").ZodError,
+      validatedConfig
+    );
+
+    throw healthError;
+  }
+
+  // Log warnings but continue
+  if (health.warnings.length > 0) {
+    process.stderr.write("\n=== CONFIGURATION WARNINGS ===\n");
+    for (const warning of health.warnings) {
+      process.stderr.write(`  ⚠️  ${warning}\n`);
+    }
+    process.stderr.write("=== STARTUP WILL CONTINUE ===\n\n");
+  }
 
   // Only log verbose config when LOG_LEVEL is debug
   const isDebugLevel = validatedConfig.application.LOG_LEVEL === "debug";

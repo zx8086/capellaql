@@ -249,11 +249,48 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
 
   if (!isProduction) return;
 
+  // =========================================================================
+  // SERVICE IDENTITY VALIDATION
+  // =========================================================================
+
+  // Service name validation - no localhost/test references
+  const serviceName = data.telemetry.SERVICE_NAME;
+  if (serviceName.includes("localhost") || serviceName.includes("test") || serviceName.includes("local")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Production service name should not contain localhost, test, or local references",
+      path: ["telemetry", "SERVICE_NAME"],
+    });
+  }
+
+  // Service version validation - no "dev" or "latest"
+  const serviceVersion = data.telemetry.SERVICE_VERSION;
+  if (serviceVersion === "dev" || serviceVersion === "latest" || serviceVersion === "0.0.0") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Production requires specific version, not dev, latest, or 0.0.0",
+      path: ["telemetry", "SERVICE_VERSION"],
+    });
+  }
+
+  // =========================================================================
+  // DATABASE SECURITY VALIDATION
+  // =========================================================================
+
   // Critical security check for default passwords
   if (data.capella.COUCHBASE_PASSWORD === "password") {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
       message: "CRITICAL SECURITY: Default password not allowed in production - this is a security vulnerability",
+      path: ["capella", "COUCHBASE_PASSWORD"],
+    });
+  }
+
+  // Password minimum length check
+  if (data.capella.COUCHBASE_PASSWORD.length < 12) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Production database password must be at least 12 characters",
       path: ["capella", "COUCHBASE_PASSWORD"],
     });
   }
@@ -264,15 +301,6 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
       code: z.ZodIssueCode.custom,
       message: "WARNING: Using default Administrator username in production is not recommended",
       path: ["capella", "COUCHBASE_USERNAME"],
-    });
-  }
-
-  // Validate CORS origins in production
-  if (data.application.ALLOWED_ORIGINS.some((origin) => origin === "*" || origin.includes("localhost"))) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Production CORS origins should not include localhost or wildcards",
-      path: ["application", "ALLOWED_ORIGINS"],
     });
   }
 
@@ -288,6 +316,19 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
     }
   } catch {
     // URL parsing failed, will be caught by schema validation
+  }
+
+  // =========================================================================
+  // CORS AND NETWORK SECURITY
+  // =========================================================================
+
+  // Validate CORS origins in production
+  if (data.application.ALLOWED_ORIGINS.some((origin) => origin === "*" || origin.includes("localhost"))) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Production CORS origins should not include localhost or wildcards",
+      path: ["application", "ALLOWED_ORIGINS"],
+    });
   }
 }
 

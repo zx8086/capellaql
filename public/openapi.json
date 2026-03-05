@@ -1,0 +1,25 @@
+{
+  "openapi": "3.1.1",
+  "info": {
+    "title": "CapellaQL GraphQL Service",
+    "version": "2.0.0",
+    "description": "High-performance GraphQL service providing modern API interface for Couchbase Capella databases."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4000",
+      "description": "Local development server"
+    },
+    {
+      "url": "https://capellaql-staging.tommy.com",
+      "description": "Staging server"
+    },
+    {
+      "url": "https://capellaql.tommy.com",
+      "description": "Production server"
+    }
+  ],
+  "_note": "Full specification available in openapi.yaml",
+  "_source": "migrate/docs/api/openapi.yaml",
+  "_generated": "2026-03-02T13:43:09.922Z"
+}

@@ -1,6 +1,7 @@
 /* src/telemetry/metrics/databaseMetrics.ts - 2025-compliant database observability */
 
 import { type Counter, context, type Histogram, metrics, trace, type UpDownCounter } from "@opentelemetry/api";
+import { withCardinalityCheck } from "../../lib/metricsCardinalityManager";
 import { telemetryHealthMonitor } from "../health/telemetryHealth";
 
 let dbOperationCounter: Counter | undefined;
@@ -92,15 +93,21 @@ export function recordDatabaseOperation(
       ...(spanContext?.traceId && { trace_id: spanContext.traceId.slice(0, 8) }),
     };
 
+    const { allowed, labels: checkedLabels } = withCardinalityCheck(
+      "database_operation_duration_ms",
+      metricsAttributes
+    );
+    if (!allowed) return;
+
     // Record operation count
     if (dbOperationCounter) {
-      dbOperationCounter.add(1, metricsAttributes);
+      dbOperationCounter.add(1, checkedLabels);
     }
 
     // Record response time (convert to seconds for 2025 compliance)
     if (dbResponseTimeHistogram) {
       const durationSeconds = durationMs / 1000;
-      dbResponseTimeHistogram.record(durationSeconds, metricsAttributes);
+      dbResponseTimeHistogram.record(durationSeconds, checkedLabels);
     }
 
     // Record success for health monitoring

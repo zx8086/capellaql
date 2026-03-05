@@ -1,29 +1,149 @@
 /* src/utils/logger.ts */
 
-// DEPRECATED: This file is deprecated. Use ../telemetry/logger.ts instead.
-// Re-exporting for backward compatibility.
+// Stryker disable all: Logger implementation is tested via integration tests and telemetry output verification.
+// String literal mutations in log messages and field names are low-value mutations that don't catch real bugs.
 
-import {
-  debug as telemetryDebug,
-  err as telemetryErr,
-  log as telemetryLog,
-  warn as telemetryWarn,
-} from "../telemetry/logger";
+type LoggerConfig = { telemetry: { serviceName: string; environment: string } };
 
-console.warn("DEPRECATED: src/utils/logger.ts is deprecated. Use ../telemetry module instead.");
+let configInstance: LoggerConfig | null = null;
 
-export function log(message: string, meta?: any): void {
-  telemetryLog(message, meta);
+function getConfig(): LoggerConfig {
+  if (!configInstance) {
+    try {
+      const { telemetryConfig } = require("$config");
+      configInstance = {
+        telemetry: {
+          serviceName: telemetryConfig.SERVICE_NAME,
+          environment: telemetryConfig.DEPLOYMENT_ENVIRONMENT,
+        },
+      };
+    } catch (_error) {
+      configInstance = {
+        telemetry: {
+          serviceName: "capellaql",
+          environment: "development",
+        },
+      };
+    }
+  }
+  // TypeScript can't infer that configInstance is always non-null after the if block
+  // because loadConfig() comes from a dynamic require
+  return configInstance!;
 }
 
-export function err(message: string, meta?: any): void {
-  telemetryErr(message, meta, meta);
+function getWinstonLogger() {
+  // Always get fresh reference to winstonTelemetryLogger
+  // It may be reinitialized after telemetry setup (reinitialize() is called)
+  try {
+    const { winstonTelemetryLogger } = require("../telemetry/winston-logger");
+    return winstonTelemetryLogger;
+  } catch (_error) {
+    console.error("ERROR: Could not load winston logger, falling back to console:", _error);
+    const config = getConfig();
+    return {
+      info: (msg: string, ctx: Record<string, unknown>) =>
+        console.log(
+          JSON.stringify({
+            "@timestamp": new Date().toISOString(),
+            "log.level": "INFO",
+            message: msg,
+            service: {
+              name: config.telemetry.serviceName,
+              environment: config.telemetry.environment,
+            },
+            ...ctx,
+          })
+        ),
+      warn: (msg: string, ctx: Record<string, unknown>) =>
+        console.warn(
+          JSON.stringify({
+            "@timestamp": new Date().toISOString(),
+            "log.level": "WARN",
+            message: msg,
+            service: {
+              name: config.telemetry.serviceName,
+              environment: config.telemetry.environment,
+            },
+            ...ctx,
+          })
+        ),
+      error: (msg: string, ctx: Record<string, unknown>) =>
+        console.error(
+          JSON.stringify({
+            "@timestamp": new Date().toISOString(),
+            "log.level": "ERROR",
+            message: msg,
+            service: {
+              name: config.telemetry.serviceName,
+              environment: config.telemetry.environment,
+            },
+            ...ctx,
+          })
+        ),
+    };
+  }
 }
 
-export function warn(message: string, meta?: any): void {
-  telemetryWarn(message, meta);
+export function log(message: string, context: Record<string, unknown> = {}) {
+  const config = getConfig();
+  getWinstonLogger().info(message, {
+    service: {
+      name: config.telemetry.serviceName,
+      environment: config.telemetry.environment,
+    },
+    ...context,
+  });
 }
 
-export function debug(message: string, meta?: any): void {
-  telemetryDebug(message, meta);
+export function warn(message: string, context: Record<string, unknown> = {}) {
+  const config = getConfig();
+  getWinstonLogger().warn(message, {
+    service: {
+      name: config.telemetry.serviceName,
+      environment: config.telemetry.environment,
+    },
+    ...context,
+  });
 }
+
+export function error(message: string, context: Record<string, unknown> = {}) {
+  const config = getConfig();
+  getWinstonLogger().error(message, {
+    service: {
+      name: config.telemetry.serviceName,
+      environment: config.telemetry.environment,
+    },
+    ...context,
+  });
+}
+
+export function audit(eventType: string, context: Record<string, unknown> = {}) {
+  const config = getConfig();
+  getWinstonLogger().info(eventType, {
+    audit: true,
+    event_type: eventType,
+    service: {
+      name: config.telemetry.serviceName,
+      environment: config.telemetry.environment,
+    },
+    ...context,
+  });
+}
+
+export function logError(message: string, err: Error, context: Record<string, unknown> = {}) {
+  const config = getConfig();
+  getWinstonLogger().error(message, {
+    service: {
+      name: config.telemetry.serviceName,
+      environment: config.telemetry.environment,
+    },
+    error: {
+      name: err.name,
+      message: err.message,
+      stack: err.stack,
+    },
+    ...context,
+  });
+}
+
+export const logger = { log, warn, error, audit, logError };

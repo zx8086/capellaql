@@ -1,6 +1,7 @@
 /* src/models/errors.ts - Structured Error Hierarchy */
 
 import { serializeError, toError } from "$utils/errorUtils";
+import { createProblemDetails, type ErrorCode, type ProblemDetails } from "../errors";
 
 /**
  * Base application error class that all custom errors extend
@@ -41,6 +42,34 @@ export abstract class AppError extends Error {
       cause: this.cause?.message,
     };
   }
+
+  /**
+   * Convert to RFC 7807 Problem Details format.
+   * Per migration plan: Clean break - RFC 7807 only.
+   *
+   * @param instance - Optional URI reference for this specific occurrence
+   * @returns ProblemDetails object ready for JSON serialization
+   */
+  toProblemDetails(instance?: string): ProblemDetails {
+    return createProblemDetails({
+      code: this.getErrorCode(),
+      detail: this.message,
+      instance,
+      status: this.statusCode,
+      extensions: {
+        errorName: this.name,
+        ...this.context,
+      },
+    });
+  }
+
+  /**
+   * Get the RFC 7807 error code for this error type.
+   * Override in subclasses for specific error code mappings.
+   */
+  protected getErrorCode(): ErrorCode | undefined {
+    return undefined;
+  }
 }
 
 /**
@@ -52,6 +81,10 @@ export class DatabaseError extends AppError {
 
   constructor(message: string, cause?: Error, context?: Record<string, any>) {
     super(`Database operation failed: ${message}`, cause, context);
+  }
+
+  protected override getErrorCode(): ErrorCode {
+    return "DB_001";
   }
 }
 
@@ -69,6 +102,10 @@ export class DocumentNotFoundError extends DatabaseError {
 
     super(message, cause, { documentId, collection });
   }
+
+  protected override getErrorCode(): ErrorCode {
+    return "DB_003";
+  }
 }
 
 /**
@@ -80,6 +117,10 @@ export class ValidationError extends AppError {
 
   constructor(message: string, field?: string, value?: any, cause?: Error) {
     super(`Validation failed: ${message}`, cause, { field, value });
+  }
+
+  protected override getErrorCode(): ErrorCode {
+    return "GQL_003";
   }
 }
 
@@ -93,6 +134,10 @@ export class AuthenticationError extends AppError {
   constructor(message: string = "Authentication required", cause?: Error) {
     super(message, cause);
   }
+
+  protected override getErrorCode(): ErrorCode {
+    return "AUTH_001";
+  }
 }
 
 /**
@@ -105,6 +150,10 @@ export class AuthorizationError extends AppError {
   constructor(message: string = "Access denied", resource?: string, cause?: Error) {
     super(message, cause, { resource });
   }
+
+  protected override getErrorCode(): ErrorCode {
+    return "AUTH_002";
+  }
 }
 
 /**
@@ -116,6 +165,10 @@ export class GraphQLError extends AppError {
 
   constructor(message: string, operationName?: string, variables?: Record<string, any>, cause?: Error) {
     super(`GraphQL operation failed: ${message}`, cause, { operationName, variables });
+  }
+
+  protected override getErrorCode(): ErrorCode {
+    return "GQL_001";
   }
 }
 
@@ -132,6 +185,10 @@ export class ExternalServiceError extends AppError {
       endpoint,
     });
   }
+
+  protected override getErrorCode(): ErrorCode {
+    return "HTTP_005";
+  }
 }
 
 /**
@@ -144,6 +201,10 @@ export class RateLimitError extends AppError {
   constructor(limit: number, windowMs: number, clientId?: string, cause?: Error) {
     super(`Rate limit exceeded: ${limit} requests per ${windowMs}ms`, cause, { limit, windowMs, clientId });
   }
+
+  protected override getErrorCode(): ErrorCode {
+    return "DB_010";
+  }
 }
 
 /**
@@ -155,6 +216,10 @@ export class ConfigurationError extends AppError {
 
   constructor(message: string, configKey?: string, cause?: Error) {
     super(`Configuration error: ${message}`, cause, { configKey });
+  }
+
+  protected override getErrorCode(): ErrorCode {
+    return "CONFIG_001";
   }
 }
 
@@ -169,6 +234,10 @@ export class CircuitBreakerError extends AppError {
     super(`Circuit breaker is open for service: ${serviceName}`, cause, {
       serviceName,
     });
+  }
+
+  protected override getErrorCode(): ErrorCode {
+    return "OTEL_002";
   }
 }
 

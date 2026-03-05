@@ -1,0 +1,1127 @@
+# CapellaQL OpenAPI Specification
+# OpenAPI 3.1.1 - GraphQL Service API Documentation
+# Generated: 2026-03-02
+
+openapi: "3.1.1"
+jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema"
+
+info:
+  title: CapellaQL GraphQL Service
+  version: "2.0.0"
+  description: |
+    High-performance GraphQL service providing modern API interface for Couchbase Capella databases.
+
+    ## Features
+    - **GraphQL API**: Full GraphQL query support with introspection
+    - **Response Caching**: Intelligent caching with per-field TTL configuration
+    - **OpenTelemetry**: Comprehensive distributed tracing, metrics, and logging
+    - **Health Monitoring**: Multiple health endpoints for Kubernetes probes
+    - **RFC 7807 Errors**: Standardized problem details for error responses
+
+    ## GraphQL Endpoint
+    The primary API is exposed via GraphQL at `/graphql`. Use POST for queries/mutations
+    or GET for simple read operations. WebSocket connections are supported for subscriptions.
+
+    ## Authentication
+    Authentication is handled via Kong API Gateway with JWT tokens.
+  contact:
+    name: CapellaQL Team
+    email: capellaql@tommy.com
+  license:
+    name: Proprietary
+    identifier: LicenseRef-Tommy
+
+servers:
+  - url: http://localhost:4000
+    description: Local development server
+  - url: https://capellaql-staging.tommy.com
+    description: Staging server
+  - url: https://capellaql.tommy.com
+    description: Production server
+
+tags:
+  - name: GraphQL
+    description: GraphQL API endpoint
+  - name: Health
+    description: Health check and monitoring endpoints
+  - name: Kubernetes
+    description: Kubernetes probe endpoints (liveness, readiness)
+  - name: Performance
+    description: Performance metrics and analytics
+
+paths:
+  /graphql:
+    get:
+      tags: [GraphQL]
+      summary: GraphQL Query (GET)
+      description: |
+        Execute GraphQL queries via HTTP GET. Supports simple read operations
+        and GraphiQL playground access in development mode.
+      operationId: getGraphQL
+      parameters:
+        - name: query
+          in: query
+          required: true
+          description: GraphQL query string
+          schema:
+            type: string
+            example: "{ __typename }"
+        - name: variables
+          in: query
+          required: false
+          description: JSON-encoded variables object
+          schema:
+            type: string
+            example: '{"brand":"TH","season":"C52"}'
+        - name: operationName
+          in: query
+          required: false
+          description: Name of the operation to execute (for multi-operation documents)
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Successful GraphQL response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphQLResponse"
+        "400":
+          description: Bad Request - Invalid GraphQL query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphQLErrorResponse"
+
+    post:
+      tags: [GraphQL]
+      summary: GraphQL Query/Mutation (POST)
+      description: |
+        Execute GraphQL queries and mutations via HTTP POST.
+        This is the primary method for GraphQL operations.
+
+        ## Supported Operations
+        - `looksSummary` - Get summary statistics for looks
+        - `looks` - List looks with filtering
+        - `lookDetails` - Get detailed look information
+        - `optionsSummary` - Get options summary statistics
+        - `optionsProductView` - Get product view of options
+        - `imageDetails` - Get image URLs for a style
+        - `searchDocuments` - Search across multiple collections
+        - `getAllSeasonalAssignments` - Get seasonal assignments
+        - `getDivisionAssignment` - Get specific division assignment
+      operationId: postGraphQL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GraphQLRequest"
+            examples:
+              introspection:
+                summary: Introspection query
+                value:
+                  query: "{ __typename }"
+              looksSummary:
+                summary: Looks summary query
+                value:
+                  query: |
+                    query LooksSummary($brand: String, $season: String) {
+                      looksSummary(brand: $brand, season: $season) {
+                        totalLooks
+                        hasTitle
+                        hasTrend
+                      }
+                    }
+                  variables:
+                    brand: "TH"
+                    season: "C52"
+              optionsSummary:
+                summary: Options summary query
+                value:
+                  query: |
+                    query OptionsSummary(
+                      $salesOrg: String!
+                      $season: String!
+                      $division: String!
+                      $active: Boolean!
+                      $channels: [SalesChannel!]!
+                    ) {
+                      optionsSummary(
+                        SalesOrganizationCode: $salesOrg
+                        StyleSeasonCode: $season
+                        DivisionCode: $division
+                        ActiveOption: $active
+                        SalesChannels: $channels
+                      ) {
+                        totalOptions
+                        hasImages
+                        isActive
+                      }
+                    }
+                  variables:
+                    salesOrg: "1000"
+                    season: "C52"
+                    division: "01"
+                    active: true
+                    channels: ["SELLIN", "B2B"]
+      responses:
+        "200":
+          description: Successful GraphQL response
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphQLResponse"
+              examples:
+                success:
+                  summary: Successful response
+                  value:
+                    data:
+                      looksSummary:
+                        totalLooks: 156
+                        hasTitle: 145
+                        hasTrend: 98
+                partialError:
+                  summary: Partial error response
+                  value:
+                    data:
+                      looksSummary: null
+                    errors:
+                      - message: "Document not found"
+                        path: ["looksSummary"]
+                        extensions:
+                          code: "DB_003"
+        "400":
+          description: Bad Request - Malformed query
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphQLErrorResponse"
+        "413":
+          description: Payload Too Large - Request body exceeds 512KB limit
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "429":
+          description: Rate Limit Exceeded
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+        "500":
+          description: Internal Server Error
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetails"
+
+    options:
+      tags: [GraphQL]
+      summary: CORS Preflight
+      description: Handle CORS preflight requests for GraphQL endpoint
+      operationId: optionsGraphQL
+      responses:
+        "204":
+          description: CORS preflight successful
+          headers:
+            Access-Control-Allow-Origin:
+              schema:
+                type: string
+              description: Allowed origins
+            Access-Control-Allow-Methods:
+              schema:
+                type: string
+                example: "GET, POST, OPTIONS"
+            Access-Control-Allow-Headers:
+              schema:
+                type: string
+                example: "Content-Type, Authorization"
+            Access-Control-Max-Age:
+              schema:
+                type: integer
+                example: 86400
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Basic Health Check
+      description: |
+        Returns basic health status of the service.
+        Use this for simple "is it running" checks.
+      operationId: getHealth
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicHealthResponse"
+        "500":
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BasicHealthResponse"
+
+  /health/live:
+    get:
+      tags: [Health, Kubernetes]
+      summary: Liveness Probe
+      description: |
+        Kubernetes liveness probe endpoint.
+        Returns 200 if the process is alive and responsive.
+        Use this in Kubernetes `livenessProbe` configuration.
+      operationId: getLivenessProbe
+      responses:
+        "200":
+          description: Process is alive
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: ulid
+              description: Unique request identifier
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LivenessResponse"
+
+  /health/ready:
+    get:
+      tags: [Health, Kubernetes]
+      summary: Readiness Probe
+      description: |
+        Kubernetes readiness probe endpoint.
+        Returns 200 if service is ready to accept traffic (database connected, etc).
+        Returns 503 if not ready.
+        Use this in Kubernetes `readinessProbe` configuration.
+      operationId: getReadinessProbe
+      responses:
+        "200":
+          description: Service is ready to accept traffic
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: ulid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+        "503":
+          description: Service is not ready
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReadinessResponse"
+
+  /health/status:
+    get:
+      tags: [Health]
+      summary: Comprehensive Status Check
+      description: |
+        Returns comprehensive health status including all dependencies
+        (Couchbase, cache, telemetry). Follows the monitoring-updated.md pattern.
+      operationId: getHealthStatus
+      responses:
+        "200":
+          description: All systems healthy or degraded (still operational)
+          headers:
+            X-Request-ID:
+              schema:
+                type: string
+                format: ulid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComprehensiveHealthResponse"
+        "503":
+          description: Service unavailable - critical systems down
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComprehensiveHealthResponse"
+
+  /health/system:
+    get:
+      tags: [Health]
+      summary: System Health Details
+      description: |
+        Returns detailed system health including component status,
+        memory usage, and environment information.
+      operationId: getSystemHealth
+      responses:
+        "200":
+          description: System health details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemHealthResponse"
+        "500":
+          description: Health check failed
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SystemHealthResponse"
+
+  /health/telemetry:
+    get:
+      tags: [Health]
+      summary: Telemetry Health
+      description: Returns OpenTelemetry configuration and status
+      operationId: getTelemetryHealth
+      responses:
+        "200":
+          description: Telemetry health status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TelemetryHealthResponse"
+
+  /health/telemetry/detailed:
+    get:
+      tags: [Health, Performance]
+      summary: Detailed Telemetry Metrics
+      description: |
+        Returns detailed telemetry metrics including batch coordinator statistics,
+        buffer status, memory pressure analysis, and export performance.
+      operationId: getDetailedTelemetry
+      responses:
+        "200":
+          description: Detailed telemetry metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DetailedTelemetryResponse"
+
+  /health/cache:
+    get:
+      tags: [Health, Performance]
+      summary: Cache Health and Analytics
+      description: |
+        Returns cache analytics comparing SQLite and Map cache implementations,
+        including hit rates, memory usage, and performance metrics.
+      operationId: getCacheHealth
+      responses:
+        "200":
+          description: Cache health and analytics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CacheHealthResponse"
+
+  /health/performance:
+    get:
+      tags: [Health, Performance]
+      summary: Performance Metrics
+      description: Returns current performance metrics including database latency and runtime stats
+      operationId: getPerformanceMetrics
+      responses:
+        "200":
+          description: Performance metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceMetricsResponse"
+
+  /health/performance/history:
+    get:
+      tags: [Health, Performance]
+      summary: Performance History
+      description: Returns historical performance metrics and trends
+      operationId: getPerformanceHistory
+      parameters:
+        - name: count
+          in: query
+          description: Number of historical entries to return (max 50)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+      responses:
+        "200":
+          description: Performance history
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PerformanceHistoryResponse"
+
+  /health/graphql:
+    get:
+      tags: [Health, Performance]
+      summary: GraphQL Resolver Performance
+      description: |
+        Returns GraphQL resolver performance metrics including per-resolver
+        statistics, cache hit rates, and slow query analysis.
+      operationId: getGraphQLPerformance
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of recent operations to include (max 100)
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+      responses:
+        "200":
+          description: GraphQL performance metrics
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GraphQLPerformanceResponse"
+
+  /health/comprehensive:
+    get:
+      tags: [Health]
+      summary: Comprehensive Health Report
+      description: |
+        Returns a comprehensive health report combining all health checks,
+        performance metrics, cache stats, and telemetry status with
+        overall assessment and recommendations.
+      operationId: getComprehensiveHealth
+      responses:
+        "200":
+          description: Comprehensive health report
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComprehensiveReportResponse"
+
+  /health/summary:
+    get:
+      tags: [Health]
+      summary: Health Summary
+      description: Returns a condensed health summary with critical issues highlighted
+      operationId: getHealthSummary
+      responses:
+        "200":
+          description: Health summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthSummaryResponse"
+
+components:
+  schemas:
+    # GraphQL Schemas
+    GraphQLRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          description: GraphQL query string
+          example: "{ __typename }"
+        variables:
+          type: object
+          description: Variables for the query
+          additionalProperties: true
+        operationName:
+          type: string
+          description: Operation name for multi-operation documents
+          nullable: true
+
+    GraphQLResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          description: Query result data
+          additionalProperties: true
+          nullable: true
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+          description: List of errors (if any)
+        extensions:
+          type: object
+          description: Optional extensions
+          additionalProperties: true
+
+    GraphQLError:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          description: Error message
+        locations:
+          type: array
+          items:
+            type: object
+            properties:
+              line:
+                type: integer
+              column:
+                type: integer
+        path:
+          type: array
+          items:
+            oneOf:
+              - type: string
+              - type: integer
+        extensions:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Error code (e.g., DB_003, GQL_001)
+            timestamp:
+              type: string
+              format: date-time
+          additionalProperties: true
+
+    GraphQLErrorResponse:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphQLError"
+          minItems: 1
+
+    # RFC 7807 Problem Details
+    ProblemDetails:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI reference identifying the problem type
+          example: "https://capellaql.tommy.com/errors/rate-limit-exceeded"
+        title:
+          type: string
+          description: Short, human-readable summary
+          example: "Rate Limit Exceeded"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 429
+        detail:
+          type: string
+          description: Human-readable explanation
+          example: "You have exceeded the rate limit of 500 requests per minute"
+        instance:
+          type: string
+          format: uri
+          description: URI reference identifying the specific occurrence
+          example: "/graphql"
+        timestamp:
+          type: string
+          format: date-time
+          description: When the error occurred
+        requestId:
+          type: string
+          format: ulid
+          description: Unique request identifier for tracing
+
+    # Health Response Schemas
+    BasicHealthResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+          example: "healthy"
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+          example: "2.0.0"
+        uptime:
+          type: number
+          description: Uptime in seconds
+        error:
+          type: string
+          description: Error message if unhealthy
+
+    LivenessResponse:
+      type: object
+      required: [alive, timestamp]
+      properties:
+        alive:
+          type: boolean
+          example: true
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: ulid
+
+    ReadinessResponse:
+      type: object
+      required: [ready, timestamp]
+      properties:
+        ready:
+          type: boolean
+          example: true
+        timestamp:
+          type: string
+          format: date-time
+        requestId:
+          type: string
+          format: ulid
+        checks:
+          type: object
+          properties:
+            database:
+              type: boolean
+            cache:
+              type: boolean
+            telemetry:
+              type: boolean
+
+    ComprehensiveHealthResponse:
+      type: object
+      required: [status, timestamp]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, critical]
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        environment:
+          type: string
+        uptime:
+          type: number
+        dependencies:
+          type: object
+          properties:
+            couchbase:
+              $ref: "#/components/schemas/DependencyHealth"
+            cache:
+              $ref: "#/components/schemas/DependencyHealth"
+            telemetry:
+              $ref: "#/components/schemas/DependencyHealth"
+
+    DependencyHealth:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy, unknown]
+        responseTime:
+          type: number
+          description: Response time in milliseconds
+        error:
+          type: string
+          nullable: true
+
+    SystemHealthResponse:
+      type: object
+      required: [overall, timestamp, components]
+      properties:
+        overall:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: string
+          format: date-time
+        components:
+          type: object
+          properties:
+            database:
+              type: object
+              properties:
+                status:
+                  type: string
+                circuitBreaker:
+                  type: object
+                  properties:
+                    state:
+                      type: string
+                      enum: [closed, open, half-open]
+                    failures:
+                      type: integer
+                    successes:
+                      type: integer
+            runtime:
+              type: object
+              properties:
+                status:
+                  type: string
+                memory:
+                  type: object
+                  properties:
+                    used:
+                      type: integer
+                    free:
+                      type: integer
+                    total:
+                      type: integer
+                    heapUsed:
+                      type: integer
+                    heapTotal:
+                      type: integer
+                environment:
+                  type: string
+                version:
+                  type: string
+            telemetry:
+              type: object
+              properties:
+                status:
+                  type: string
+                exporters:
+                  type: object
+                  properties:
+                    traces:
+                      type: boolean
+                    metrics:
+                      type: boolean
+                    logs:
+                      type: boolean
+
+    TelemetryHealthResponse:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        timestamp:
+          type: integer
+          description: Unix timestamp in milliseconds
+        exporters:
+          type: object
+          properties:
+            traces:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                endpoint:
+                  type: string
+            metrics:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                endpoint:
+                  type: string
+            logs:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                endpoint:
+                  type: string
+
+    DetailedTelemetryResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        batchCoordinator:
+          type: object
+          properties:
+            statistics:
+              type: object
+              properties:
+                totalBatches:
+                  type: integer
+                successfulBatches:
+                  type: integer
+                failedBatches:
+                  type: integer
+                totalSpansExported:
+                  type: integer
+                dataDropCount:
+                  type: integer
+                emergencyFlushCount:
+                  type: integer
+                averageExportDuration:
+                  type: number
+            buffers:
+              type: object
+              properties:
+                traces:
+                  type: integer
+                metrics:
+                  type: integer
+                logs:
+                  type: integer
+                memoryUsageMB:
+                  type: number
+            memoryPressure:
+              type: object
+              properties:
+                pressureLevel:
+                  type: string
+                  enum: [low, medium, high, critical]
+            performance:
+              type: object
+              properties:
+                successRate:
+                  type: string
+                emergencyFlushRate:
+                  type: string
+                dataLossRate:
+                  type: string
+        recommendations:
+          type: array
+          items:
+            type: string
+
+    CacheHealthResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        sqlite:
+          type: object
+          properties:
+            hits:
+              type: integer
+            misses:
+              type: integer
+            size:
+              type: integer
+            memoryUsage:
+              type: integer
+            hitRate:
+              type: number
+            enabled:
+              type: boolean
+        mapCache:
+          type: object
+          properties:
+            hits:
+              type: integer
+            misses:
+              type: integer
+            size:
+              type: integer
+            memoryUsage:
+              type: integer
+            hitRate:
+              type: string
+        comparison:
+          type: object
+          properties:
+            totalHits:
+              type: integer
+            totalMisses:
+              type: integer
+            totalMemoryMB:
+              type: number
+            preferredCache:
+              type: string
+              enum: [sqlite, map, none]
+
+    PerformanceMetricsResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        database:
+          type: object
+          properties:
+            latency:
+              type: number
+              description: Database latency in milliseconds
+            connectionStatus:
+              type: string
+            errorRate:
+              type: number
+        runtime:
+          type: object
+          properties:
+            memoryUsage:
+              type: number
+            heapUsage:
+              type: number
+        telemetry:
+          type: object
+          properties:
+            exportLatency:
+              type: number
+            droppedSpans:
+              type: integer
+            batchSize:
+              type: integer
+            circuitBreakerState:
+              type: string
+        correlations:
+          type: object
+          properties:
+            databaseToMemory:
+              type: number
+            telemetryToPerformance:
+              type: number
+            overallHealth:
+              type: string
+
+    PerformanceHistoryResponse:
+      type: object
+      properties:
+        metrics:
+          type: array
+          items:
+            $ref: "#/components/schemas/PerformanceMetricsResponse"
+        count:
+          type: integer
+        trends:
+          type: object
+          properties:
+            databaseLatencyTrend:
+              type: string
+              enum: [improving, stable, degrading]
+            memoryUsageTrend:
+              type: string
+              enum: [improving, stable, degrading]
+            overallTrend:
+              type: string
+              enum: [improving, stable, degrading]
+
+    GraphQLPerformanceResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        summary:
+          type: object
+          properties:
+            totalOperations:
+              type: integer
+            averageDuration:
+              type: number
+            errorRate:
+              type: number
+            slowOperations:
+              type: integer
+        resolvers:
+          type: array
+          items:
+            type: object
+            properties:
+              resolver:
+                type: string
+              count:
+                type: integer
+              cacheHits:
+                type: integer
+              dbFetches:
+                type: integer
+              cacheHitRate:
+                type: string
+              avgDurationMs:
+                type: string
+              minDurationMs:
+                type: number
+              maxDurationMs:
+                type: number
+              p50DurationMs:
+                type: number
+              p95DurationMs:
+                type: number
+        insights:
+          type: object
+          properties:
+            cacheEffectiveness:
+              type: integer
+            slowResolvers:
+              type: array
+              items:
+                type: object
+            fastestResolver:
+              type: string
+            slowestResolver:
+              type: string
+
+    ComprehensiveReportResponse:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        version:
+          type: string
+        environment:
+          type: string
+        uptime:
+          type: number
+        system:
+          $ref: "#/components/schemas/SystemHealthResponse"
+        performance:
+          $ref: "#/components/schemas/PerformanceMetricsResponse"
+        cache:
+          type: object
+          allOf:
+            - $ref: "#/components/schemas/CacheHealthResponse"
+            - type: object
+              properties:
+                status:
+                  type: string
+                  enum: [optimal, good, poor, unknown]
+        telemetry:
+          type: object
+          properties:
+            exporters:
+              $ref: "#/components/schemas/TelemetryHealthResponse"
+            batchCoordinator:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum: [healthy, warning, critical, unknown]
+        overall:
+          type: object
+          properties:
+            status:
+              type: string
+              enum: [healthy, warning, unhealthy]
+            criticalIssues:
+              type: array
+              items:
+                type: string
+            recommendations:
+              type: array
+              items:
+                type: string
+
+    HealthSummaryResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        message:
+          type: string
+        criticalIssues:
+          type: array
+          items:
+            type: string
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token issued by Kong API Gateway
+
+    KongHeaders:
+      type: apiKey
+      in: header
+      name: x-consumer-id
+      description: Kong consumer identification headers
+
+security:
+  - BearerAuth: []
+  - KongHeaders: []

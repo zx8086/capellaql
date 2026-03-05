@@ -1,6 +1,7 @@
 /* src/telemetry/metrics/httpMetrics.ts */
 
 import { type Counter, context, type Histogram, metrics, trace } from "@opentelemetry/api";
+import { withCardinalityCheck } from "../../lib/metricsCardinalityManager";
 
 let httpRequestCounter: Counter | undefined;
 let httpResponseTimeHistogram: Histogram | undefined;
@@ -46,7 +47,10 @@ export function recordHttpRequest(method: string, route: string, statusCode?: nu
       ...(statusCode && { status_code: statusCode.toString() }),
     };
 
-    httpRequestCounter.add(1, labels);
+    const { allowed, labels: checkedLabels } = withCardinalityCheck("http_requests_total", labels);
+    if (!allowed) return;
+
+    httpRequestCounter.add(1, checkedLabels);
   } catch (error) {
     console.error("Error recording HTTP request:", error);
   }
@@ -78,7 +82,10 @@ export function recordHttpResponseTime(durationMs: number, method?: string, rout
       }
     }
 
-    httpResponseTimeHistogram.record(durationSeconds, labels);
+    const { allowed, labels: checkedLabels } = withCardinalityCheck("http_requests_total", labels);
+    if (!allowed) return;
+
+    httpResponseTimeHistogram.record(durationSeconds, checkedLabels);
   } catch (error) {
     console.error("Error recording HTTP response time:", error);
   }
@@ -90,12 +97,11 @@ export function recordGraphQLRequest(operationName: string, operationType: strin
   }
 
   try {
-    httpRequestCounter.add(1, {
-      method: "POST",
-      route: "/graphql",
-      operation_name: operationName,
-      operation_type: operationType,
-    });
+    const labels = { method: "POST", route: "/graphql", operation_name: operationName, operation_type: operationType };
+    const { allowed, labels: checkedLabels } = withCardinalityCheck("http_requests_total", labels);
+    if (!allowed) return;
+
+    httpRequestCounter.add(1, checkedLabels);
   } catch (error) {
     console.error("Error recording GraphQL request:", error);
   }
@@ -114,13 +120,17 @@ export function recordGraphQLResponseTime(
   try {
     const durationSeconds = durationMs / 1000;
 
-    httpResponseTimeHistogram.record(durationSeconds, {
+    const labels = {
       method: "POST",
       route: "/graphql",
       operation_name: operationName,
       operation_type: operationType,
       has_errors: hasErrors.toString(),
-    });
+    };
+    const { allowed, labels: checkedLabels } = withCardinalityCheck("http_requests_total", labels);
+    if (!allowed) return;
+
+    httpResponseTimeHistogram.record(durationSeconds, checkedLabels);
   } catch (error) {
     console.error("Error recording GraphQL response time:", error);
   }

@@ -48,6 +48,7 @@ export interface TelemetryConfig {
   ENABLE_OPENTELEMETRY: boolean;
   SERVICE_NAME: string;
   SERVICE_VERSION: string;
+  SERVICE_NAMESPACE: string;
   DEPLOYMENT_ENVIRONMENT: string;
   TRACES_ENDPOINT: string;
   METRICS_ENDPOINT: string;

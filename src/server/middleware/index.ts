@@ -65,8 +65,11 @@ export function withRequestId(
   };
 }
 
+export { backpressureMiddleware } from "./backpressure";
 export { corsMiddleware } from "./cors";
+export { DEPRECATED_ROUTES, type DeprecatedRoute, deprecationMiddleware } from "./deprecation";
 export { loggingMiddleware } from "./logging";
+export { methodValidationMiddleware } from "./methodValidation";
 export { cleanupRateLimitStore, rateLimitMiddleware } from "./rateLimit";
 export { securityMiddleware } from "./security";
 export { tracingMiddleware } from "./tracing";

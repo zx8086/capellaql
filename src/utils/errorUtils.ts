@@ -8,6 +8,23 @@
  * @see SIO-442
  */
 
+// Re-export RFC 7807 error utilities for convenience
+export {
+  createProblemDetails,
+  createProblemResponse,
+  type ErrorDetails,
+  errorToProblemDetails,
+  isError as isResultError,
+  isProblemDetails,
+  isSuccess,
+  type ProblemDetails,
+  type Result,
+  tryCatch,
+  tryCatchSync,
+  unwrap,
+  unwrapOr,
+} from "../errors";
+
 /**
  * Serialized error structure for logging and API responses
  */

@@ -43,8 +43,9 @@ if (earlyShutdownRequested) {
   process.exit(0);
 }
 
-// Initialize Couchbase connection (after telemetry for proper instrumentation)
-import { connectionManager } from "./lib/couchbase";
+// Dynamic import of Couchbase module AFTER telemetry is initialized
+// This ensures DataLoader instrumentation is registered before dataloader module loads
+const { connectionManager } = await import("./lib/couchbase");
 
 try {
   await connectionManager.initialize();
@@ -71,10 +72,12 @@ const [{ default: config }, { graphqlHandler }, { healthHandlers }, middleware, 
 ]);
 
 const {
+  backpressureMiddleware,
   cleanupRateLimitStore,
   compose,
   corsMiddleware,
   loggingMiddleware,
+  methodValidationMiddleware,
   rateLimitMiddleware,
   securityMiddleware,
   tracingMiddleware,
@@ -158,6 +161,8 @@ function withMiddleware(
   handler: (request: Request, context: RequestContext) => Promise<Response>
 ): (request: Request, context: RequestContext) => Promise<Response> {
   const pipeline = compose(
+    methodValidationMiddleware,
+    backpressureMiddleware,
     rateLimitMiddleware,
     corsMiddleware,
     securityMiddleware,
@@ -308,9 +313,11 @@ async function createServer(): Promise<Server> {
     // WebSocket handlers for GraphQL subscriptions
     websocket: websocketHandlers,
 
-    // Global error handler
+    // Global error handler - RFC 7807 compliant
     error(error) {
       err("Unhandled server error", error);
+      // Dynamic import to avoid circular dependencies at module load
+      // StaticResponses.INTERNAL_ERROR is pre-built with RFC 7807 format
       return StaticResponses.INTERNAL_ERROR;
     },
   });
@@ -442,6 +449,8 @@ function setupGracefulShutdown(): void {
 
       // Phase 6: Cleanup remaining resources
       log("Shutdown Phase 6: Cleaning up remaining resources", { phase: 6 });
+      const { memoryGuardian } = await import("./lib/memoryGuardian");
+      memoryGuardian.destroy();
       shutdownPerformanceMonitor();
 
       const shutdownDuration = Date.now() - shutdownStartTime;

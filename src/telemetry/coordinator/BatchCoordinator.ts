@@ -3,7 +3,7 @@ import type { MetricData } from "@opentelemetry/sdk-metrics";
 import type { SpanData } from "@opentelemetry/sdk-trace-base";
 import config from "$config";
 import { getErrorMessage } from "$utils/errorUtils";
-import { log } from "../winston-logger";
+import { error, log, logError, warn } from "$utils/logger";
 
 // Batch data types for coordinated exports
 interface TelemetryBatch {
@@ -103,7 +103,11 @@ export class TelemetryBatchCoordinator {
     this.startBatchTimer();
     this.startMemoryMonitoring();
     if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      console.debug("TelemetryBatchCoordinator initialized with memory management", this.config);
+      log("TelemetryBatchCoordinator initialized with memory management", {
+        component: "batch-coordinator",
+        operation: "init",
+        ...this.config,
+      });
     }
   }
 
@@ -236,7 +240,10 @@ export class TelemetryBatchCoordinator {
       };
 
       if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        console.debug(`Exporting batch ${batchId}`, {
+        log("Exporting batch", {
+          component: "batch-coordinator",
+          operation: "export",
+          batchId,
           traces: batch.traces.length,
           metrics: batch.metrics.length,
           logs: batch.logs.length,
@@ -251,15 +258,42 @@ export class TelemetryBatchCoordinator {
       this.updateStatistics(exportResult, duration);
 
       if (exportResult.success) {
-        console.debug(`Batch ${batchId} exported successfully in ${duration}ms`);
+        if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+          log("Batch exported successfully", {
+            component: "batch-coordinator",
+            operation: "export",
+            batchId,
+            durationMs: duration,
+          });
+        }
       } else {
-        console.error(`Batch ${batchId} export failed:`, exportResult.error);
+        error("Batch export failed", {
+          component: "batch-coordinator",
+          operation: "export",
+          batchId,
+          exportError: exportResult.error,
+        });
       }
-    } catch (error) {
+    } catch (err) {
       const duration = Date.now() - startTime;
-      console.error(`Batch ${batchId} export error:`, error);
+      if (err instanceof Error) {
+        logError("Batch export error", err, {
+          component: "batch-coordinator",
+          operation: "export",
+          batchId,
+          durationMs: duration,
+        });
+      } else {
+        error("Batch export error", {
+          component: "batch-coordinator",
+          operation: "export",
+          batchId,
+          durationMs: duration,
+          exportError: String(err),
+        });
+      }
 
-      this.updateStatistics({ success: false, exportedCount: 0, duration, error: getErrorMessage(error) }, duration);
+      this.updateStatistics({ success: false, exportedCount: 0, duration, error: getErrorMessage(err) }, duration);
     } finally {
       this.isExporting = false;
     }
@@ -331,7 +365,14 @@ export class TelemetryBatchCoordinator {
 
     try {
       // Simulate trace export - in real implementation, this would use actual OTLP exporters
-      console.debug(`Exporting ${spans.length} traces for batch ${batchId}`);
+      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+        log("Exporting traces", {
+          component: "batch-coordinator",
+          operation: "export-traces",
+          count: spans.length,
+          batchId,
+        });
+      }
 
       // For now, we'll simulate successful export
       // In real implementation: await this.traceExporter.export(spans);
@@ -355,7 +396,14 @@ export class TelemetryBatchCoordinator {
     const startTime = Date.now();
 
     try {
-      console.debug(`Exporting ${metrics.length} metrics for batch ${batchId}`);
+      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+        log("Exporting metrics", {
+          component: "batch-coordinator",
+          operation: "export-metrics",
+          count: metrics.length,
+          batchId,
+        });
+      }
 
       // Simulate metric export
       // In real implementation: await this.metricExporter.export(metrics);
@@ -379,7 +427,14 @@ export class TelemetryBatchCoordinator {
     const startTime = Date.now();
 
     try {
-      console.debug(`Exporting ${logs.length} logs for batch ${batchId}`);
+      if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+        log("Exporting logs", {
+          component: "batch-coordinator",
+          operation: "export-logs",
+          count: logs.length,
+          batchId,
+        });
+      }
 
       // Simulate log export
       // In real implementation: await this.logExporter.export(logs);
@@ -445,12 +500,22 @@ export class TelemetryBatchCoordinator {
   }
 
   async forceFlush(): Promise<void> {
-    console.debug("Force flushing telemetry batch coordinator");
+    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+      log("Force flushing telemetry batch coordinator", {
+        component: "batch-coordinator",
+        operation: "force-flush",
+      });
+    }
     await this.flushBatch();
   }
 
   async shutdown(): Promise<void> {
-    console.debug("Shutting down telemetry batch coordinator");
+    if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+      log("Shutting down telemetry batch coordinator", {
+        component: "batch-coordinator",
+        operation: "shutdown",
+      });
+    }
     this.isShutdown = true;
 
     if (this.batchTimer) {
@@ -485,22 +550,24 @@ export class TelemetryBatchCoordinator {
     this.memoryCheckTimer = setInterval(() => {
       const memoryPressure = this.checkMemoryPressure();
 
-      // Debug logging for troubleshooting
-      if (process.env.NODE_ENV === "development") {
-        console.debug(`Memory check: ${memoryPressure.pressureLevel}`, {
+      // Debug logging for troubleshooting (only in dev with debug flag)
+      if (process.env.NODE_ENV === "development" && process.env.DEBUG_OTEL_EXPORTERS === "true") {
+        log(`Memory check: ${memoryPressure.pressureLevel}`, {
+          component: "batch-coordinator",
+          operation: "memory-check",
           heapUsageRatio: memoryPressure.heapUsageRatio.toFixed(3),
           bufferMemoryMB: memoryPressure.bufferMemoryUsageMB.toFixed(2),
           totalMemoryMB: memoryPressure.totalMemoryUsageMB.toFixed(2),
-          bufferCounts: {
-            traces: this.traceBuffer.length,
-            metrics: this.metricBuffer.length,
-            logs: this.logBuffer.length,
-          },
+          traces: this.traceBuffer.length,
+          metrics: this.metricBuffer.length,
+          logs: this.logBuffer.length,
         });
       }
 
       if (memoryPressure.pressureLevel === "high" || memoryPressure.pressureLevel === "critical") {
-        console.warn(`Telemetry memory pressure detected: ${memoryPressure.pressureLevel}`, {
+        warn(`Telemetry memory pressure detected: ${memoryPressure.pressureLevel}`, {
+          component: "batch-coordinator",
+          operation: "memory-check",
           heapUsageRatio: memoryPressure.heapUsageRatio,
           bufferMemoryMB: memoryPressure.bufferMemoryUsageMB,
           totalMemoryMB: memoryPressure.totalMemoryUsageMB,
@@ -576,26 +643,50 @@ export class TelemetryBatchCoordinator {
     this.lastEmergencyFlush = now;
     this.statistics.emergencyFlushCount++;
 
-    console.warn("Emergency telemetry flush due to memory pressure", {
-      bufferSizes: {
-        traces: this.traceBuffer.length,
-        metrics: this.metricBuffer.length,
-        logs: this.logBuffer.length,
-      },
+    warn("Emergency telemetry flush due to memory pressure", {
+      component: "batch-coordinator",
+      operation: "emergency-flush",
+      traces: this.traceBuffer.length,
+      metrics: this.metricBuffer.length,
+      logs: this.logBuffer.length,
       memoryUsageMB: this.currentMemoryUsage / (1024 * 1024),
     });
 
     // Force immediate flush
-    this.flushBatch().catch((error) => {
-      console.error("Emergency flush failed:", error);
+    this.flushBatch().catch((err) => {
+      if (err instanceof Error) {
+        logError("Emergency flush failed", err, {
+          component: "batch-coordinator",
+          operation: "emergency-flush",
+        });
+      } else {
+        error("Emergency flush failed", {
+          component: "batch-coordinator",
+          operation: "emergency-flush",
+          flushError: String(err),
+        });
+      }
     });
 
     // Force garbage collection if available
     if (global.gc) {
       try {
         global.gc();
-      } catch (error) {
-        console.debug("Manual garbage collection failed:", error);
+      } catch (err) {
+        if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+          if (err instanceof Error) {
+            logError("Manual garbage collection failed", err, {
+              component: "batch-coordinator",
+              operation: "gc",
+            });
+          } else {
+            log("Manual garbage collection failed", {
+              component: "batch-coordinator",
+              operation: "gc",
+              gcError: String(err),
+            });
+          }
+        }
       }
     }
   }
@@ -604,7 +695,10 @@ export class TelemetryBatchCoordinator {
    * Handle critical memory pressure by dropping data
    */
   private handleCriticalMemoryPressure(): void {
-    console.error("CRITICAL: Telemetry memory pressure - dropping oldest data to prevent OOM");
+    error("CRITICAL: Telemetry memory pressure - dropping oldest data to prevent OOM", {
+      component: "batch-coordinator",
+      operation: "memory-pressure-critical",
+    });
 
     const _initialTraceCount = this.traceBuffer.length;
     const _initialMetricCount = this.metricBuffer.length;
@@ -629,28 +723,39 @@ export class TelemetryBatchCoordinator {
     this.currentMemoryUsage -= droppedSize;
     this.statistics.dataDropCount += tracesToDrop + metricsToDrop + logsToDrop;
 
-    console.error("Telemetry data dropped due to memory pressure", {
-      dropped: {
-        traces: tracesToDrop,
-        metrics: metricsToDrop,
-        logs: logsToDrop,
-        totalItems: tracesToDrop + metricsToDrop + logsToDrop,
-        memoryFreedMB: droppedSize / (1024 * 1024),
-      },
-      remaining: {
-        traces: this.traceBuffer.length,
-        metrics: this.metricBuffer.length,
-        logs: this.logBuffer.length,
-        memoryUsageMB: this.currentMemoryUsage / (1024 * 1024),
-      },
+    error("Telemetry data dropped due to memory pressure", {
+      component: "batch-coordinator",
+      operation: "data-drop",
+      droppedTraces: tracesToDrop,
+      droppedMetrics: metricsToDrop,
+      droppedLogs: logsToDrop,
+      totalDropped: tracesToDrop + metricsToDrop + logsToDrop,
+      memoryFreedMB: droppedSize / (1024 * 1024),
+      remainingTraces: this.traceBuffer.length,
+      remainingMetrics: this.metricBuffer.length,
+      remainingLogs: this.logBuffer.length,
+      remainingMemoryMB: this.currentMemoryUsage / (1024 * 1024),
     });
 
     // Force garbage collection
     if (global.gc) {
       try {
         global.gc();
-      } catch (error) {
-        console.debug("Manual garbage collection failed:", error);
+      } catch (err) {
+        if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
+          if (err instanceof Error) {
+            logError("Manual garbage collection failed", err, {
+              component: "batch-coordinator",
+              operation: "gc",
+            });
+          } else {
+            log("Manual garbage collection failed", {
+              component: "batch-coordinator",
+              operation: "gc",
+              gcError: String(err),
+            });
+          }
+        }
       }
     }
 

@@ -16,20 +16,21 @@ CapellaQL is a high-performance GraphQL service built with Bun that provides a m
 - `bun run build:dev` - Build with watch mode
 
 ### Testing & Performance
-- `k6 run test/k6/smoke-test-health.js` - Quick validation (3 VUs, 3 minutes)
-- `k6 run test/k6/stress-test-health.js` - Stress testing (100-200 VUs, 15 minutes)
-- `k6 run test/k6/soak-test-health.js` - Long-duration testing (50 VUs, 3 hours)
-- `k6 run test/k6/spike-test-health.js` - Traffic spike simulation
-- `k6 run test/k6/graphql-endpoints.js` - GraphQL endpoint performance testing
+- `bun test` - Run all Bun tests (unit, integration, e2e)
+- `bun run test:bun:unit` - Run unit tests only
+- `bun run test:bun:integration` - Run integration tests
+- `bun run test:playwright` - Run Playwright E2E tests
+- `k6 run tests/k6/smoke/health-smoke.ts` - Quick health validation
+- `k6 run tests/k6/stress/system-stress.ts` - Stress testing (100-200 VUs)
+- `k6 run tests/k6/stress/soak-test.ts` - Long-duration testing (50 VUs, 3 hours)
+- `k6 run tests/k6/stress/spike-test.ts` - Traffic spike simulation
 
-### Development Dashboard
-- `http://localhost:4000/dashboard` - **CapellaQL Development Dashboard**
-  - Real-time cache analytics with SQLite vs Map performance comparison
-  - Telemetry insights with memory pressure analysis and data loss tracking
-  - Comprehensive system health monitoring (database, memory, telemetry)
-  - Performance overview with key metrics and trends
-  - Auto-refresh capability (30-second intervals)
-  - Direct links to all health endpoints for detailed analysis
+### Health Monitoring
+- `http://localhost:4000/health` - Basic health check
+- `http://localhost:4000/health/system` - Detailed system health
+- `http://localhost:4000/health/performance` - Performance metrics
+- `http://localhost:4000/health/telemetry` - Telemetry status
+- `http://localhost:4000/health/comprehensive` - Full health report
 
 ## Architecture Overview
 
@@ -43,11 +44,12 @@ CapellaQL is a high-performance GraphQL service built with Bun that provides a m
 ### Key Architectural Patterns
 
 #### Connection Management
-- Single cluster connection shared across all resolvers (`src/lib/couchbaseConnector.ts`)
-- Factory pattern for bucket/scope/collection access
-- Production-ready error handling with comprehensive retry logic (`src/lib/couchbaseErrorHandler.ts`)
-- Real-time performance metrics and health monitoring (`src/lib/couchbaseMetrics.ts`)
-- Advanced transaction error handling (`src/lib/couchbaseTransactionHandler.ts`)
+- Single cluster connection shared across all resolvers (`src/lib/couchbase/connection-manager.ts`)
+- Factory pattern for bucket/scope/collection access (`src/lib/couchbase/repository.ts`)
+- Production-ready error handling with comprehensive retry logic (`src/lib/couchbase/errors.ts`)
+- Circuit breaker pattern for resilience (`src/lib/couchbase/circuit-breaker.ts`)
+- Real-time performance metrics and health monitoring (`src/lib/couchbase/metrics.ts`)
+- Advanced transaction error handling (`src/lib/couchbase/transaction-handler.ts`)
 
 #### GraphQL Resolver Organization
 - Modular resolver structure in `src/graphql/resolvers/`
@@ -55,23 +57,29 @@ CapellaQL is a high-performance GraphQL service built with Bun that provides a m
 - Resolvers are combined in `src/graphql/resolvers/index.ts`
 
 #### Configuration Management
-- Centralized config system in `src/config.ts` with Zod validation
-- Environment-based configuration with sensible defaults
-- Structured config sections: application, capella, openTelemetry
+- 4-pillar configuration pattern in `src/config/` with Zod validation
+- Environment-based configuration with sensible defaults (`src/config/defaults.ts`)
+- Environment variable mapping (`src/config/envMapping.ts`)
+- Schema validation with production security rules (`src/config/schemas.ts`)
 
-#### Custom OpenTelemetry Implementation
-- Custom OTLP exporters in `src/otlp/` with DNS prefetching and retry logic
+#### OpenTelemetry Implementation
+- Centralized telemetry system in `src/telemetry/` with circuit breaker reliability
+- Export stats tracking for observability (`src/telemetry/export-stats-tracker.ts`)
 - Comprehensive instrumentation including HTTP, GraphQL, and business metrics
-- Structured logging with correlation IDs using Winston
+- Structured logging with correlation IDs (`src/telemetry/logger.ts`)
 
 ## Development Conventions
 
 ### File Organization
 ```
 src/
-├── config.ts                    # Central configuration with Zod validation
+├── config/                      # 4-pillar configuration system
+│   ├── index.ts                # Configuration exports
+│   ├── defaults.ts             # Default configuration values
+│   ├── envMapping.ts           # Environment variable mapping
+│   ├── loader.ts               # Configuration loader with validation
+│   └── schemas.ts              # Zod validation schemas
 ├── index.ts                     # Main server entry point with Elysia
-├── instrumentation.ts           # OpenTelemetry setup and metrics
 ├── dashboard/
 │   └── index.html              # Development dashboard (served at /dashboard)
 ├── graphql/
@@ -80,25 +88,40 @@ src/
 │   ├── types.ts                # TypeScript types for resolvers
 │   └── resolvers/              # Modular resolver files
 ├── lib/
-│   ├── couchbaseConnector.ts   # Database connection factory
-│   ├── clusterProvider.ts      # Cluster management utilities
-│   ├── couchbaseErrorHandler.ts # Production-ready error handling with retry logic
-│   ├── couchbaseMetrics.ts     # Performance metrics and monitoring
-│   ├── couchbaseTransactionHandler.ts # Advanced transaction error handling
-│   ├── dataLoader.ts           # Enhanced DataLoader with comprehensive error handling
-│   └── queryCache.ts           # Query result caching layer
+│   ├── couchbase/              # Couchbase database layer
+│   │   ├── connection-manager.ts  # Connection factory
+│   │   ├── circuit-breaker.ts     # Resilience patterns
+│   │   ├── errors.ts              # Error handling
+│   │   ├── metrics.ts             # Performance monitoring
+│   │   └── transaction-handler.ts # Transaction management
+│   ├── graphqlResponseCache.ts # Response caching layer
+│   ├── queryCache.ts           # Query result caching
+│   └── systemHealth.ts         # System health monitoring
 ├── models/
 │   ├── index.ts                # Model exports
 │   ├── types.ts                # TypeScript types and Zod schemas
 │   └── errors.ts               # Structured error hierarchy
-├── otlp/                       # Custom OpenTelemetry exporters
+├── telemetry/                   # OpenTelemetry implementation
+│   ├── instrumentation.ts      # OTEL setup and metrics
+│   ├── logger.ts               # Structured logging
+│   ├── export-stats-tracker.ts # Export monitoring
+│   └── metrics/                # Metrics collection
 ├── utils/
-│   ├── logger.ts               # Winston-based structured logging
-│   └── simpleLogger.ts         # Fallback logging utilities
+│   └── logger.ts               # Winston-based structured logging
 tests/                          # Centralized test directory
-├── unit/                       # Unit tests
-├── integration/                # Integration tests  
-└── e2e/                       # End-to-end tests
+├── bun/                       # Bun runtime tests
+│   ├── unit/                  # Unit tests
+│   ├── integration/           # Integration tests
+│   ├── e2e/                   # End-to-end tests
+│   └── shared/                # Shared test utilities
+├── playwright/                # Playwright E2E tests
+│   └── graphql/               # GraphQL-specific specs
+└── k6/                        # K6 performance tests
+    ├── smoke/                 # Quick validation (3 VUs)
+    ├── load/                  # Average load (50-100 VUs)
+    ├── stress/                # High load (100-200 VUs)
+    ├── scenarios/             # Business scenario tests
+    └── legacy/                # Legacy JS tests
 ```
 
 ### Path Aliases (tsconfig.json)
@@ -111,17 +134,13 @@ tests/                          # Centralized test directory
 
 #### Connection Usage
 ```typescript
-import { getCluster } from "$lib/clusterProvider";
-import { CouchbaseErrorHandler } from "$lib/couchbaseErrorHandler";
+import { getCouchbaseConnection } from "$lib/couchbase";
 
-// Production-ready connection with comprehensive error handling
-const cluster = await CouchbaseErrorHandler.executeWithRetry(
-  async () => await getCluster(),
-  CouchbaseErrorHandler.createConnectionOperationContext("getCluster", requestId)
-);
+// Production-ready connection with circuit breaker and error handling
+const { cluster, bucket, collection } = await getCouchbaseConnection();
 
-// Use cluster.collection(bucket, scope, collection) for specific collections
-const collection = cluster.collection("bucket", "scope", "collection");
+// Execute queries with built-in retry and metrics
+const result = await collection.get("document-key");
 ```
 
 #### Query Patterns
@@ -227,23 +246,43 @@ This project has access to comprehensive specialized agents for expert assistanc
 ### Test Organization
 ```
 tests/
-├── unit/                    # Unit tests for individual components
-│   ├── config.test.ts      # Configuration validation tests
-│   ├── utils/
-│   │   └── bunUtils.test.ts # Bun utility function tests
-│   └── lib/
-│       └── couchbaseConnector.test.ts # Database connection tests
-├── integration/            # Integration tests for component interactions
-│   └── graphql.test.ts    # GraphQL resolver integration tests
-└── e2e/                   # End-to-end tests for full system
-    └── server.test.ts     # Server startup, endpoints, performance tests
+├── bun/                     # Bun runtime tests
+│   ├── unit/               # Unit tests for individual components
+│   │   ├── config/         # Configuration validation tests
+│   │   ├── utils/          # Utility function tests
+│   │   ├── lib/            # Library tests (couchbase, cache)
+│   │   └── errors/         # Error handling tests (RFC 7807)
+│   ├── integration/        # Integration tests
+│   │   ├── database/       # Database connection tests
+│   │   ├── config/         # Hot reload tests
+│   │   ├── workflows/      # Circuit breaker, shutdown tests
+│   │   └── graphql/        # GraphQL resolver tests
+│   ├── e2e/                # End-to-end tests
+│   │   └── server.test.ts  # Server startup, endpoints
+│   └── shared/             # Shared test utilities
+├── playwright/             # Playwright E2E tests
+│   ├── graphql/            # GraphQL spec tests
+│   ├── helpers/            # GraphQL client helpers
+│   └── api-best-practices.spec.ts  # RFC compliance tests
+└── k6/                     # K6 performance tests
+    ├── smoke/              # Quick validation (3 VUs, 3 min)
+    ├── load/               # Average load (50-100 VUs)
+    ├── stress/             # High load (100-200 VUs)
+    ├── scenarios/          # Business scenario tests
+    ├── data/               # Test data loaders
+    ├── utils/              # Shared K6 utilities
+    └── legacy/             # Legacy JS tests
 ```
 
 ### Test Commands
-- `bun test` - Run all tests with watch mode
-- `bun test tests/unit` - Run only unit tests
-- `bun test tests/integration` - Run only integration tests  
-- `bun test tests/e2e` - Run only end-to-end tests
+- `bun test` - Run all Bun tests with watch mode
+- `bun test tests/bun/unit` - Run only unit tests
+- `bun test tests/bun/integration` - Run only integration tests
+- `bun test tests/bun/e2e` - Run only end-to-end tests
+- `bun run test:bun:errors` - Run RFC 7807 error handling tests
+- `bun run test:playwright` - Run Playwright E2E tests
+- `bun run test:k6:smoke:all` - Run all K6 smoke tests
+- `bun run test:k6:stress:all` - Run all K6 stress tests
 - `bun test --coverage` - Run tests with coverage report
 
 ## Critical Rules

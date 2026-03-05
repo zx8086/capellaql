@@ -61,4 +61,9 @@ logs
 # AGENTS/
 .bun-cache/
 
-migrate/
+#migrate/
+
+# StrykerJS mutation testing
+.stryker-tmp/
+reports/mutation/
+migrate/scripts/bundled-runtimes/bun-cli

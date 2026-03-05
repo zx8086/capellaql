@@ -289,7 +289,7 @@ function createResource(config: TelemetryConfig) {
     [ATTR_SERVICE_NAME]: config.SERVICE_NAME,
     [ATTR_SERVICE_VERSION]: config.SERVICE_VERSION,
     [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: config.DEPLOYMENT_ENVIRONMENT,
-    [SEMRESATTRS_SERVICE_NAMESPACE]: "capella-graphql-api",
+    [SEMRESATTRS_SERVICE_NAMESPACE]: config.SERVICE_NAMESPACE,
     [SEMRESATTRS_SERVICE_INSTANCE_ID]: config.runtime?.HOSTNAME || config.runtime?.INSTANCE_ID || os.hostname(),
     [ATTR_TELEMETRY_SDK_NAME]: "opentelemetry",
     [ATTR_TELEMETRY_SDK_LANGUAGE]: "nodejs",

@@ -1,11 +1,14 @@
 /* src/server/handlers/health.ts */
 
 import { getGraphQLPerformanceStats, getRecentGraphQLPerformance } from "../../lib/graphqlPerformanceTracker";
+import { memoryGuardian } from "../../lib/memoryGuardian";
+import { metricsCardinalityManager } from "../../lib/metricsCardinalityManager";
 import { getPerformanceHistory, getPerformanceMetrics, getPerformanceTrends } from "../../lib/performanceMonitor";
 import { getSystemHealth, getSystemHealthSummary } from "../../lib/systemHealth";
 import { getComprehensiveHealth, getLivenessCheck, getReadinessCheck } from "../../services/health";
 import { err, getTelemetryHealth } from "../../telemetry";
 import { createHealthcheck } from "../../utils/bunUtils";
+import { jsonResponseWithETag } from "../../utils/etag";
 import type { RouteHandler } from "../types";
 
 // JSON response helper
@@ -19,10 +22,10 @@ function jsonResponse(data: any, status = 200): Response {
 /**
  * /health - Basic health check
  */
-export const basicHealthHandler: RouteHandler = async (_request, _context) => {
+export const basicHealthHandler: RouteHandler = async (request, _context) => {
   try {
     const healthStatus = await createHealthcheck();
-    return jsonResponse(healthStatus);
+    return jsonResponseWithETag(request, healthStatus);
   } catch (error) {
     err("Health check failed", error);
     return jsonResponse(
@@ -40,10 +43,20 @@ export const basicHealthHandler: RouteHandler = async (_request, _context) => {
 /**
  * /health/telemetry - Telemetry health status
  */
-export const telemetryHealthHandler: RouteHandler = async (_request, _context) => {
+export const telemetryHealthHandler: RouteHandler = async (request, _context) => {
   try {
     const telemetryHealth = getTelemetryHealth();
-    return jsonResponse(telemetryHealth);
+    const cardinalityStats = metricsCardinalityManager.getCardinalityStats();
+    const cardinalityConfig = metricsCardinalityManager.getConfiguration();
+
+    return jsonResponseWithETag(request, {
+      ...telemetryHealth,
+      cardinality: {
+        enabled: cardinalityConfig.enabled,
+        metrics: cardinalityStats,
+        totalLimits: cardinalityConfig.limitsCount,
+      },
+    });
   } catch (error) {
     err("Failed to get telemetry health", error);
     return jsonResponse(
@@ -60,10 +73,10 @@ export const telemetryHealthHandler: RouteHandler = async (_request, _context) =
 /**
  * /health/system - System health details
  */
-export const systemHealthHandler: RouteHandler = async (_request, _context) => {
+export const systemHealthHandler: RouteHandler = async (request, _context) => {
   try {
     const systemHealth = await getSystemHealth();
-    return jsonResponse(systemHealth);
+    return jsonResponseWithETag(request, systemHealth);
   } catch (error) {
     err("System health check failed", error);
     return jsonResponse(
@@ -121,10 +134,14 @@ export const healthSummaryHandler: RouteHandler = async (_request, _context) => 
 /**
  * /health/performance - Performance metrics
  */
-export const performanceHandler: RouteHandler = async (_request, _context) => {
+export const performanceHandler: RouteHandler = async (request, _context) => {
   try {
     const performanceMetrics = await getPerformanceMetrics();
-    return jsonResponse(performanceMetrics);
+    const memoryStatus = memoryGuardian.getStatus();
+    return jsonResponseWithETag(request, {
+      ...performanceMetrics,
+      memoryGuardian: memoryStatus,
+    });
   } catch (error) {
     err("Performance metrics collection failed", error);
     return jsonResponse(
@@ -186,7 +203,7 @@ export const performanceHistoryHandler: RouteHandler = async (request, _context)
 /**
  * /health/cache - Cache analytics
  */
-export const cacheHealthHandler: RouteHandler = async (_request, _context) => {
+export const cacheHealthHandler: RouteHandler = async (request, _context) => {
   try {
     const { bunSQLiteCache } = await import("../../lib/bunSQLiteCache");
     const { defaultQueryCache } = await import("../../lib/queryCache");
@@ -195,7 +212,7 @@ export const cacheHealthHandler: RouteHandler = async (_request, _context) => {
     const sqliteAnalytics = bunSQLiteCache.getAnalytics();
     const mapCacheStats = defaultQueryCache.getStats();
 
-    return jsonResponse({
+    return jsonResponseWithETag(request, {
       timestamp: new Date().toISOString(),
       sqlite: {
         ...sqliteStats,
@@ -293,7 +310,7 @@ export const telemetryDetailedHandler: RouteHandler = async (_request, _context)
 /**
  * /health/comprehensive - Combined health report
  */
-export const comprehensiveHealthHandler: RouteHandler = async (_request, _context) => {
+export const comprehensiveHealthHandler: RouteHandler = async (request, _context) => {
   try {
     const [systemHealth, telemetryHealth, performanceMetrics, cacheResponse, detailedTelemetry] =
       await Promise.allSettled([
@@ -312,7 +329,7 @@ export const comprehensiveHealthHandler: RouteHandler = async (_request, _contex
 
     const timestamp = new Date().toISOString();
 
-    return jsonResponse({
+    return jsonResponseWithETag(request, {
       timestamp,
       version: "2.0.0",
       environment: process.env.NODE_ENV || "development",

@@ -9,6 +9,7 @@ export const telemetryEnvMapping = {
   ENABLE_OPENTELEMETRY: "ENABLE_OPENTELEMETRY",
   SERVICE_NAME: "OTEL_SERVICE_NAME",
   SERVICE_VERSION: "OTEL_SERVICE_VERSION",
+  SERVICE_NAMESPACE: "OTEL_SERVICE_NAMESPACE",
   DEPLOYMENT_ENVIRONMENT: "DEPLOYMENT_ENVIRONMENT",
   // Standard OTEL exporter endpoint environment variables
   OTLP_ENDPOINT: "OTEL_EXPORTER_OTLP_ENDPOINT", // Base endpoint (fallback)
@@ -34,6 +35,7 @@ export const telemetryDefaults: TelemetryConfig = {
   ENABLE_OPENTELEMETRY: true,
   SERVICE_NAME: "capellaql-service",
   SERVICE_VERSION: "2.0",
+  SERVICE_NAMESPACE: "capella-graphql-api",
   DEPLOYMENT_ENVIRONMENT: "development",
   TRACES_ENDPOINT: "http://localhost:4318/v1/traces",
   METRICS_ENDPOINT: "http://localhost:4318/v1/metrics",
@@ -58,6 +60,10 @@ export const TelemetryConfigSchema = z.object({
   ENABLE_OPENTELEMETRY: z.coerce.boolean().default(true),
   SERVICE_NAME: z.string().min(1, "SERVICE_NAME is required and cannot be empty").default("capellaql-service"),
   SERVICE_VERSION: z.string().min(1, "SERVICE_VERSION is required and cannot be empty").default("2.0"),
+  SERVICE_NAMESPACE: z
+    .string()
+    .min(1, "SERVICE_NAMESPACE is required and cannot be empty")
+    .default("capella-graphql-api"),
   DEPLOYMENT_ENVIRONMENT: z.enum(["development", "staging", "production", "test"]).default("development"),
   TRACES_ENDPOINT: z.string().url("TRACES_ENDPOINT must be a valid URL").default("http://localhost:4318/v1/traces"),
   METRICS_ENDPOINT: z.string().url("METRICS_ENDPOINT must be a valid URL").default("http://localhost:4318/v1/metrics"),
@@ -155,6 +161,10 @@ export function loadTelemetryConfigFromEnv(): TelemetryConfig {
     SERVICE_VERSION:
       (parseEnvVar(getEnvVar(telemetryEnvMapping.SERVICE_VERSION), "string", "OTEL_SERVICE_VERSION") as string) ||
       telemetryDefaults.SERVICE_VERSION,
+
+    SERVICE_NAMESPACE:
+      (parseEnvVar(getEnvVar(telemetryEnvMapping.SERVICE_NAMESPACE), "string", "OTEL_SERVICE_NAMESPACE") as string) ||
+      telemetryDefaults.SERVICE_NAMESPACE,
 
     DEPLOYMENT_ENVIRONMENT:
       (parseEnvVar(
@@ -290,6 +300,7 @@ export function getTelemetryEnvVarPath(configPath: string): string | undefined {
     "telemetry.ENABLE_OPENTELEMETRY": "ENABLE_OPENTELEMETRY",
     "telemetry.SERVICE_NAME": "OTEL_SERVICE_NAME",
     "telemetry.SERVICE_VERSION": "OTEL_SERVICE_VERSION",
+    "telemetry.SERVICE_NAMESPACE": "OTEL_SERVICE_NAMESPACE",
     "telemetry.DEPLOYMENT_ENVIRONMENT": "DEPLOYMENT_ENVIRONMENT",
     "telemetry.TRACES_ENDPOINT": "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
     "telemetry.METRICS_ENDPOINT": "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",

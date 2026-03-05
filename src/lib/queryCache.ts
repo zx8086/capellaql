@@ -22,6 +22,8 @@ export interface CacheStats {
   misses: number;
   evictions: number;
   memoryUsage: number; // Approximate bytes
+  staleHits: number; // Number of times stale data was served after fetcher failure
+  staleSize?: number; // Current number of entries in the stale cache
 }
 
 /**
@@ -32,6 +34,7 @@ export interface CacheConfig {
   maxSize: number; // Maximum number of entries
   maxMemory: number; // Maximum memory usage in bytes (approximate)
   cleanupInterval: number; // Cleanup interval in milliseconds
+  staleTolerance: number; // How long stale data is retained after primary expiry (ms)
 }
 
 /**
@@ -39,6 +42,7 @@ export interface CacheConfig {
  */
 export class QueryCache {
   private cache = new Map<string, CacheEntry<any>>();
+  private staleCache = new Map<string, CacheEntry<any>>();
   private accessOrder = new Map<string, number>(); // For LRU tracking
   private stats: CacheStats = {
     size: 0,
@@ -46,6 +50,7 @@ export class QueryCache {
     misses: 0,
     evictions: 0,
     memoryUsage: 0,
+    staleHits: 0,
   };
   private accessCounter = 0;
   private cleanupTimer?: Timer;
@@ -56,6 +61,7 @@ export class QueryCache {
       maxSize: 1000,
       maxMemory: 10 * 1024 * 1024, // 10MB
       cleanupInterval: 60 * 1000, // 1 minute
+      staleTolerance: 30 * 60 * 1000, // 30 minutes
     }
   ) {
     this.startCleanupTimer();
@@ -63,6 +69,7 @@ export class QueryCache {
       maxSize: config.maxSize,
       defaultTtl: config.defaultTtl,
       maxMemory: config.maxMemory,
+      staleTolerance: config.staleTolerance,
     });
   }
 
@@ -84,9 +91,9 @@ export class QueryCache {
       return cached.data;
     }
 
-    // Cache miss - remove expired entry if it exists
+    // Primary cache miss - move expired entry to stale cache
     if (cached) {
-      this.remove(key);
+      this.moveToStale(key, cached);
     }
 
     this.stats.misses++;
@@ -99,9 +106,19 @@ export class QueryCache {
       // Store in cache
       this.set(key, data, ttl);
 
+      // Remove from stale cache since we have fresh data
+      this.staleCache.delete(key);
+
       return data;
     } catch (error) {
-      err("Cache fetcher failed", error, { key });
+      // Fetcher failed - try stale fallback
+      const stale = this.getStale<T>(key);
+      if (stale !== undefined) {
+        log("Serving stale data after fetcher failure", { key });
+        this.stats.staleHits++;
+        return stale;
+      }
+      err("Cache fetcher failed with no stale fallback", error, { key });
       throw error;
     }
   }
@@ -142,7 +159,7 @@ export class QueryCache {
 
     if (!cached || now - cached.timestamp >= cached.ttl) {
       if (cached) {
-        this.remove(key);
+        this.moveToStale(key, cached);
       }
       this.stats.misses++;
       return undefined;
@@ -164,7 +181,7 @@ export class QueryCache {
 
     if (!cached || now - cached.timestamp >= cached.ttl) {
       if (cached) {
-        this.remove(key);
+        this.moveToStale(key, cached);
       }
       return false;
     }
@@ -184,9 +201,10 @@ export class QueryCache {
       this.stats.memoryUsage -= entry.size;
 
       log("Cache remove", { key, size: entry.size });
-      return true;
     }
-    return false;
+    // Also remove from stale cache
+    const staleRemoved = this.staleCache.delete(key);
+    return !!entry || staleRemoved;
   }
 
   /**
@@ -195,6 +213,7 @@ export class QueryCache {
   clear(): void {
     const oldSize = this.cache.size;
     this.cache.clear();
+    this.staleCache.clear();
     this.accessOrder.clear();
     this.stats = {
       size: 0,
@@ -202,6 +221,7 @@ export class QueryCache {
       misses: this.stats.misses,
       evictions: this.stats.evictions,
       memoryUsage: 0,
+      staleHits: this.stats.staleHits,
     };
 
     log("Cache cleared", { oldSize });
@@ -211,7 +231,10 @@ export class QueryCache {
    * Get cache statistics
    */
   getStats(): CacheStats {
-    return { ...this.stats };
+    return {
+      ...this.stats,
+      staleSize: this.staleCache.size,
+    };
   }
 
   /**
@@ -227,6 +250,14 @@ export class QueryCache {
       }
     }
 
+    // Also invalidate matching stale entries
+    for (const key of this.staleCache.keys()) {
+      if (pattern.test(key)) {
+        this.staleCache.delete(key);
+        count++;
+      }
+    }
+
     log("Cache pattern invalidation", { pattern: pattern.toString(), count });
     return count;
   }
@@ -238,6 +269,39 @@ export class QueryCache {
     const keyParts = [operation, collection || "default", JSON.stringify(params, Object.keys(params).sort())];
 
     return keyParts.join(":");
+  }
+
+  /**
+   * Move an expired entry from primary cache to stale cache
+   */
+  private moveToStale(key: string, entry: CacheEntry<any>): void {
+    this.cache.delete(key);
+    this.accessOrder.delete(key);
+    this.stats.size = this.cache.size;
+    this.stats.memoryUsage -= entry.size;
+
+    // Store in stale cache with current timestamp for stale tolerance window
+    this.staleCache.set(key, {
+      ...entry,
+      timestamp: Date.now(), // Reset timestamp for stale tolerance window
+      ttl: this.config.staleTolerance,
+    });
+  }
+
+  /**
+   * Get stale data for a key (only if within stale tolerance)
+   */
+  getStale<T>(key: string): T | undefined {
+    const stale = this.staleCache.get(key);
+    if (!stale) return undefined;
+
+    const now = Date.now();
+    if (now - stale.timestamp >= stale.ttl) {
+      this.staleCache.delete(key);
+      return undefined;
+    }
+
+    return stale.data;
   }
 
   /**
@@ -332,13 +396,22 @@ export class QueryCache {
 
     for (const [key, entry] of this.cache.entries()) {
       if (now - entry.timestamp >= entry.ttl) {
-        this.remove(key);
+        this.moveToStale(key, entry);
         cleaned++;
       }
     }
 
-    if (cleaned > 0) {
-      log("Cache cleanup", { cleaned, remaining: this.cache.size });
+    // Cleanup expired stale entries
+    let staleCleaned = 0;
+    for (const [key, entry] of this.staleCache.entries()) {
+      if (now - entry.timestamp >= entry.ttl) {
+        this.staleCache.delete(key);
+        staleCleaned++;
+      }
+    }
+
+    if (cleaned > 0 || staleCleaned > 0) {
+      log("Cache cleanup", { cleaned, staleCleaned, remaining: this.cache.size, staleRemaining: this.staleCache.size });
     }
   }
 

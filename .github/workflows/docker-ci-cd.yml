@@ -31,6 +31,7 @@ permissions:
   contents: read
   security-events: write
   packages: write
+  id-token: write  # Needed for cosign keyless signing
 
 # =============================================================================
 # Job 1: Build - Build and push multi-platform image
@@ -162,6 +163,37 @@ jobs:
           provenance: true
           sbom: true
 
+      - name: Install Cosign
+        if: github.event_name != 'pull_request'
+        uses: sigstore/cosign-installer@v3
+
+      - name: Sign container image
+        if: github.event_name != 'pull_request'
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+          DIGEST: ${{ steps.build.outputs.digest }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          cosign sign --yes \
+            --key env://COSIGN_PRIVATE_KEY \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}
+
+      - name: Attest SBOM
+        if: github.event_name != 'pull_request'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
+          COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
+        run: |
+          cosign attest --yes \
+            --key env://COSIGN_PRIVATE_KEY \
+            --predicate <(echo '{
+              "predicateType":"https://spdx.dev/Document",
+              "predicate":{"name":"${{ env.IMAGE_NAME }}","version":"${{ env.PKG_VERSION }}"}
+            }') \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}
+
       - name: Build metrics
         run: |
           BUILD_END_TIME=$(date +%s)
@@ -284,6 +316,7 @@ jobs:
             echo "- DHI Distroless base image"
             echo "- dumb-init PID 1 handler"
             echo "- UID 65532 (nonroot)"
+            echo "- Cosign image signing + SBOM attestation"
             echo ""
             echo "### Build Optimizations"
             echo "- Docker Build Cloud (native ARM builds)"
