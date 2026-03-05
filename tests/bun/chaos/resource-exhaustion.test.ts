@@ -24,9 +24,8 @@ describe("Chaos: Resource Exhaustion Scenarios", () => {
       );
       expect(status.heapUsedMB).toBeGreaterThan(0);
       expect(status.heapUsageRatio).toBeGreaterThan(0);
-      // Note: In Bun/JSC, heapUsed can briefly exceed heapTotal during GC,
-      // so we use a generous upper bound instead of strict <= 1
-      expect(status.heapUsageRatio).toBeLessThan(2);
+      // heapUsageRatio is RSS / memoryBudgetMB — should be well under 1 in tests
+      expect(status.heapUsageRatio).toBeLessThan(1);
     });
 
     test("shouldAcceptRequest reflects current pressure level", () => {
@@ -63,10 +62,9 @@ describe("Chaos: Resource Exhaustion Scenarios", () => {
       // RSS should be greater than zero
       expect(status.rssMB).toBeGreaterThan(0);
 
-      // heapUsageRatio should be positive. In Bun/JSC, heapUsed can briefly
-      // exceed heapTotal during GC cycles, so we don't assert strict <= 1.
+      // heapUsageRatio is RSS / memoryBudgetMB — tiny fraction in test environments
       expect(status.heapUsageRatio).toBeGreaterThan(0);
-      expect(status.heapUsageRatio).toBeLessThan(2);
+      expect(status.heapUsageRatio).toBeLessThan(1);
     });
   });
 

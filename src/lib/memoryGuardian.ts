@@ -1,5 +1,6 @@
 /* src/lib/memoryGuardian.ts */
 
+import { totalmem } from "node:os";
 import { log, warn } from "../telemetry/logger";
 
 /**
@@ -16,6 +17,8 @@ export interface MemoryGuardianConfig {
   highThreshold: number;
   /** Memory usage threshold for critical level (0-1, default: 0.95) */
   criticalThreshold: number;
+  /** Maximum memory budget in MB. Defaults to 75% of system memory. */
+  memoryBudgetMB: number;
 }
 
 const DEFAULT_CONFIG: MemoryGuardianConfig = {
@@ -23,6 +26,7 @@ const DEFAULT_CONFIG: MemoryGuardianConfig = {
   elevatedThreshold: 0.7,
   highThreshold: 0.85,
   criticalThreshold: 0.95,
+  memoryBudgetMB: Math.round((totalmem() * 0.75) / (1024 * 1024)),
 };
 
 export interface MemoryStatus {
@@ -49,21 +53,27 @@ class MemoryGuardian {
 
   /**
    * Check current memory status and update pressure level.
+   *
+   * Uses RSS / memoryBudgetMB as the pressure ratio. RSS reflects actual
+   * process memory consumption, while memoryBudgetMB is a stable ceiling
+   * (defaults to 75 % of system RAM). The previous approach used
+   * heapUsed / heapTotal which is meaningless — V8/Bun grows heapTotal
+   * just ahead of heapUsed, so that ratio always hovers near 0.85–0.98.
    */
   private checkMemory(): MemoryStatus {
     const memUsage = process.memoryUsage();
     const heapUsedMB = memUsage.heapUsed / (1024 * 1024);
     const heapTotalMB = memUsage.heapTotal / (1024 * 1024);
     const rssMB = memUsage.rss / (1024 * 1024);
-    const heapUsageRatio = memUsage.heapUsed / memUsage.heapTotal;
+    const memoryUsageRatio = rssMB / this.config.memoryBudgetMB;
 
     const previousLevel = this.currentLevel;
 
-    if (heapUsageRatio >= this.config.criticalThreshold) {
+    if (memoryUsageRatio >= this.config.criticalThreshold) {
       this.currentLevel = "critical";
-    } else if (heapUsageRatio >= this.config.highThreshold) {
+    } else if (memoryUsageRatio >= this.config.highThreshold) {
       this.currentLevel = "high";
-    } else if (heapUsageRatio >= this.config.elevatedThreshold) {
+    } else if (memoryUsageRatio >= this.config.elevatedThreshold) {
       this.currentLevel = "elevated";
     } else {
       this.currentLevel = "normal";
@@ -74,7 +84,7 @@ class MemoryGuardian {
       heapUsedMB: Math.round(heapUsedMB * 100) / 100,
       heapTotalMB: Math.round(heapTotalMB * 100) / 100,
       rssMB: Math.round(rssMB * 100) / 100,
-      heapUsageRatio: Math.round(heapUsageRatio * 1000) / 1000,
+      heapUsageRatio: Math.round(memoryUsageRatio * 1000) / 1000,
       timestamp: Date.now(),
     };
 
@@ -106,6 +116,7 @@ class MemoryGuardian {
 
     log("Memory guardian started", {
       checkInterval: this.config.checkInterval,
+      memoryBudgetMB: this.config.memoryBudgetMB,
       thresholds: {
         elevated: this.config.elevatedThreshold,
         high: this.config.highThreshold,

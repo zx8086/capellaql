@@ -33,7 +33,7 @@ export const backpressureMiddleware: Middleware = async (
     const problem = createProblemResponse(
       createProblemDetails({
         code: "HTTP_005",
-        detail: `Server is under critical memory pressure (${(status.heapUsageRatio * 100).toFixed(1)}% heap usage). Please retry after ${retryAfter} seconds.`,
+        detail: `Server is under critical memory pressure (${(status.heapUsageRatio * 100).toFixed(1)}% of memory budget, RSS ${status.rssMB}MB). Please retry after ${retryAfter} seconds.`,
         extensions: {
           pressureLevel,
           heapUsageMB: status.heapUsedMB,
