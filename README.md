@@ -67,12 +67,13 @@ The service will be available at `http://localhost:4000/graphql`
 
 ## ⚙️ Configuration
 
-Configure the service using environment variables:
+Configure the service using environment variables. The configuration system uses a 4-pillar pattern (defaults, env mapping, Zod validation, loader) with 44+ variables across 5 categories.
 
 ### Core Settings
 - `BASE_URL`: Base URL for the service
 - `PORT`: Port number (default: 4000)
 - `LOG_LEVEL`: Logging level (debug, info, warn, error)
+- `ALLOWED_ORIGINS`: Comma-separated CORS origins
 
 ### Couchbase Configuration
 - `COUCHBASE_URL`: Couchbase cluster connection string
@@ -81,60 +82,71 @@ Configure the service using environment variables:
 - `COUCHBASE_BUCKET`: Target bucket name
 - `COUCHBASE_SCOPE`: Target scope name
 - `COUCHBASE_COLLECTION`: Target collection name
+- `COUCHBASE_KV_TIMEOUT`, `COUCHBASE_QUERY_TIMEOUT`, etc.: Operation timeouts
 
 ### OpenTelemetry Settings
 - `ENABLE_OPENTELEMETRY`: Enable telemetry (true/false)
-- `SERVICE_NAME`: Service identifier for tracing
-- `SERVICE_VERSION`: Service version
-- `TRACES_ENDPOINT`: OTLP traces endpoint
-- `METRICS_ENDPOINT`: OTLP metrics endpoint
-- `LOGS_ENDPOINT`: OTLP logs endpoint
+- `OTEL_SERVICE_NAME`: Service identifier for tracing
+- `OTEL_SERVICE_VERSION`: Service version
+- `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`: OTLP traces endpoint
+- `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT`: OTLP metrics endpoint
+- `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT`: OTLP logs endpoint
+
+### Deployment Settings
+- `HOSTNAME`: Server hostname
+- `K8S_POD_NAME`, `K8S_NAMESPACE`: Kubernetes metadata
+- `INSTANCE_ID`, `CONTAINER_ID`: Instance identification
+
+### Runtime Settings
+- `NODE_ENV`: Environment mode
+- `BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS`: DNS cache TTL
+
+For the full list of 44+ environment variables, see [docs/configuration/environment.md](docs/configuration/environment.md).
 
 ## 📖 API Documentation
 
-### Main Queries
+The GraphQL endpoint is available at `/graphql`. The schema exposes 11 queries across looks, options, images, documents, and seasonal assignments.
+
+### Key Query Examples
 
 #### `looksSummary`
-Retrieve summary information for looks with filtering options.
+Retrieve summary statistics for looks with optional brand/season/division filtering.
 
 ```graphql
 query {
-  looksSummary(
-    styleSeasonCode: "SS24"
-    companyCode: "COMP001"
-    limit: 10
-  ) {
-    id
-    name
-    description
-    imageUrl
+  looksSummary(brand: "TH", season: "SS24", division: "DIV01") {
+    totalLooks
+    hasTitle
+    hasTrend
+    hasRelatedStyles
+    hasDescription
+    hasDeliveryName
+    hasGender
+    hasTag
   }
 }
 ```
 
 #### `looks`
-Get detailed look information including options and assignments.
+Get look documents with optional brand/season/division filtering.
 
 ```graphql
 query {
-  looks(
-    styleSeasonCode: "SS24"
-    lookId: "LOOK001"
-  ) {
-    id
-    name
-    description
-    options {
-      id
-      name
-      price
-    }
+  looks(brand: "TH", season: "SS24", division: "DIV01") {
+    documentKey
+    divisionCode
+    lookType
+    assetUrl
+    title
+    trend
+    relatedStyles
+    isDeleted
   }
 }
 ```
 
 #### `getAllSeasonalAssignments`
-Retrieve seasonal assignment data with division filtering.
+Retrieve seasonal assignment data with division and channel details.
 
 ```graphql
 query {
@@ -143,15 +155,29 @@ query {
     companyCode: "COMP001"
     isActive: true
   ) {
-    id
+    name
+    brand
+    brandName
+    styleSeasonCode
+    companyCode
+    channels
+    salesOrganizationCodes
     divisions {
-      id
       name
+      code
       isActive
     }
+    fms {
+      year
+      season { code name }
+    }
+    createdOn
+    modifiedOn
   }
 }
 ```
+
+For the full query reference (all 11 queries with complete type definitions), see [docs/api/graphql-queries.md](docs/api/graphql-queries.md).
 
 ## Performance Testing and Benchmarks
 
@@ -167,17 +193,17 @@ CapellaQL includes a comprehensive K6 testing suite to ensure optimal performanc
 #### Smoke Test
 **Purpose**: Quick validation of basic functionality
 ```bash
-k6 run test/k6/smoke-test-health.js
+k6 run tests/k6/smoke/health-smoke.ts
 ```
 - **Virtual Users**: 3
 - **Duration**: 3 minutes
 - **Threshold**: 95% of requests < 50ms
 - **Use Case**: Pre-deployment validation
 
-#### 🌊 Soak Test
+#### Soak Test
 **Purpose**: Extended load endurance testing
 ```bash
-k6 run test/k6/soak-test-health.js
+k6 run tests/k6/soak/soak-test.ts
 ```
 - **Virtual Users**: 50 (constant)
 - **Duration**: 3 hours
@@ -187,7 +213,7 @@ k6 run test/k6/soak-test-health.js
 #### Stress Test
 **Purpose**: Identify system breaking point
 ```bash
-k6 run test/k6/stress-test-health.js
+k6 run tests/k6/stress/system-stress.ts
 ```
 - **Virtual Users**: 100-200 (gradual increase)
 - **Duration**: 15 minutes
@@ -197,7 +223,7 @@ k6 run test/k6/stress-test-health.js
 #### Spike Test
 **Purpose**: Sudden traffic surge simulation
 ```bash
-k6 run test/k6/spike-test-health.js
+k6 run tests/k6/spike/spike-test.ts
 ```
 - **Virtual Users**: 25-100 (rapid spike)
 - **Duration**: 5 minutes
@@ -218,41 +244,41 @@ CapellaQL follows a layered architecture with comprehensive middleware integrati
 ### Request Flow
 
 ```
-Client Request → CORS → Rate Limiting → Security Headers → GraphQL → Resolvers → Couchbase
-                  ↓         ↓              ↓              ↓         ↓           ↓
-              OpenTelemetry Tracing & Metrics Collection Throughout Pipeline
+Client Request → Method Validation → Backpressure → Rate Limiting → CORS → Security Headers → Tracing → Logging → GraphQL → Resolvers → Couchbase
+                       ↓                  ↓              ↓            ↓           ↓              ↓          ↓
+                                     OpenTelemetry Tracing & Metrics Collection Throughout Pipeline
 ```
 
-### Middleware Pipeline
+### Middleware Pipeline (7 layers)
 
-#### 1. CORS Configuration
-```typescript
-cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000'],
-  credentials: true,
-  methods: ['GET', 'POST', 'OPTIONS']
-})
-```
+#### 1. Method Validation (`methodValidationMiddleware`)
+Validates HTTP method is allowed for the requested endpoint.
 
-#### 2. Rate Limiting
+#### 2. Backpressure (`backpressureMiddleware`)
+RSS-based memory pressure detection. Rejects requests with HTTP 503 (RFC 7231) when memory usage exceeds thresholds.
+
+#### 3. Rate Limiting (`rateLimitMiddleware`)
 **Implementation**: Token bucket algorithm
 - **Limit**: 500 requests per minute per client/path combination
 - **Identification**: Client IP + request path
 - **Response**: HTTP 429 with retry-after header
 - **Bypass**: Health check endpoints excluded
 
-#### 3. Security Headers
+#### 4. CORS (`corsMiddleware`)
+Cross-Origin Resource Sharing headers with configurable allowed origins.
+
+#### 5. Security Headers (`securityMiddleware`)
 - **HSTS**: HTTP Strict Transport Security
 - **CSP**: Content Security Policy
 - **X-Frame-Options**: Clickjacking protection
 - **X-Content-Type-Options**: MIME type sniffing prevention
 - **Referrer-Policy**: Referrer information control
 
-#### 4. Request ID Generation
-Each request receives a unique correlation ID for distributed tracing:
-```typescript
-const requestId = crypto.randomUUID()
-```
+#### 6. Distributed Tracing (`tracingMiddleware`)
+OpenTelemetry span creation and propagation for end-to-end request tracking.
+
+#### 7. Request Logging (`loggingMiddleware`)
+Structured request/response logging with ULID-based correlation IDs.
 
 ### OpenTelemetry Integration
 
@@ -275,59 +301,13 @@ const requestId = crypto.randomUUID()
 - **Structured Logging**: Correlation IDs for debugging
 - **Health Checks**: Proactive monitoring endpoints
 
-## GraphQL Schema Details
+## GraphQL Schema Overview
 
-CapellaQL implements a comprehensive GraphQL schema designed for fashion retail data management with optimized resolver patterns.
-
-### Core Types
-
-#### Look Type
-```graphql
-type Look {
-  id: ID!
-  name: String!
-  description: String
-  imageUrl: String
-  styleSeasonCode: String!
-  companyCode: String!
-  options: [Option!]!
-  assignments: [SeasonalAssignment!]!
-  createdAt: DateTime
-  updatedAt: DateTime
-}
-```
-
-#### Option Type
-```graphql
-type Option {
-  id: ID!
-  name: String!
-  description: String
-  price: Float
-  currency: String
-  availability: AvailabilityStatus!
-  images: [ImageDetail!]!
-  variants: [OptionVariant!]!
-}
-```
-
-#### Seasonal Assignment Type
-```graphql
-type SeasonalAssignment {
-  id: ID!
-  styleSeasonCode: String!
-  companyCode: String!
-  divisions: [Division!]!
-  isActive: Boolean!
-  effectiveDate: DateTime
-  expirationDate: DateTime
-}
-```
+CapellaQL implements a comprehensive GraphQL schema designed for fashion retail data management with 11 query resolvers organized in a modular pattern.
 
 ### Resolver Organization
 
-#### Query Resolvers
-The resolver architecture follows a modular pattern with dedicated files for each domain:
+The resolver architecture follows a modular pattern with dedicated files for each domain in `src/graphql/resolvers/`:
 
 ```typescript
 const resolvers = {
@@ -335,87 +315,41 @@ const resolvers = {
     ...looks.Query,
     ...looksSummary.Query,
     ...optionsSummary.Query,
-    ...getAllSeasonalAssignments.Query,
+    ...optionsProductView.Query,
+    ...imageDetails.Query,
+    ...lookDetails.Query,
+    ...imageUrlCheck.Query,
+    ...looksUrlCheck.Query,
     ...documentSearch.Query,
-    ...imageUrlCheck.Query
+    ...getDivisionAssignment.Query,
+    ...getAllSeasonalAssignments.Query,
   }
 }
 ```
 
-#### Data Flow Patterns
+### Available Queries
 
-**1. Direct Document Retrieval**
-```typescript
-const result = await collection.get(documentKey)
-```
+| Query | Description |
+|-------|-------------|
+| `looksSummary` | Summary statistics for looks (counts by field presence) |
+| `looks` | Look documents with brand/season/division filtering |
+| `lookDetails` | Detailed look information by document key |
+| `optionsSummary` | Option summary statistics with sales channel filtering |
+| `optionsProductView` | Product view of options with status flags |
+| `imageDetails` | Image URLs for a style (front, back, detail, etc.) |
+| `getImageUrlCheck` | Validate image URL suffixes by division and season |
+| `getLooksUrlCheck` | Validate look URL suffixes by division and season |
+| `searchDocuments` | Cross-collection document search by keys |
+| `getAllSeasonalAssignments` | Seasonal assignments with divisions and channels |
+| `getDivisionAssignment` | Single division assignment details |
 
-**2. N1QL Query Execution**
-```typescript
-const query = `EXECUTE FUNCTION \`default\`.\`new_model\`.getAllSeasonalAssignments($styleSeasonCode, $companyCode)`
-const result = await cluster.query(query, { parameters: { styleSeasonCode, companyCode } })
-```
+### Data Flow Patterns
 
-**3. Multi-Collection Search**
-```typescript
-for (const { bucket, scope, collection } of collections) {
-  const collectionRef = connection.collection(bucket, scope, collection)
-  const result = await collectionRef.get(key)
-}
-```
+**1. Key-Value Operations** - Direct document retrieval by key
+**2. Stored Function Execution** - Server-side N1QL functions with parameterized calls
+**3. Multi-Collection Search** - Cross-collection document discovery with DataLoader batching
 
-### Query Examples
-
-#### Complex Look Query with Filtering
-```graphql
-query GetLooksWithOptions($styleSeasonCode: String!, $companyCode: String) {
-  looks(styleSeasonCode: $styleSeasonCode, companyCode: $companyCode) {
-    id
-    name
-    description
-    imageUrl
-    options {
-      id
-      name
-      price
-      currency
-      availability
-      images {
-        url
-        altText
-        isPrimary
-      }
-    }
-    assignments {
-      divisions {
-        id
-        name
-        isActive
-      }
-    }
-  }
-}
-```
-
-#### Document Search Across Collections
-```graphql
-query SearchDocuments($collections: [CollectionInput!]!, $keys: [String!]!) {
-  searchDocuments(collections: $collections, keys: $keys) {
-    bucket
-    scope
-    collection
-    data
-    timeTaken
-    error
-  }
-}
-```
-
-### Schema Optimization Features
-- **Field-level Caching**: Resolver-level response caching
-- **Lazy Loading**: On-demand relationship resolution
-- **Batch Loading**: DataLoader pattern for N+1 prevention
-- **Input Validation**: Comprehensive argument validation
-- **Error Boundaries**: Graceful error handling with partial results
+For full type definitions, see `src/graphql/typeDefs.ts`.
 
 ## 🐳 Docker Multi-Architecture Support
 
@@ -522,33 +456,49 @@ CapellaQL implements optimized patterns for Couchbase Capella database integrati
 
 ### Connection Architecture
 
-#### Connection Factory Pattern
+#### ConnectionManager Singleton Pattern
+
+The `CouchbaseConnectionManager` is a singleton that manages a single cluster connection shared across all resolvers, with circuit breaker integration, retry logic, and health monitoring.
+
 ```typescript
-interface capellaConn {
-  cluster: QueryableCluster
-  bucket: (name: string) => Bucket
-  scope: (bucket: string, name: string) => Scope
-  collection: (bucket: string, scope: string, name: string) => Collection
+interface CouchbaseConnection {
+  // Core SDK objects
+  cluster: Cluster
+  bucket: (name?: string) => Bucket
+  scope: (bucketName?: string, scopeName?: string) => Scope
+  collection: (bucketName?: string, scopeName?: string, collectionName?: string) => Collection
+
+  // Default references (cached)
   defaultBucket: Bucket
   defaultScope: Scope
   defaultCollection: Collection
+
+  // Enhanced methods
+  getHealth: () => Promise<HealthStatus>
+  executeWithRetry?: <T>(operation: () => Promise<T>, context?: RetryContext) => Promise<T>
+
+  // Error classes (for instanceof checks)
   errors: {
-    DocumentNotFoundError: typeof DocumentNotFoundError
-    CouchbaseError: typeof CouchbaseError
+    DocumentNotFoundError: any
+    CouchbaseError: any
+    TimeoutError: any
+    AuthenticationFailureError: any
+    CasMismatchError: any
+    TemporaryFailureError: any
   }
 }
 ```
 
-#### Connection Establishment
+#### Usage
 ```typescript
-const cluster = await connect(clusterConnStr, {
-  username: username,
-  password: password
-})
+import { connectionManager } from "./lib/couchbase"
 
-const bucket = cluster.bucket(bucketName)
-const scope = bucket.scope(scopeName)
-const collection = scope.collection(collectionName)
+// Initialize once at startup
+await connectionManager.initialize()
+
+// Get connection for operations
+const connection = await connectionManager.getConnection()
+const result = await connection.defaultCollection.get("document-key")
 ```
 
 ### Authentication Patterns
@@ -887,9 +837,11 @@ const addresses = await dnsPromises.resolve4(hostname, { ttl: true })
 
 **Rate Limit Debugging**:
 ```bash
+# Check rate limit headers on response
 curl -I http://localhost:4000/graphql
 
-curl http://localhost:4000/metrics | grep rate_limit
+# Check performance metrics for rate limiting data
+curl http://localhost:4000/health/performance
 ```
 
 **Rate Limit Configuration**:
@@ -906,13 +858,33 @@ const rateLimitConfig = {
 
 #### 1. Health Check Endpoints
 
-**Health Check Implementation**:
+CapellaQL provides 13 health endpoints for comprehensive monitoring:
+
+| Endpoint | Description |
+|----------|-------------|
+| `/health` | Basic health check |
+| `/health/telemetry` | Telemetry health status |
+| `/health/system` | System health details |
+| `/health/summary` | Health summary |
+| `/health/performance` | Performance metrics |
+| `/health/performance/history` | Performance history |
+| `/health/cache` | Cache analytics |
+| `/health/telemetry/detailed` | Detailed telemetry |
+| `/health/comprehensive` | Full health report |
+| `/health/graphql` | GraphQL resolver performance |
+| `/health/status` | Standardized status |
+| `/health/ready` | K8s readiness probe |
+| `/health/live` | K8s liveness probe |
+
 ```bash
+# Basic health check
 curl http://localhost:4000/health
 
-curl http://localhost:4000/ready
+# K8s readiness probe
+curl http://localhost:4000/health/ready
 
-curl http://localhost:4000/metrics
+# Full health report
+curl http://localhost:4000/health/comprehensive
 ```
 
 #### 2. Log Analysis
@@ -943,9 +915,11 @@ docker logs capellaql | grep "duration" | awk '{print $NF}' | sort -n
 - **Logs**: Structured logging with correlation IDs
 
 ### Health Monitoring
-- Health check endpoint: `/health`
-- Metrics endpoint: `/metrics` (when enabled)
-- Ready check: `/ready`
+- Basic health check: `/health`
+- K8s readiness probe: `/health/ready`
+- K8s liveness probe: `/health/live`
+- Full health report: `/health/comprehensive`
+- See [Health Check Endpoints](#1-health-check-endpoints) for all 13 endpoints
 
 ## Security
 

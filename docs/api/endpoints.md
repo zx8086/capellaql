@@ -455,6 +455,18 @@ GraphQL resolver performance statistics.
 
 ---
 
+## WebSocket / GraphQL Subscriptions
+
+The `/graphql` endpoint supports WebSocket upgrades for real-time GraphQL subscriptions.
+
+- **Upgrade**: Send a request to `/graphql` with the `Upgrade: websocket` header. The server checks `shouldUpgradeWebSocket()` and upgrades matching requests via Bun's native WebSocket support.
+- **Protocol**: Implements the GraphQL over WebSocket protocol with `connection_init` / `connection_ack`, `start`, and `stop` message types. Invalid messages receive an `error` type response.
+- **Connection tracking**: Active WebSocket connections are tracked via the `activeConnections` counter (incremented on open, decremented on close), enabling monitoring through the logging middleware.
+- **Lifecycle events**: Connection open, close (with duration), and error events are logged with structured telemetry including `requestId` and `clientIp`.
+- **Source**: `src/server/websocket/subscriptions.ts`
+
+---
+
 ## Error Responses
 
 All endpoints follow RFC 7807 Problem Details for error responses:

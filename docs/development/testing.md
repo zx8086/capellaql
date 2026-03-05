@@ -1351,7 +1351,21 @@ export function validateBaseline(
 
 ## 13. Chaos Engineering Tests
 
-### Chaos Test Categories
+### CapellaQL Chaos Tests
+
+The `tests/bun/chaos/` directory contains chaos engineering tests that validate system resilience under failure conditions:
+
+```
+tests/bun/chaos/
+├── network-partition.test.ts      # Simulates network failures and partition scenarios
+├── cache-failure.test.ts          # Tests behavior when the SQLite cache is unavailable or corrupted
+├── couchbase-failure.test.ts      # Validates error handling during Couchbase connection loss, timeouts, and auth failures
+└── resource-exhaustion.test.ts    # Exercises memory pressure, CPU saturation, and resource limit enforcement
+```
+
+Run with: `bun test tests/bun/chaos/`
+
+### Legacy Chaos Test Categories
 
 ```
 test/chaos/

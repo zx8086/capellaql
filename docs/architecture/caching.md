@@ -509,6 +509,20 @@ The cache system logs all operations for debugging:
 
 ---
 
+## SQLite Cache (Bun-Native Implementation)
+
+The `BunSQLiteCache` class (`src/lib/bunSQLiteCache.ts`) provides a high-performance, Bun-native in-memory SQLite cache as the primary caching layer.
+
+- **Engine**: Uses `bun:sqlite` with an in-memory database (`:memory:`) and prepared statements for maximum throughput.
+- **TTL management**: Each entry has an `expires_at` timestamp. Expired entries are automatically purged on a configurable interval (default: 60 seconds).
+- **Eviction**: When `maxEntries` (default: 10,000) or `maxMemoryMB` (default: 50 MB) is exceeded, the cache evicts expired entries first, then falls back to LRU eviction (least recently accessed + lowest hit count).
+- **Compression support**: A `compressionThreshold` (default: 1 KB) is defined for future compression of large values. Values above the threshold are flagged for compression (currently a no-op with the infrastructure in place).
+- **Hit/miss analytics**: The cache tracks hits, misses, evictions, and per-entry hit counts. Detailed analytics (top keys, expiration distribution, memory distribution) are available via `getAnalytics()` and exposed at the `/health/cache` endpoint.
+- **Key generation**: Uses `Bun.hash()` (SIMD-accelerated) for fast, collision-resistant cache key hashing via `generateHashedKey()` and `generateOperationKey()`.
+- **Cleanup**: Call `destroy()` during shutdown to stop the cleanup timer and close the SQLite database.
+
+---
+
 ## Performance Characteristics
 
 | Operation | Typical Timing |

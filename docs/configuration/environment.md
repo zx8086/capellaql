@@ -2,7 +2,7 @@
 
 ## 4-Pillar Configuration Architecture
 
-The authentication service implements a robust configuration pattern with comprehensive security validation.
+The CapellaQL service implements a robust configuration pattern with comprehensive security validation.
 
 > **Reusable Standard**: For a complete, self-contained guide to implementing this pattern in other applications, see **[4-Pillar Configuration Pattern](./4-pillar-pattern.md)**.
 
@@ -14,73 +14,101 @@ The authentication service implements a robust configuration pattern with compre
 | **4. Validation** | `src/config/schemas.ts` | Zod v4 schema validation at end |
 
 ### Security Features
-- **HTTPS Enforcement**: Kong Admin URL must use HTTPS in production
-- **Token Validation**: Minimum 32-character requirement in production
 - **Environment Validation**: Prevents localhost URLs in production
 - **Immutability**: Runtime configuration changes prevented
+- **Zod Validation**: All configuration validated at startup via schema validation
+- **Production Password Enforcement**: Default passwords rejected in production
+- **CORS Validation**: Wildcard and localhost origins rejected in production
 
 ---
 
-## Required Environment Variables
-
-### Kong Integration
-
-| Variable | Description | Example | Required |
-|----------|-------------|---------|----------|
-| `KONG_MODE` | Deployment mode | `API_GATEWAY` or `KONNECT` | Yes |
-| `KONG_ADMIN_URL` | Kong Admin API endpoint | `http://kong-admin:8001` | Yes |
-| `KONG_ADMIN_TOKEN` | Admin API token | `Bearer xyz789...` | KONNECT only |
-| `KONG_JWT_AUTHORITY` | JWT token issuer | `https://sts.example.com/` | Yes |
-| `KONG_JWT_AUDIENCE` | JWT token audience | `http://api.example.com/` | Yes |
-| `KONG_JWT_KEY_CLAIM_NAME` | Claim name for consumer key | `key` | No (default: `key`) |
-| `JWT_EXPIRATION_MINUTES` | Token expiration | `15` | No (default: `15`) |
+## Environment Variables
 
 ### Application Settings
 
-| Variable | Description | Example | Required |
-|----------|-------------|---------|----------|
-| `PORT` | Server port | `3000` | No (default: `3000`) |
-| `NODE_ENV` | Runtime environment | `development`, `production`, `test` | No |
+| Variable | Env Var | Type | Default | Description |
+|----------|---------|------|---------|-------------|
+| `LOG_LEVEL` | `LOG_LEVEL` | string | `"info"` | Logging level (`debug`, `info`, `warn`, `error`) |
+| `YOGA_RESPONSE_CACHE_TTL` | `YOGA_RESPONSE_CACHE_TTL` | number | `900000` (15min) | GraphQL Yoga response cache TTL (ms) |
+| `PORT` | `PORT` | number | `4000` | Server listening port |
+| `ALLOWED_ORIGINS` | `ALLOWED_ORIGINS` | array | `["http://localhost:3000"]` | CORS allowed origins |
+| `BASE_URL` | `BASE_URL` | string | `"http://localhost"` | Application base URL |
 
-**Port Notes**: Ports 1-1023 require special permissions. Use port mapping in Docker/K8s.
+### Couchbase (Capella) Settings
 
-### OpenTelemetry
+| Variable | Env Var | Type | Default | Description |
+|----------|---------|------|---------|-------------|
+| `COUCHBASE_URL` | `COUCHBASE_URL` | string | `"couchbase://localhost"` | Cluster connection string |
+| `COUCHBASE_USERNAME` | `COUCHBASE_USERNAME` | string | `"Administrator"` | Database username (dev only default) |
+| `COUCHBASE_PASSWORD` | `COUCHBASE_PASSWORD` | string | `"password"` | Database password (MUST override in production) |
+| `COUCHBASE_BUCKET` | `COUCHBASE_BUCKET` | string | `"default"` | Target bucket |
+| `COUCHBASE_SCOPE` | `COUCHBASE_SCOPE` | string | `"_default"` | Target scope |
+| `COUCHBASE_COLLECTION` | `COUCHBASE_COLLECTION` | string | `"_default"` | Target collection |
+| `COUCHBASE_KV_TIMEOUT` | `COUCHBASE_KV_TIMEOUT` | number | `5000` | KV operation timeout (ms) |
+| `COUCHBASE_KV_DURABLE_TIMEOUT` | `COUCHBASE_KV_DURABLE_TIMEOUT` | number | `10000` | Durable KV timeout (ms) |
+| `COUCHBASE_QUERY_TIMEOUT` | `COUCHBASE_QUERY_TIMEOUT` | number | `15000` | N1QL query timeout (ms) |
+| `COUCHBASE_ANALYTICS_TIMEOUT` | `COUCHBASE_ANALYTICS_TIMEOUT` | number | `30000` | Analytics timeout (ms) |
+| `COUCHBASE_SEARCH_TIMEOUT` | `COUCHBASE_SEARCH_TIMEOUT` | number | `15000` | Full-text search timeout (ms) |
+| `COUCHBASE_CONNECT_TIMEOUT` | `COUCHBASE_CONNECT_TIMEOUT` | number | `10000` | Connection timeout (ms) |
+| `COUCHBASE_BOOTSTRAP_TIMEOUT` | `COUCHBASE_BOOTSTRAP_TIMEOUT` | number | `15000` | Cluster bootstrap timeout (ms) |
 
-| Variable | Description | Example | Required |
-|----------|-------------|---------|----------|
-| `TELEMETRY_MODE` | Telemetry mode | `console`, `otlp`, `both` | No (default: `both`) |
-| `OTEL_SERVICE_NAME` | Service name | `authentication-service` | No |
-| `OTEL_SERVICE_VERSION` | Service version override | `1.0.0` | No |
+**Timeout Validation Ranges** (enforced by Zod schema):
 
-**Version Sourcing:** The service version is automatically read from `package.json` at runtime. The `OTEL_SERVICE_VERSION` environment variable can override this for special deployments. This ensures version consistency between `telemetry.serviceVersion` and `apiInfo.version`.
-| `OTEL_EXPORTER_OTLP_ENDPOINT` | Base OTLP endpoint | `http://otel-collector:4318` | No |
-| `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | Traces endpoint | `https://otel.example.com/v1/traces` | No |
-| `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | Metrics endpoint | `https://otel.example.com/v1/metrics` | No |
-| `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | Logs endpoint | `https://otel.example.com/v1/logs` | No |
-| `OTEL_EXPORTER_OTLP_TIMEOUT` | Export timeout (ms) | `30000` | No |
-| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Batch size | `2048` | No |
-| `OTEL_BSP_MAX_QUEUE_SIZE` | Queue size | `10000` | No |
+| Timeout | Minimum | Maximum |
+|---------|---------|---------|
+| KV | 1,000ms | 30,000ms |
+| KV Durable | 5,000ms | 60,000ms |
+| Query | 5,000ms | 120,000ms |
+| Analytics | 10,000ms | 300,000ms |
+| Search | 5,000ms | 120,000ms |
+| Connect | 5,000ms | 60,000ms |
+| Bootstrap | 10,000ms | 120,000ms |
 
-### Kong Circuit Breaker
+### Runtime Settings
 
-| Variable | Description | Default | Range |
-|----------|-------------|---------|-------|
-| `CIRCUIT_BREAKER_ENABLED` | Enable circuit breaker | `true` | boolean |
-| `CIRCUIT_BREAKER_TIMEOUT` | Request timeout (ms) | `5000` | 100-10000 |
-| `CIRCUIT_BREAKER_ERROR_THRESHOLD` | Error threshold (%) | `50` | 1-100 |
-| `CIRCUIT_BREAKER_RESET_TIMEOUT` | Reset timeout (ms) | `60000` | 1000-300000 |
-| `CIRCUIT_BREAKER_VOLUME_THRESHOLD` | Min requests before tripping | `3` | 1-100 |
-| `CIRCUIT_BREAKER_ROLLING_COUNT_TIMEOUT` | Rolling window (ms) | `10000` | 1000-60000 |
-| `CIRCUIT_BREAKER_ROLLING_COUNT_BUCKETS` | Rolling window buckets | `10` | 1-20 |
-| `STALE_DATA_TOLERANCE_MINUTES` | Stale cache window | `30` | 5-240 |
-| `HIGH_AVAILABILITY` | Enable Redis stale cache | `false` | boolean |
+| Variable | Env Var | Type | Default | Description |
+|----------|---------|------|---------|-------------|
+| `NODE_ENV` | `NODE_ENV` | string | `"development"` | Runtime environment (`development`, `staging`, `production`, `test`) |
+| `CN_ROOT` | `CN_ROOT` | string | `"/usr/src/app"` | Application root path |
+| `CN_CXXCBC_CACHE_DIR` | `CN_CXXCBC_CACHE_DIR` | string | undefined | Couchbase C++ SDK cache directory |
+| `SOURCE_MAP_SUPPORT` | `SOURCE_MAP_SUPPORT` | boolean | `true` | Enable source map support |
+| `PRESERVE_SOURCE_MAPS` | `PRESERVE_SOURCE_MAPS` | boolean | `true` | Preserve source maps in production |
+| `BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS` | `BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS` | number | `120` | Bun DNS cache TTL (seconds, max 3600) |
 
-### Kong Settings
+### Deployment Settings
 
-| Variable | Description | Default | Range |
-|----------|-------------|---------|-------|
-| `KONG_SECRET_CREATION_MAX_RETRIES` | Secret creation retry attempts | `3` | 1-10 |
-| `KONG_MAX_HEADER_LENGTH` | Maximum header length | `256` | 64-8192 |
+| Variable | Env Var | Type | Default | Description |
+|----------|---------|------|---------|-------------|
+| `BASE_URL` | `BASE_URL` | string | `"http://localhost"` | Service base URL |
+| `HOSTNAME` | `HOSTNAME` | string | `"0.0.0.0"` | Bind hostname |
+| `INSTANCE_ID` | `INSTANCE_ID` | string | `"unknown"` | Service instance identifier |
+| `CONTAINER_ID` | `CONTAINER_ID` | string | undefined | Container identifier |
+| `K8S_POD_NAME` | `K8S_POD_NAME` | string | undefined | Kubernetes pod name |
+| `K8S_NAMESPACE` | `K8S_NAMESPACE` | string | undefined | Kubernetes namespace |
+
+### Telemetry Settings
+
+| Variable | Env Var | Type | Default | Description |
+|----------|---------|------|---------|-------------|
+| `ENABLE_OPENTELEMETRY` | `ENABLE_OPENTELEMETRY` | boolean | `true` | Enable OpenTelemetry |
+| `SERVICE_NAME` | `OTEL_SERVICE_NAME` | string | `"capellaql-service"` | Service identifier for telemetry |
+| `SERVICE_VERSION` | `OTEL_SERVICE_VERSION` | string | `"2.0"` | Service version |
+| `DEPLOYMENT_ENVIRONMENT` | `DEPLOYMENT_ENVIRONMENT` | string | `"development"` | Deployment environment |
+| `OTLP_ENDPOINT` | `OTEL_EXPORTER_OTLP_ENDPOINT` | string | - | Base OTLP endpoint (fallback) |
+| `TRACES_ENDPOINT` | `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | string | `"http://localhost:4318/v1/traces"` | Traces endpoint |
+| `METRICS_ENDPOINT` | `OTEL_EXPORTER_OTLP_METRICS_ENDPOINT` | string | `"http://localhost:4318/v1/metrics"` | Metrics endpoint |
+| `LOGS_ENDPOINT` | `OTEL_EXPORTER_OTLP_LOGS_ENDPOINT` | string | `"http://localhost:4318/v1/logs"` | Logs endpoint |
+| `METRIC_READER_INTERVAL` | `METRIC_READER_INTERVAL` | number | `60000` | Metrics export interval (ms) |
+| `SUMMARY_LOG_INTERVAL` | `SUMMARY_LOG_INTERVAL` | number | `300000` | Summary logging interval (ms) |
+| `EXPORT_TIMEOUT_MS` | `EXPORT_TIMEOUT_MS` | number | `30000` | OTLP export timeout (ms) |
+| `BATCH_SIZE` | `BATCH_SIZE` | number | `2048` | Telemetry batch size |
+| `MAX_QUEUE_SIZE` | `MAX_QUEUE_SIZE` | number | `10000` | Max queue before dropping |
+| `CIRCUIT_BREAKER_THRESHOLD` | `CIRCUIT_BREAKER_THRESHOLD` | number | `5` | Failure threshold before circuit opens |
+| `CIRCUIT_BREAKER_TIMEOUT_MS` | `CIRCUIT_BREAKER_TIMEOUT_MS` | number | `60000` | Recovery timeout (ms) |
+| `LOG_RETENTION_DEBUG_DAYS` | `LOG_RETENTION_DEBUG_DAYS` | number | `1` | Debug log retention (days) |
+| `LOG_RETENTION_INFO_DAYS` | `LOG_RETENTION_INFO_DAYS` | number | `7` | Info log retention (days) |
+| `LOG_RETENTION_WARN_DAYS` | `LOG_RETENTION_WARN_DAYS` | number | `30` | Warning log retention (days) |
+| `LOG_RETENTION_ERROR_DAYS` | `LOG_RETENTION_ERROR_DAYS` | number | `90` | Error log retention (days) |
 
 ### Telemetry Circuit Breaker
 
@@ -101,118 +129,6 @@ The authentication service implements a robust configuration pattern with compre
 **Performance Notes:**
 - **Runtime Metrics**: Disabled by default to save ~10% CPU overhead. Enable if you need event loop delay or detailed memory metrics.
 - **Memory Guardian**: Monitors telemetry backpressure and heap usage. The heap limit is used for percentage calculations since Bun doesn't expose v8's `heap_size_limit`. Override this value to match your container's memory limit for accurate pressure detection.
-
-#### Per-Operation Overrides
-
-Circuit breaker supports operation-specific settings:
-
-```typescript
-// Example: config.ts
-operations: {
-  getConsumerSecret: {
-    timeout: 3000,                // 3s for secret retrieval
-    errorThresholdPercentage: 40  // 40% threshold
-  },
-  healthCheck: {
-    timeout: 2000,                // 2s for health checks
-    errorThresholdPercentage: 60  // 60% threshold (tolerant)
-  }
-}
-```
-
-### Redis/Valkey Cache (High-Availability Mode)
-
-The service supports both Redis and Valkey as cache backends. Server type is automatically detected at runtime using the `INFO server` command.
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `HIGH_AVAILABILITY` | Enable Redis/Valkey stale cache | `false` | No |
-| `REDIS_URL` | Connection URL | `redis://localhost:6379` | No |
-| `REDIS_PASSWORD` | Authentication password | - | No |
-| `REDIS_DB` | Database number | `0` | No |
-| `REDIS_MAX_RETRIES` | Retry attempts | `3` | No |
-| `REDIS_CONNECTION_TIMEOUT` | Connection timeout (ms) | `5000` | No |
-| `CACHE_HEALTH_TTL_MS` | Health check cache TTL (ms) | `2000` | No |
-| `CACHE_MAX_MEMORY_ENTRIES` | Max in-memory stale cache entries | `1000` | No |
-
-**Redis vs Valkey:**
-- Both use the `redis://` protocol scheme
-- Valkey is a Redis-compatible alternative (fork)
-- The service auto-detects the server type and displays it in health endpoints
-- DevContainer provides both: Redis on port 6379, Valkey on port 6380
-
-### Cache Resilience Configuration
-
-The cache layer includes comprehensive resilience features to handle connection issues gracefully.
-
-> **Note**: The cache resilience settings below use hardcoded defaults from `src/config/defaults.ts`. Environment variable overrides are mapped in `envMapping.ts` but not yet wired in `loader.ts`. These values are planned for future configurability.
-
-#### Cache Circuit Breaker (Defaults Only)
-
-| Setting | Description | Default | Range |
-|---------|-------------|---------|-------|
-| Circuit breaker enabled | Enable cache circuit breaker | `true` | boolean |
-| Failure threshold | Failures before opening | `5` | 1-100 |
-| Reset timeout | Time before half-open (ms) | `30000` | 1000-300000 |
-| Success threshold | Successes to close | `2` | 1-20 |
-
-#### Reconnection Manager (Defaults Only)
-
-| Setting | Description | Default | Range |
-|---------|-------------|---------|-------|
-| Max attempts | Max reconnection attempts | `5` | 1-20 |
-| Base delay | Base backoff delay (ms) | `100` | 10-1000 |
-| Max delay | Max backoff delay cap (ms) | `5000` | 100-60000 |
-| Cooldown | Cooldown before retry (ms) | `60000` | 1000-300000 |
-
-#### Health Monitor (Defaults Only)
-
-| Setting | Description | Default | Range |
-|---------|-------------|---------|-------|
-| Monitoring enabled | Enable background monitoring | `true` | boolean |
-| Check interval | Check interval (ms) | `10000` | 1000-60000 |
-| Unhealthy threshold | Failures to mark unhealthy | `3` | 1-20 |
-| Healthy threshold | Successes to mark healthy | `2` | 1-20 |
-| Ping timeout | PING timeout (ms) | `500` | 100-5000 |
-
-#### Operation Timeouts (Defaults Only)
-
-| Setting | Description | Default | Range |
-|---------|-------------|---------|-------|
-| GET timeout | GET operation timeout (ms) | `1000` | 100-10000 |
-| SET timeout | SET operation timeout (ms) | `2000` | 100-10000 |
-| DELETE timeout | DELETE operation timeout (ms) | `1000` | 100-10000 |
-| SCAN timeout | SCAN operation timeout (ms) | `5000` | 1000-30000 |
-| PING timeout | PING operation timeout (ms) | `500` | 100-5000 |
-| Connect timeout | Connection timeout (ms) | `5000` | 1000-30000 |
-
-**Resilience Features:**
-- **3-Layer Protection**: Error detection, circuit breaker, health monitoring
-- **Exponential Backoff**: Delays increase: 100ms, 200ms, 400ms, 800ms, 1600ms...
-- **Mutex Reconnection**: Prevents concurrent reconnection storms
-- **Per-Operation Timeouts**: Different timeouts for different operation types
-- **15+ Error Patterns**: Extended detection for connection_closed, reset, timeout, etc.
-- **Graceful Degradation**: Falls back to Kong circuit breaker when cache fails
-
-**Fallback Chain:**
-
-| Mode | Fallback Chain |
-|------|----------------|
-| **Non-HA** | Local Memory Cache -> In-Memory Stale Cache -> Return null |
-| **HA** | Redis Primary -> Redis Stale -> In-Memory Stale (last resort) -> Return null |
-
-In HA mode, each service instance lazily populates an in-memory cache on successful Redis reads. When Redis is completely unavailable, this in-memory cache serves as a last-resort fallback. Each instance only has data for consumers it has previously served.
-
-### API Documentation
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `API_CORS` | CORS origin | No (default: `*`) |
-| `API_TITLE` | OpenAPI title | No |
-| `API_DESCRIPTION` | API description | No |
-| `API_VERSION` | API version | No |
-| `API_CONTACT_NAME` | Contact name | No |
-| `API_CONTACT_EMAIL` | Contact email | No |
 
 ### Request Validation (API Best Practices)
 
@@ -251,92 +167,63 @@ See [profiling.md](../development/profiling.md) for complete profiling guide.
 
 ---
 
+## Configuration Hot-Reload
+
+The service supports hot-reloading of environment configuration without restarting (`src/lib/configHotReload.ts`).
+
+- **File watching**: Monitors `.env` and `.env.local` (configurable) for changes using `configWatcher`. When a file change is detected, the new configuration is parsed and diffed against the current state.
+- **Validation before apply**: New configuration is validated (required variables, URL formats, numeric ranges, production security rules) before being applied. If validation fails, the change is rejected and a `configurationReloadFailed` event is emitted.
+- **Rollback on error**: If an error occurs during application of a validated config, the system automatically rolls back to the previous configuration from a backup snapshot.
+- **Events**: Emits `configurationReloaded`, `configurationReloadFailed`, and `configurationRolledBack` events for integration with other subsystems.
+
+---
+
 ## Example Configuration
 
 ### Development
 ```bash
 # .env
-PORT=3000
+PORT=4000
 NODE_ENV=development
-TELEMETRY_MODE=console
-
-KONG_MODE=API_GATEWAY
-KONG_ADMIN_URL=http://192.168.178.3:30001
-KONG_JWT_AUTHORITY=http://sts.example.com/
-KONG_JWT_AUDIENCE=http://api.example.com/
+COUCHBASE_URL=couchbase://localhost
+COUCHBASE_USERNAME=Administrator
+COUCHBASE_PASSWORD=password
+COUCHBASE_BUCKET=default
+ENABLE_OPENTELEMETRY=true
 ```
 
 ### Production
 ```bash
 # .env.production
-PORT=3000
+PORT=4000
 NODE_ENV=production
-TELEMETRY_MODE=otlp
-
-KONG_MODE=KONNECT
-KONG_ADMIN_URL=https://us.api.konghq.com/v2/control-planes/abc123
-KONG_ADMIN_TOKEN=kpat_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-KONG_JWT_AUTHORITY=https://sts.example.com/
-KONG_JWT_AUDIENCE=https://api.example.com/
-
-# High Availability (Redis or Valkey)
-HIGH_AVAILABILITY=true
-REDIS_URL=rediss://redis.example.com:6380
-STALE_DATA_TOLERANCE_MINUTES=120
-
-# OpenTelemetry
-OTEL_EXPORTER_OTLP_ENDPOINT=https://otel.example.com
+COUCHBASE_URL=couchbases://your-cluster.cloud.couchbase.com
+COUCHBASE_USERNAME=app_user
+COUCHBASE_PASSWORD=secure_password
+COUCHBASE_BUCKET=fashion-bucket
+COUCHBASE_SCOPE=retail
+COUCHBASE_COLLECTION=looks
+ENABLE_OPENTELEMETRY=true
+OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://otel.example.com/v1/traces
+OTEL_EXPORTER_OTLP_METRICS_ENDPOINT=https://otel.example.com/v1/metrics
+OTEL_EXPORTER_OTLP_LOGS_ENDPOINT=https://otel.example.com/v1/logs
 ```
 
 ---
 
-## CORS Configuration
+## Production Security Validation
 
-CORS headers are configurable via `API_CORS`:
+The following checks are enforced automatically when `NODE_ENV=production` or `DEPLOYMENT_ENVIRONMENT=production`:
 
-```typescript
-const corsHeaders = {
-  "Access-Control-Allow-Origin": config.apiInfo.cors,  // API_CORS value
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Consumer-ID, X-Consumer-Username",
-  "Access-Control-Max-Age": "86400"
-};
-```
-
-- **Default**: `*` (allows all origins)
-- **Production**: Use specific origins (e.g., `https://app.example.com`)
-
----
-
-## Dependencies
-
-### Runtime Dependencies
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `@opentelemetry/*` | Various | Observability stack (traces, metrics, logs) |
-| `opossum` | ^9.0.0 | Circuit breaker for Kong API protection |
-| `redis` | ^5.8.3 | Cache backend for HA mode |
-| `winston` | ^3.18.3 | Structured logging with ECS format |
-| `zod` | ^4.1.12 | Schema validation |
-
-### Development Dependencies
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `@biomejs/biome` | ^2.2.5 | Linting and formatting |
-| `@playwright/test` | ^1.56.0 | E2E testing |
-| `@types/bun` | 1.2.23 | Bun runtime types |
-| `typescript` | ^5.9.3 | TypeScript compiler |
-
-### Minimum Requirements
-
-| Requirement | Value |
-|-------------|-------|
-| Bun Runtime | >= 1.1.35 (recommended 1.3.9+) |
-| Memory | 512MB min, 1GB recommended |
-| CPU | Single core sufficient |
-| Container Size | 58MB (distroless base) |
+| Check | Rule |
+|-------|------|
+| **Default Password** | `COUCHBASE_PASSWORD` cannot be `"password"` |
+| **Password Length** | `COUCHBASE_PASSWORD` must be at least 12 characters |
+| **Default Username** | Warning if `COUCHBASE_USERNAME` is `"Administrator"` |
+| **Database Host** | `COUCHBASE_URL` cannot use `localhost` or `127.0.0.1` |
+| **CORS Origins** | `ALLOWED_ORIGINS` cannot include wildcards or localhost |
+| **Service Name** | Cannot contain `localhost`, `test`, or `local` |
+| **Service Version** | Cannot be `dev`, `latest`, or `0.0.0` |
 
 ---
 
@@ -350,9 +237,3 @@ const corsHeaders = {
 | `src/config/schemas.ts` | Pillar 4: Zod schema validation |
 | `src/config/config.ts` | Configuration getters and cache |
 | `src/config/index.ts` | Module exports |
-
-## Type Definitions
-
-| File | Purpose |
-|------|---------|
-| `src/types/circuit-breaker.types.ts` | Circuit breaker types (opossum + telemetry) |

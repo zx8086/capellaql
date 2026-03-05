@@ -4,17 +4,16 @@
 
 ## Changes Made
 
-### ✅ Corrections
+### Corrections
 1. **ECS Field Mapping** - Fixed `consumer.*` namespace (was incorrectly documented as `user.*`)
 2. **Telemetry Health Response** - Corrected structure to match actual implementation
-3. **Redis Instrumentation** - Documented public API wrapper functions
+3. **File Tree** - Corrected to match actual `src/telemetry/` directory structure
 
-### ⭐ New Sections Added
+### New Sections Added
 1. **Memory Monitoring System** - GC metrics, memory pressure monitoring
 2. **Lifecycle Logging** - Shutdown sequence batching and flushing
 3. **SLA Monitoring System** - Automatic performance violation detection
 4. **Profiling Metrics Integration** - OpenTelemetry profiling metrics
-5. **Redis Instrumentation Public API** - High-level wrapper documentation
 
 ---
 
@@ -28,37 +27,33 @@ The telemetry system consists of three pillars (traces, metrics, logs) with supp
 
 ```
 src/telemetry/
-├── instrumentation.ts      # NodeSDK initialization, exporters, processors
-├── tracer.ts               # Custom span creation API
-├── winston-logger.ts       # Structured logging with OTLP transport
-├── metrics.ts              # Legacy metrics entry point
-├── metrics/                # Modular metrics system
-│   ├── index.ts            # Public API exports
-│   ├── initialization.ts   # Meter and instrument creation
-│   ├── instruments.ts      # 65 metric instrument definitions
-│   ├── types.ts            # TypeScript attribute types
-│   ├── http-metrics.ts     # HTTP request/response metrics
-│   ├── auth-metrics.ts     # JWT and authentication metrics
-│   ├── kong-metrics.ts     # Kong Admin API metrics
-│   ├── redis-metrics.ts    # Redis/Valkey cache metrics
-│   ├── cache-metrics.ts    # Cache tier metrics
-│   ├── process-metrics.ts  # Memory, CPU, GC metrics
-│   ├── circuit-breaker-metrics.ts
-│   ├── api-version-metrics.ts
-│   ├── consumer-metrics.ts
-│   ├── security-metrics.ts
-│   ├── error-metrics.ts
-│   └── telemetry-metrics.ts
-├── redis-instrumentation.ts    # Redis span creation
-├── cardinality-guard.ts        # Metric cardinality protection
-├── consumer-volume.ts          # Consumer traffic classification
+├── index.ts                    # Public API exports
+├── config.ts                   # Telemetry configuration
+├── instrumentation.ts          # NodeSDK initialization, exporters, processors
+├── winston-logger.ts           # Structured logging with OTLP transport
+├── logger.ts                   # Structured logging with correlation IDs
+├── coordinator/
+│   └── BatchCoordinator.ts     # Batch coordination for exports
+├── health/
+│   ├── CircuitBreaker.ts       # Circuit breaker for telemetry exports
+│   ├── comprehensiveHealth.ts  # Full health report aggregation
+│   └── telemetryHealth.ts      # Export health tracking and diagnostics
+├── metrics/                    # Modular metrics system
+│   ├── index.ts                # Public API exports
+│   ├── initialization.ts       # Meter and instrument creation
+│   ├── instruments.ts          # Metric instrument definitions
+│   ├── types.ts                # TypeScript attribute types
+│   ├── httpMetrics.ts          # HTTP request/response metrics
+│   ├── databaseMetrics.ts      # Couchbase database metrics
+│   └── process-metrics.ts      # Memory, CPU, GC metrics
+├── tracing/
+│   └── dbSpans.ts              # Database span creation
 ├── telemetry-circuit-breaker.ts # Per-signal circuit breakers
-├── telemetry-health-monitor.ts  # Export health tracking
 ├── export-stats-tracker.ts      # Export success/failure stats
-├── gc-metrics.ts               # Garbage collection monitoring
-├── sla-monitor.ts              # SLA violation detection
-├── profiling-metrics.ts        # Profiling integration
-└── lifecycle-logger.ts         # Startup/shutdown logging
+├── gc-metrics.ts                # Garbage collection monitoring
+├── sla-monitor.ts               # SLA violation detection
+├── profiling-metrics.ts         # Profiling integration
+└── lifecycle-logger.ts          # Startup/shutdown logging
 ```
 
 **Initialization Flow:**
@@ -109,89 +104,23 @@ async function initializeTelemetry(): Promise<void> {
 #### Distributed Tracing
 - HTTP request tracing with automatic span correlation
 - Request ID generation for end-to-end tracing
-- Kong API call instrumentation with W3C Trace Context propagation
-- JWT generation timing
+- Database span creation via `src/telemetry/tracing/dbSpans.ts`
+- GraphQL operation instrumentation
 - Circuit breaker state transitions
 - Cache tier usage tracking
 
 #### W3C Trace Context Propagation
-All outbound HTTP requests (particularly to Kong Admin API) include W3C Trace Context headers for distributed tracing:
+All outbound HTTP requests include W3C Trace Context headers for distributed tracing:
 - `traceparent`: Trace ID, parent span ID, and trace flags
 - `tracestate`: Vendor-specific trace information
-
-This is implemented via `createStandardHeaders()` in `src/adapters/kong-utils.ts`, which automatically injects trace context from the active OpenTelemetry context.
-
-#### Redis Trace Hierarchy
-
-Redis cache operations are instrumented to appear as nested spans under HTTP request spans, providing full trace continuity across the entire request lifecycle:
-
-**Trace Hierarchy:**
-```
-HTTP Request (root span)
-├── Kong Consumer Lookup (child span)
-├── JWT Generation (child span)
-└── Redis Cache Operations (child spans)
-    ├── redis.get (check for cached consumer)
-    ├── redis.set (cache consumer data)
-    └── redis.delete (invalidate cache entry)
-```
-
-**Implementation**: `src/telemetry/redis-instrumentation.ts:65-164`
-
-The Redis instrumentation creates spans with the active OpenTelemetry context as parent, ensuring proper trace hierarchy. Each Redis operation is wrapped with `context.with()` to maintain trace continuity.
-
-**Span Naming Conventions:**
-- `redis.get` - Read operations (GET, HGET, etc.)
-- `redis.set` - Write operations (SET, HSET, etc.)
-- `redis.delete` - Delete operations (DEL, HDEL, etc.)
-- `redis.list` - List operations (LPUSH, RPUSH, etc.)
-
-**Span Attributes:**
-Each Redis span includes:
-- `redis.operation` - Operation type (get, set, delete, list)
-- `redis.key` - Cache key being accessed
-- `redis.result.type` - Result type (string, object, array, null)
-- `redis.result.length` - Result size (for performance analysis)
-- `redis.error` - Error message (if operation failed)
-
-**Log Correlation:**
-Redis operations automatically include trace context in logs, enabling span-to-log navigation in observability tools:
-
-```json
-{
-  "@timestamp": "2026-01-27T20:58:32.000Z",
-  "message": "Redis GET completed",
-  "trace.id": "550e8400-e29b-41d4-a716-446655440000",
-  "span.id": "redis-span-123",
-  "redis.operation": "get",
-  "redis.key": "consumer:98765432-9876-5432-1098-765432109876",
-  "redis.result.type": "object",
-  "redis.result.length": 245
-}
-```
-
-**Observability Tool Navigation:**
-In observability backends (Elastic APM, Datadog, Jaeger):
-1. View HTTP request trace
-2. Expand nested spans to see Kong and JWT operations
-3. Click Redis spans to see cache access patterns
-4. Navigate from spans to related logs using trace.id
-5. Analyze Redis operation latencies in trace waterfall
-
-**Testing:**
-16 Redis instrumentation tests validate trace context propagation:
-- `test/bun/telemetry/redis-instrumentation-utils.test.ts`
-- Tests verify span creation, attributes, and parent-child relationships
-- Cache integration tests validate end-to-end trace hierarchy
-
-**Reference:** Commit f4bc0d5 (2026-01-27) - Fixed Redis instrumentation trace context propagation
 
 #### Consolidated Metrics Collection
 - **Runtime Metrics**: Event loop delay, memory usage, CPU utilization
 - **System Metrics**: Host-level CPU, memory, disk, network via HostMetrics
-- **Business Metrics**: JWT generation, Kong operations, cache performance
-- **Circuit Breaker Metrics**: Failure rates, state transitions, stale cache usage
-- **Cache Metrics**: Hit rates, tier usage, operations by backend
+- **HTTP Metrics**: Request/response tracking via `src/telemetry/metrics/httpMetrics.ts`
+- **Database Metrics**: Couchbase operation tracking via `src/telemetry/metrics/databaseMetrics.ts`
+- **Circuit Breaker Metrics**: Failure rates, state transitions
+- **Cache Metrics**: Hit rates, operations by backend
 - **Unified Metrics Endpoint**: Single endpoint with multiple views for different operational needs
 
 #### Structured Logging
@@ -321,7 +250,7 @@ The service maps custom application fields to ECS-like field names for better ob
 
 | Custom Field | Mapped Field | Type | Description |
 |--------------|--------------|------|-------------|
-| `consumerId` | `consumer.id` | string | Consumer identifier from Kong |
+| `consumerId` | `consumer.id` | string | Consumer identifier |
 | `username` | `consumer.name` | string | Consumer username |
 | `requestId` | `event.id` | string | Unique request identifier |
 | `totalDuration` | `event.duration` | number | Duration in nanoseconds |
@@ -329,10 +258,10 @@ The service maps custom application fields to ECS-like field names for better ob
 #### Important: Consumer vs User Namespace
 
 **The service uses `consumer.*` namespace, NOT `user.*`**. This is intentional:
-- `consumer.*` - Kong consumer entities (API clients)
+- `consumer.*` - API consumer entities (API clients)
 - `user.*` - Reserved for end-user identification (not currently used)
 
-This distinction allows future differentiation between Kong consumers (API clients) and actual end-users in multi-tenant scenarios.
+This distinction allows future differentiation between API consumers (API clients) and actual end-users in multi-tenant scenarios.
 
 #### Benefits of ECS Mapping
 
@@ -371,11 +300,11 @@ logger.info('Token generated', {
 
 #### Consumer Field Mapping
 
-Kong consumer fields are mapped to `labels.consumer_*` for better OTLP transport compatibility:
+Consumer fields are mapped to `labels.consumer_*` for better OTLP transport compatibility:
 
 | Source Field | OTLP Field | Description |
 |--------------|------------|-------------|
-| `consumerId` | `labels.consumer_id` | Consumer identifier from Kong |
+| `consumerId` | `labels.consumer_id` | Consumer identifier |
 | `username` | `labels.consumer_name` | Consumer username |
 
 **Example Log Output:**
@@ -387,8 +316,6 @@ Kong consumer fields are mapped to `labels.consumer_*` for better OTLP transport
   "labels.consumer_name": "user@example.com"
 }
 ```
-
-**Reference:** Commit c08c233 (2026-02-13) - Map Kong consumer fields to labels.consumer_* in logs
 
 #### Non-ECS Fields
 
@@ -631,6 +558,18 @@ const freedPercent = (freed / before.used_heap_size) * 100;
 console.log(`GC freed ${freedPercent.toFixed(2)}% of heap`);
 ```
 
+### Memory Guardian
+
+The Memory Guardian (`src/lib/memoryGuardian.ts`) provides application-level memory pressure monitoring with actionable thresholds.
+
+- **Pressure levels**: 4 levels -- `normal`, `elevated` (>=70% of budget), `high` (>=85%), and `critical` (>=95%). Thresholds are configurable via `MemoryGuardianConfig`.
+- **RSS-based calculation**: Pressure is calculated as `RSS / memoryBudgetMB`, where `memoryBudgetMB` defaults to 75% of system RAM. This avoids the misleading `heapUsed/heapTotal` ratio that V8/Bun keeps artificially high.
+- **Periodic checks**: Memory is sampled every 5 seconds (configurable). Level transitions are logged with structured telemetry including RSS, heap stats, and level change count.
+- **Backpressure integration**: `shouldAcceptRequest()` returns `false` at `critical` pressure. The backpressure middleware uses this to respond with HTTP 503 and a `Retry-After` header (30s at critical, 10s at high).
+- **Graceful shutdown**: The guardian is destroyed in Phase 6 of the shutdown sequence to stop the monitoring timer.
+
+---
+
 #### Memory Leak Detection Indicators
 
 **Watch for these patterns:**
@@ -678,7 +617,7 @@ const shutdownSteps: ShutdownMessage[] = [
     step: 'telemetry_flush'
   },
   {
-    message: 'Closing cache connections and Kong service',
+    message: 'Closing cache connections and external services',
     step: 'external_services_shutdown'
   },
   {
@@ -1292,94 +1231,6 @@ profiling_queue_length > 5
 
 ---
 
-## Redis Instrumentation Public API
-
-### Redis Instrumentation Wrapper
-
-The Redis instrumentation provides a high-level wrapper function for automatic tracing.
-
-**Implementation**: `src/telemetry/redis-instrumentation.ts:165-180`
-
-#### Primary API: `instrumentRedisOperation`
-
-```typescript
-import { instrumentRedisOperation } from '../telemetry/redis-instrumentation';
-
-// Automatic span creation, trace context propagation, and metric recording
-const result = await instrumentRedisOperation(
-  {
-    operation: 'GET',
-    key: 'consumer:abc-123',
-    connectionUrl: 'redis://localhost:6379',
-    database: 0
-  },
-  async () => {
-    return await redis.get('consumer:abc-123');
-  }
-);
-```
-
-#### Low-Level Span Helpers
-
-For manual span control:
-
-```typescript
-import {
-  createRedisSpan,
-  recordRedisSuccess,
-  recordRedisError,
-  recordRedisCacheMetrics,
-  finishRedisSpan
-} from '../telemetry/redis-instrumentation';
-
-// Manual span lifecycle
-const span = createRedisSpan({
-  operation: 'SET',
-  key: 'consumer:abc-123'
-});
-
-try {
-  const result = await redis.set('consumer:abc-123', data);
-  recordRedisSuccess(span, result);
-  recordRedisCacheMetrics(span, false, latencyMs); // cache miss on SET
-} catch (error) {
-  recordRedisError(span, error);
-} finally {
-  finishRedisSpan(span);
-}
-```
-
-#### Instrumentation Features
-
-**Automatic Trace Context Propagation:**
-- Spans created with `context.active()` as parent
-- Ensures proper trace hierarchy under HTTP request spans
-- W3C Trace Context compatibility
-
-**Key Sanitization:**
-- Sensitive keys (e.g., `consumer_secret:*`) automatically masked
-- Long keys (>100 chars) truncated with `...` suffix
-- Configurable via `sanitizeKeys` option
-
-**Metric Integration:**
-- Calls `recordRedisOperation()` automatically
-- Records cache hit/miss classification
-- Tracks operation latency and success rate
-
-**Configuration Options:**
-
-```typescript
-import { BunRedisInstrumentation } from '../telemetry/redis-instrumentation';
-
-const instrumentation = new BunRedisInstrumentation({
-  enabled: true,              // Enable/disable instrumentation
-  sanitizeKeys: true,         // Mask sensitive keys
-  maxKeyLength: 100           // Truncate long keys
-});
-```
-
----
-
 ## Key Metrics
 
 ### Complete Metrics Reference (65 Instruments)
@@ -1408,11 +1259,9 @@ Returns service health with dependency status:
   "highAvailability": false,
   "circuitBreakerState": "closed",
   "dependencies": {
-    "kong": {
+    "couchbase": {
       "status": "healthy",
-      "mode": "KONNECT",
-      "url": "https://us.api.konghq.com/v2/control-planes/abc123",
-      "responseTime": "45ms"
+      "responseTime": "12ms"
     },
     "telemetry": {
       "traces": {
@@ -1463,7 +1312,7 @@ Returns service health with dependency status:
 
 Returns comprehensive telemetry system status with component-level diagnostics.
 
-**Implementation**: `src/telemetry/telemetry-health-monitor.ts`
+**Implementation**: `src/telemetry/health/telemetryHealth.ts`
 
 ```bash
 curl http://localhost:3000/health/telemetry
@@ -1604,10 +1453,10 @@ interface TelemetryHealthStatus {
       "instrumentCount": 65,
       "availableMetrics": [
         "http_requests_total",
-        "http_request_duration_seconds",
-        "authentication_attempts_total",
-        "kong_operations_total",
-        "redis_operations_total",
+        "graphql_operations_total",
+        "db_operations_total",
+        "cache_operations_total",
+        "circuit_breaker_requests_total",
         "security_events_total"
       ]
     },
@@ -1662,9 +1511,9 @@ When receiving SIGTERM or SIGINT:
 2. **Stop HTTP server** - Stop accepting new requests
 3. **Clear intervals** - Clean up all background intervals:
    - `shutdownGCMetrics()` - GC monitoring interval
-   - `shutdownConsumerVolume()` - Consumer tracking interval
-   - `shutdownCardinalityGuard()` - Cardinality cleanup interval
    - `shutdownTelemetryCircuitBreakers()` - Circuit breaker intervals
+   - `shutdownSlaMonitor()` - SLA monitoring interval
+   - `shutdownProfilingMetrics()` - Profiling metrics interval
 4. **Flush telemetry** - Export pending metrics, traces, logs
 5. **Exit process** - Clean exit with code 0
 

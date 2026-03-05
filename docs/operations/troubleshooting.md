@@ -1121,16 +1121,18 @@ CapellaQL uses two independent circuit breakers:
 
 When CapellaQL receives SIGINT, SIGTERM, or SIGQUIT, it follows a 6-phase shutdown:
 
-| Phase | Action | Timeout |
-|-------|--------|---------|
-| 1 | Stop accepting new requests | Immediate |
-| 2 | Cleanup rate limit store | Immediate |
-| 3 | Flush telemetry batch coordinator | 5s |
-| 4 | Close database connections | 10s |
-| 5 | Shutdown telemetry providers | 5s |
-| 6 | Cleanup remaining resources | Immediate |
+| Phase | Action | Timeout | Details |
+|-------|--------|---------|---------|
+| 1 | Stop accepting new requests | Immediate | Calls `server.stop()` to cease listening |
+| 2 | Cleanup rate limit store | Immediate | Clears in-memory rate limit entries |
+| 3 | Flush telemetry batch coordinator | 5s | Drains pending telemetry batches via `shutdownBatchCoordinator()` |
+| 4 | Close database connections | 10s | Closes the Couchbase cluster connection via `connectionManager.close()` |
+| 5 | Shutdown telemetry providers | 5s | Idempotent shutdown of trace, metric, and log providers |
+| 6 | Cleanup remaining resources | Immediate | Destroys the memory guardian and stops the performance monitor |
 
-If a phase times out, it logs a warning and proceeds to the next phase. If the entire shutdown fails, the process exits with code 1.
+If a phase times out, it logs a warning and proceeds to the next phase. Duplicate signals are ignored once shutdown is in progress. If the entire shutdown fails, the process exits with code 1.
+
+**Source**: `setupGracefulShutdown()` in `src/index.ts`
 
 **To verify clean shutdown:** Check the last log line for `"Graceful shutdown completed"` with `shutdownDurationMs`.
 
