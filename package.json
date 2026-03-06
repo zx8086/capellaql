@@ -5,7 +5,7 @@
     "test": "bun run --sequential test:bun test:playwright",
     "test:bun": "bun test --coverage",
     "test:bun:watch": "bun test --watch",
-    "test:bun:unit": "bun test src/**/*.test.ts",
+    "test:bun:unit": "bun test tests/bun/unit",
     "test:bun:integration": "bun test tests/bun/integration",
     "test:bun:e2e": "bun test tests/bun/e2e",
     "test:bun:perf": "bun test src/**/*.test.ts --test-name-pattern='performance|benchmark'",

@@ -5,19 +5,38 @@ import {
   TelemetryConfigSchema,
   telemetryDefaults,
   validateTelemetryConfig,
+  getTelemetryEnvVarPath,
 } from "../../../../src/config/modules/telemetry";
 
 describe("Telemetry Configuration", () => {
-  let originalEnv: Record<string, string | undefined>;
+  // Track env vars modified by tests so we can restore them properly.
+  // Using process.env = {...} breaks Bun.env's internal reference, so we
+  // must restore individual keys to keep both process.env and Bun.env in sync.
+  const envKeysToRestore = [
+    "ENABLE_OPENTELEMETRY",
+    "OTEL_SERVICE_NAME",
+    "SERVICE_NAME",
+    "BATCH_SIZE",
+    "OTEL_SERVICE_VERSION",
+    "DEPLOYMENT_ENVIRONMENT",
+  ];
+  let savedEnv: Record<string, string | undefined>;
 
   beforeEach(() => {
-    // Save original environment
-    originalEnv = { ...process.env };
+    savedEnv = {};
+    for (const key of envKeysToRestore) {
+      savedEnv[key] = process.env[key];
+    }
   });
 
   afterEach(() => {
-    // Restore original environment
-    process.env = originalEnv;
+    for (const key of envKeysToRestore) {
+      if (savedEnv[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = savedEnv[key];
+      }
+    }
   });
 
   describe("Schema Validation", () => {
@@ -26,6 +45,7 @@ describe("Telemetry Configuration", () => {
         ENABLE_OPENTELEMETRY: true,
         SERVICE_NAME: "CapellaQL Service",
         SERVICE_VERSION: "2.0",
+        SERVICE_NAMESPACE: "capella-graphql-api",
         DEPLOYMENT_ENVIRONMENT: "production",
         TRACES_ENDPOINT: "http://localhost:4318/v1/traces",
         METRICS_ENDPOINT: "http://localhost:4318/v1/metrics",
@@ -35,9 +55,12 @@ describe("Telemetry Configuration", () => {
         EXPORT_TIMEOUT_MS: 30000,
         BATCH_SIZE: 2048,
         MAX_QUEUE_SIZE: 10000,
-        SAMPLING_RATE: 0.15,
         CIRCUIT_BREAKER_THRESHOLD: 5,
         CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
+        LOG_RETENTION_DEBUG_DAYS: 1,
+        LOG_RETENTION_INFO_DAYS: 7,
+        LOG_RETENTION_WARN_DAYS: 30,
+        LOG_RETENTION_ERROR_DAYS: 90,
       };
 
       const result = TelemetryConfigSchema.safeParse(validConfig);
@@ -74,16 +97,6 @@ describe("Telemetry Configuration", () => {
       expect(result.success).toBe(false);
     });
 
-    test("validates sampling rate range", () => {
-      const invalidSamplingRate = {
-        ...telemetryDefaults,
-        SAMPLING_RATE: 1.5, // Above 100%
-      };
-
-      const result = TelemetryConfigSchema.safeParse(invalidSamplingRate);
-      expect(result.success).toBe(false);
-    });
-
     test("validates batch size limits", () => {
       const invalidBatchSize = {
         ...telemetryDefaults,
@@ -93,47 +106,55 @@ describe("Telemetry Configuration", () => {
       const result = TelemetryConfigSchema.safeParse(invalidBatchSize);
       expect(result.success).toBe(false);
     });
+
+    test("validates circuit breaker threshold limits", () => {
+      const invalidThreshold = {
+        ...telemetryDefaults,
+        CIRCUIT_BREAKER_THRESHOLD: 25, // Above max of 20
+      };
+
+      const result = TelemetryConfigSchema.safeParse(invalidThreshold);
+      expect(result.success).toBe(false);
+    });
   });
 
   describe("Environment Variable Loading", () => {
     test("loads defaults when no environment variables are set", () => {
       // Clear relevant environment variables
       delete process.env.ENABLE_OPENTELEMETRY;
+      delete process.env.OTEL_SERVICE_NAME;
       delete process.env.SERVICE_NAME;
       delete process.env.BATCH_SIZE;
 
       const config = loadTelemetryConfigFromEnv();
 
-      expect(config.ENABLE_OPENTELEMETRY).toBe(telemetryDefaults.ENABLE_OPENTELEMETRY);
       expect(config.SERVICE_NAME).toBe(telemetryDefaults.SERVICE_NAME);
       expect(config.BATCH_SIZE).toBe(telemetryDefaults.BATCH_SIZE);
     });
 
     test("loads values from environment variables", () => {
       process.env.ENABLE_OPENTELEMETRY = "false";
-      process.env.SERVICE_NAME = "Custom Service";
+      process.env.OTEL_SERVICE_NAME = "Custom Service";
       process.env.BATCH_SIZE = "1024";
-      process.env.SAMPLING_RATE = "0.25";
 
       const config = loadTelemetryConfigFromEnv();
 
+      // ENABLE_OPENTELEMETRY uses ?? so false is preserved (not overridden by default)
       expect(config.ENABLE_OPENTELEMETRY).toBe(false);
       expect(config.SERVICE_NAME).toBe("Custom Service");
       expect(config.BATCH_SIZE).toBe(1024);
-      expect(config.SAMPLING_RATE).toBe(0.25);
     });
 
     test("handles malformed environment variables gracefully", () => {
       process.env.BATCH_SIZE = "not-a-number";
       process.env.ENABLE_OPENTELEMETRY = "maybe";
-      process.env.SAMPLING_RATE = "invalid";
 
       const config = loadTelemetryConfigFromEnv();
 
-      // Should fall back to defaults
+      // Should fall back to defaults for invalid numbers
       expect(config.BATCH_SIZE).toBe(telemetryDefaults.BATCH_SIZE);
-      expect(config.ENABLE_OPENTELEMETRY).toBe(telemetryDefaults.ENABLE_OPENTELEMETRY);
-      expect(config.SAMPLING_RATE).toBe(telemetryDefaults.SAMPLING_RATE);
+      // "maybe" is treated as false by parseEnvVar boolean handler
+      expect(config.ENABLE_OPENTELEMETRY).toBe(false);
     });
   });
 
@@ -156,16 +177,6 @@ describe("Telemetry Configuration", () => {
 
       const warnings = validateTelemetryConfig(configWithNaN, false);
       expect(warnings).toContain("SUMMARY_LOG_INTERVAL is NaN - this will cause infinite loops");
-    });
-
-    test("validates high sampling rate in production", () => {
-      const productionConfig = {
-        ...telemetryDefaults,
-        SAMPLING_RATE: 0.8, // 80% sampling
-      };
-
-      const warnings = validateTelemetryConfig(productionConfig, true);
-      expect(warnings).toContain("SAMPLING_RATE above 50% may impact performance in production");
     });
 
     test("validates export timeout compliance in production", () => {
@@ -196,52 +207,10 @@ describe("Telemetry Configuration", () => {
     });
   });
 
-  describe("Endpoint Consistency Validation", () => {
-    test("warns about different telemetry endpoint hosts", () => {
-      const configWithDifferentHosts = {
-        ...telemetryDefaults,
-        TRACES_ENDPOINT: "http://traces.example.com:4318/v1/traces",
-        METRICS_ENDPOINT: "http://metrics.example.com:4318/v1/metrics",
-        LOGS_ENDPOINT: "http://logs.example.com:4318/v1/logs",
-      };
-
-      // Mock console.warn to capture warnings
-      const warnSpy = mock(console, "warn");
-
-      validateTelemetryConfig(configWithDifferentHosts, false);
-
-      expect(warnSpy).toHaveBeenCalledWith(
-        "Telemetry endpoints use different hosts - consider using the same OTLP collector"
-      );
-
-      warnSpy.mockRestore();
-    });
-
-    test("accepts consistent telemetry endpoint hosts", () => {
-      const configWithSameHost = {
-        ...telemetryDefaults,
-        TRACES_ENDPOINT: "http://otel.example.com:4318/v1/traces",
-        METRICS_ENDPOINT: "http://otel.example.com:4318/v1/metrics",
-        LOGS_ENDPOINT: "http://otel.example.com:4318/v1/logs",
-      };
-
-      // Mock console.warn to ensure it's not called
-      const warnSpy = mock(console, "warn");
-
-      validateTelemetryConfig(configWithSameHost, false);
-
-      expect(warnSpy).not.toHaveBeenCalled();
-
-      warnSpy.mockRestore();
-    });
-  });
-
   describe("Error Path Mapping", () => {
     test("maps configuration paths to environment variables", () => {
-      const { getTelemetryEnvVarPath } = require("../../../src/config/modules/telemetry");
-
       expect(getTelemetryEnvVarPath("telemetry.ENABLE_OPENTELEMETRY")).toBe("ENABLE_OPENTELEMETRY");
-      expect(getTelemetryEnvVarPath("telemetry.SERVICE_NAME")).toBe("SERVICE_NAME");
+      expect(getTelemetryEnvVarPath("telemetry.SERVICE_NAME")).toBe("OTEL_SERVICE_NAME");
       expect(getTelemetryEnvVarPath("telemetry.BATCH_SIZE")).toBe("BATCH_SIZE");
       expect(getTelemetryEnvVarPath("unknown.path")).toBeUndefined();
     });

@@ -26,6 +26,8 @@ dir = ".bun-cache"
 # Enable test coverage and set reasonable threshold
 coverage = true
 coverageThreshold = 75
+# Prevent bun test from discovering tests in .bun-cache/ and node_modules/
+root = "tests/bun"
 
 [build]
 target = "bun"

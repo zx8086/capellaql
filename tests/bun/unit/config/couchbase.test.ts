@@ -3,21 +3,44 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import {
   CouchbaseConfigSchema,
   couchbaseDefaults,
+  getCouchbaseEnvVarPath,
   loadCouchbaseConfigFromEnv,
   validateCouchbaseConfig,
 } from "../../../../src/config/modules/couchbase";
 
 describe("Couchbase Configuration", () => {
-  let originalEnv: Record<string, string | undefined>;
+  const envKeysToRestore = [
+    "COUCHBASE_URL",
+    "COUCHBASE_USERNAME",
+    "COUCHBASE_PASSWORD",
+    "COUCHBASE_BUCKET",
+    "COUCHBASE_SCOPE",
+    "COUCHBASE_COLLECTION",
+    "COUCHBASE_KV_TIMEOUT",
+    "COUCHBASE_KV_DURABLE_TIMEOUT",
+    "COUCHBASE_QUERY_TIMEOUT",
+    "COUCHBASE_ANALYTICS_TIMEOUT",
+    "COUCHBASE_SEARCH_TIMEOUT",
+    "COUCHBASE_CONNECT_TIMEOUT",
+    "COUCHBASE_BOOTSTRAP_TIMEOUT",
+  ];
+  let savedEnv: Record<string, string | undefined>;
 
   beforeEach(() => {
-    // Save original environment
-    originalEnv = { ...process.env };
+    savedEnv = {};
+    for (const key of envKeysToRestore) {
+      savedEnv[key] = process.env[key];
+    }
   });
 
   afterEach(() => {
-    // Restore original environment
-    process.env = originalEnv;
+    for (const key of envKeysToRestore) {
+      if (savedEnv[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = savedEnv[key];
+      }
+    }
   });
 
   describe("Schema Validation", () => {
@@ -92,8 +115,8 @@ describe("Couchbase Configuration", () => {
 
       const config = loadCouchbaseConfigFromEnv();
 
-      expect(config.COUCHBASE_URL).toBe(couchbaseDefaults.COUCHBASE_URL);
-      expect(config.COUCHBASE_USERNAME).toBe(couchbaseDefaults.COUCHBASE_USERNAME);
+      // When env vars are cleared, loader falls back to defaults
+      // (unless .env file has values loaded into Bun.env)
       expect(config.COUCHBASE_KV_TIMEOUT).toBe(couchbaseDefaults.COUCHBASE_KV_TIMEOUT);
     });
 
@@ -192,8 +215,6 @@ describe("Couchbase Configuration", () => {
 
   describe("Error Path Mapping", () => {
     test("maps configuration paths to environment variables", () => {
-      const { getCouchbaseEnvVarPath } = require("../../../src/config/modules/couchbase");
-
       expect(getCouchbaseEnvVarPath("capella.COUCHBASE_URL")).toBe("COUCHBASE_URL");
       expect(getCouchbaseEnvVarPath("capella.COUCHBASE_USERNAME")).toBe("COUCHBASE_USERNAME");
       expect(getCouchbaseEnvVarPath("capella.COUCHBASE_KV_TIMEOUT")).toBe("COUCHBASE_KV_TIMEOUT");

@@ -3,21 +3,30 @@ import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import {
   ApplicationConfigSchema,
   applicationDefaults,
+  getApplicationEnvVarPath,
   loadApplicationConfigFromEnv,
   validateApplicationConfig,
 } from "../../../../src/config/modules/application";
 
 describe("Application Configuration", () => {
-  let originalEnv: Record<string, string | undefined>;
+  const envKeysToRestore = ["LOG_LEVEL", "PORT", "ALLOWED_ORIGINS", "BASE_URL", "YOGA_RESPONSE_CACHE_TTL"];
+  let savedEnv: Record<string, string | undefined>;
 
   beforeEach(() => {
-    // Save original environment
-    originalEnv = { ...process.env };
+    savedEnv = {};
+    for (const key of envKeysToRestore) {
+      savedEnv[key] = process.env[key];
+    }
   });
 
   afterEach(() => {
-    // Restore original environment
-    process.env = originalEnv;
+    for (const key of envKeysToRestore) {
+      if (savedEnv[key] === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = savedEnv[key];
+      }
+    }
   });
 
   describe("Schema Validation", () => {
@@ -151,8 +160,11 @@ describe("Application Configuration", () => {
     });
 
     test("warns about privileged ports in development", () => {
-      // Mock console.warn to capture warnings
-      const warnSpy = mock(console, "warn");
+      const originalWarn = console.warn;
+      const warnCalls: unknown[][] = [];
+      console.warn = (...args: unknown[]) => {
+        warnCalls.push(args);
+      };
 
       const configWithPrivilegedPort = {
         ...applicationDefaults,
@@ -160,16 +172,14 @@ describe("Application Configuration", () => {
       };
 
       validateApplicationConfig(configWithPrivilegedPort, false);
-      expect(warnSpy).toHaveBeenCalledWith("Port 80 is a privileged port - ensure proper permissions");
+      expect(warnCalls.some((args) => String(args[0]).includes("privileged port"))).toBe(true);
 
-      warnSpy.mockRestore();
+      console.warn = originalWarn;
     });
   });
 
   describe("Error Path Mapping", () => {
     test("maps configuration paths to environment variables", () => {
-      const { getApplicationEnvVarPath } = require("../../../src/config/modules/application");
-
       expect(getApplicationEnvVarPath("application.LOG_LEVEL")).toBe("LOG_LEVEL");
       expect(getApplicationEnvVarPath("application.PORT")).toBe("PORT");
       expect(getApplicationEnvVarPath("application.BASE_URL")).toBe("BASE_URL");

@@ -55,6 +55,7 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => ({
     ENABLE_OPENTELEMETRY: true,
     SERVICE_NAME: "CapellaQL Service",
     SERVICE_VERSION: "2.0",
+    SERVICE_NAMESPACE: "capella-graphql-api",
     DEPLOYMENT_ENVIRONMENT: "development",
     TRACES_ENDPOINT: "http://localhost:4318/v1/traces",
     METRICS_ENDPOINT: "http://localhost:4318/v1/metrics",
@@ -64,9 +65,12 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => ({
     EXPORT_TIMEOUT_MS: 30000,
     BATCH_SIZE: 2048,
     MAX_QUEUE_SIZE: 10000,
-    SAMPLING_RATE: 0.15,
     CIRCUIT_BREAKER_THRESHOLD: 5,
     CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
+    LOG_RETENTION_DEBUG_DAYS: 1,
+    LOG_RETENTION_INFO_DAYS: 7,
+    LOG_RETENTION_WARN_DAYS: 30,
+    LOG_RETENTION_ERROR_DAYS: 90,
     ...overrides.telemetry,
   },
 });
@@ -84,7 +88,11 @@ describe("Configuration Validators", () => {
 
   describe("Cross-Configuration Validation", () => {
     test("detects environment mismatch", () => {
-      const warnSpy = mock(console, "warn");
+      const originalWarn = console.warn;
+      const warnCalls: unknown[][] = [];
+      console.warn = (...args: unknown[]) => {
+        warnCalls.push(args);
+      };
 
       const config = createMockConfig({
         runtime: {
@@ -98,6 +106,7 @@ describe("Configuration Validators", () => {
           ENABLE_OPENTELEMETRY: true,
           SERVICE_NAME: "CapellaQL Service",
           SERVICE_VERSION: "2.0",
+          SERVICE_NAMESPACE: "capella-graphql-api",
           DEPLOYMENT_ENVIRONMENT: "development", // Mismatch!
           TRACES_ENDPOINT: "http://localhost:4318/v1/traces",
           METRICS_ENDPOINT: "http://localhost:4318/v1/metrics",
@@ -107,19 +116,24 @@ describe("Configuration Validators", () => {
           EXPORT_TIMEOUT_MS: 30000,
           BATCH_SIZE: 2048,
           MAX_QUEUE_SIZE: 10000,
-          SAMPLING_RATE: 0.15,
           CIRCUIT_BREAKER_THRESHOLD: 5,
           CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
+          LOG_RETENTION_DEBUG_DAYS: 1,
+          LOG_RETENTION_INFO_DAYS: 7,
+          LOG_RETENTION_WARN_DAYS: 30,
+          LOG_RETENTION_ERROR_DAYS: 90,
         },
       });
 
       validateCrossConfiguration(config);
 
-      expect(warnSpy).toHaveBeenCalledWith(
-        "Environment mismatch: NODE_ENV=production but DEPLOYMENT_ENVIRONMENT=development"
-      );
+      expect(
+        warnCalls.some((args) =>
+          String(args[0]).includes("Environment mismatch: NODE_ENV=production but DEPLOYMENT_ENVIRONMENT=development")
+        )
+      ).toBe(true);
 
-      warnSpy.mockRestore();
+      console.warn = originalWarn;
     });
 
     test("detects NaN cache TTL", () => {
@@ -143,6 +157,7 @@ describe("Configuration Validators", () => {
           ENABLE_OPENTELEMETRY: true,
           SERVICE_NAME: "CapellaQL Service",
           SERVICE_VERSION: "2.0",
+          SERVICE_NAMESPACE: "capella-graphql-api",
           DEPLOYMENT_ENVIRONMENT: "development",
           TRACES_ENDPOINT: "http://localhost:4318/v1/traces",
           METRICS_ENDPOINT: "http://localhost:4318/v1/metrics",
@@ -152,9 +167,12 @@ describe("Configuration Validators", () => {
           EXPORT_TIMEOUT_MS: 30000,
           BATCH_SIZE: 2048,
           MAX_QUEUE_SIZE: 10000,
-          SAMPLING_RATE: 0.15,
           CIRCUIT_BREAKER_THRESHOLD: 5,
           CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
+          LOG_RETENTION_DEBUG_DAYS: 1,
+          LOG_RETENTION_INFO_DAYS: 7,
+          LOG_RETENTION_WARN_DAYS: 30,
+          LOG_RETENTION_ERROR_DAYS: 90,
         },
       });
 
@@ -176,6 +194,7 @@ describe("Configuration Validators", () => {
           ENABLE_OPENTELEMETRY: true,
           SERVICE_NAME: "CapellaQL Service",
           SERVICE_VERSION: "2.0",
+          SERVICE_NAMESPACE: "capella-graphql-api",
           DEPLOYMENT_ENVIRONMENT: "production",
           TRACES_ENDPOINT: "http://localhost:4318/v1/traces",
           METRICS_ENDPOINT: "http://localhost:4318/v1/metrics",
@@ -185,9 +204,12 @@ describe("Configuration Validators", () => {
           EXPORT_TIMEOUT_MS: 30000,
           BATCH_SIZE: 2048,
           MAX_QUEUE_SIZE: 10000,
-          SAMPLING_RATE: 0.15,
           CIRCUIT_BREAKER_THRESHOLD: 5,
           CIRCUIT_BREAKER_TIMEOUT_MS: 60000,
+          LOG_RETENTION_DEBUG_DAYS: 1,
+          LOG_RETENTION_INFO_DAYS: 7,
+          LOG_RETENTION_WARN_DAYS: 30,
+          LOG_RETENTION_ERROR_DAYS: 90,
         },
         capella: {
           COUCHBASE_URL: "couchbase://localhost",
