@@ -27,6 +27,7 @@ export function validateCrossConfiguration(config: Config): string[] {
   // Ensure application and telemetry environment alignment
   if (config.runtime.NODE_ENV !== config.telemetry.DEPLOYMENT_ENVIRONMENT) {
     // Log warning but don't fail validation - this might be intentional
+    // console: runs before telemetry initialization
     console.warn(
       `Environment mismatch: NODE_ENV=${config.runtime.NODE_ENV} but DEPLOYMENT_ENVIRONMENT=${config.telemetry.DEPLOYMENT_ENVIRONMENT}`
     );
@@ -34,6 +35,7 @@ export function validateCrossConfiguration(config: Config): string[] {
 
   // Validate port availability (basic check)
   if (config.application.PORT < 1024 && !isProduction) {
+    // console: runs before telemetry initialization
     console.warn(`Port ${config.application.PORT} is a privileged port - ensure proper permissions`);
   }
 

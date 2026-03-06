@@ -3,7 +3,7 @@
 import { cacheEntities, SQLiteCacheKeys, withSQLiteCache } from "$lib/bunSQLiteCache";
 import { batchLoadDocuments } from "$lib/couchbase";
 import { deduplicateByFields } from "$lib/graphqlDeduplication";
-import { createCouchbaseSearchSpan, err, log } from "../../telemetry";
+import { createCouchbaseSearchSpan, debug, err, log } from "../../telemetry";
 import type { GraphQLContext } from "../context";
 import { type DocumentSearchArgs, DocumentSearchArgsSchema, withValidation } from "../validation/schemas";
 
@@ -61,7 +61,7 @@ const searchDocumentsResolver = withValidation(
             // Deduplicate results using SIMD-accelerated comparison
             const deduplicatedResults = deduplicateByFields(results, ["bucket", "scope", "collection"]);
 
-            log("DataLoader batch operation completed", {
+            debug("DataLoader batch operation completed", {
               requestId: context.requestId,
               totalTime,
               successful: deduplicatedResults.filter((r) => r.data && !r.error).length,

@@ -8,6 +8,8 @@ import type { Config } from "./schemas";
 export const defaultConfig: Config = {
   application: {
     LOG_LEVEL: "info",
+    LOGGING_BACKEND: "pino",
+    TELEMETRY_MODE: "both",
     YOGA_RESPONSE_CACHE_TTL: 900000, // 15 minutes
     PORT: 4000,
     ALLOWED_ORIGINS: ["http://localhost:3000"],

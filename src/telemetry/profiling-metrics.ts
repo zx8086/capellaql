@@ -2,6 +2,7 @@
 /* OpenTelemetry profiling metrics integration */
 
 import { type Counter, type Histogram, metrics, type ObservableGauge } from "@opentelemetry/api";
+import { getLogger } from "../logging/container";
 
 // ============================================================================
 // Types
@@ -104,7 +105,7 @@ export function initializeProfilingMetrics(): void {
 
   isInitialized = true;
 
-  console.info("Profiling metrics initialized", {
+  getLogger().info("Profiling metrics initialized", {
     component: "profiling-metrics",
     operation: "initialize",
   });
@@ -160,7 +161,7 @@ export function startProfilingSession(reason: ProfilingTriggerReason, endpoint?:
     });
   }
 
-  console.info("Profiling session started", {
+  getLogger().info("Profiling session started", {
     component: "profiling-metrics",
     operation: "session_start",
     sessionId,
@@ -180,7 +181,7 @@ export function startProfilingSession(reason: ProfilingTriggerReason, endpoint?:
 export function completeProfilingSession(sessionId: string, outputPath?: string): void {
   const session = activeSessions.get(sessionId);
   if (!session) {
-    console.warn("Profiling session not found", {
+    getLogger().warn("Profiling session not found", {
       component: "profiling-metrics",
       operation: "session_complete_not_found",
       sessionId,
@@ -205,7 +206,7 @@ export function completeProfilingSession(sessionId: string, outputPath?: string)
   activeSessions.delete(sessionId);
   metricsState.activeSessionsCount = activeSessions.size;
 
-  console.info("Profiling session completed", {
+  getLogger().info("Profiling session completed", {
     component: "profiling-metrics",
     operation: "session_complete",
     sessionId,
@@ -243,13 +244,14 @@ export function failProfilingSession(sessionId: string, error?: Error): void {
   activeSessions.delete(sessionId);
   metricsState.activeSessionsCount = activeSessions.size;
 
-  console.error("Profiling session failed", {
+  getLogger().error("Profiling session failed", {
+    "error.type": error instanceof Error ? error.name : "Error",
+    "error.message": error instanceof Error ? error.message : String(error ?? "unknown"),
     component: "profiling-metrics",
     operation: "session_failed",
     sessionId,
     durationSeconds,
     reason: session.reason,
-    error: error?.message,
   });
 }
 
@@ -269,7 +271,7 @@ export function failProfilingSession(sessionId: string, error?: Error): void {
 export function triggerSLAViolationProfiling(endpoint: string, p95Latency: number, threshold: number): string | null {
   // Check if we have too many active sessions (overhead limit)
   if (activeSessions.size >= 3) {
-    console.warn("Profiling trigger skipped: overhead limit reached", {
+    getLogger().warn("Profiling trigger skipped: overhead limit reached", {
       component: "profiling-metrics",
       operation: "trigger_skipped_overhead",
       endpoint,
@@ -281,7 +283,7 @@ export function triggerSLAViolationProfiling(endpoint: string, p95Latency: numbe
   // Start the session
   const sessionId = startProfilingSession("sla_violation", endpoint);
 
-  console.info("SLA violation profiling triggered", {
+  getLogger().info("SLA violation profiling triggered", {
     component: "profiling-metrics",
     operation: "sla_violation_trigger",
     sessionId,
@@ -331,7 +333,7 @@ export function shutdownProfilingMetrics(): void {
     failProfilingSession(sessionId, new Error("Shutdown"));
   }
 
-  console.info("Profiling metrics shutdown", {
+  getLogger().info("Profiling metrics shutdown", {
     component: "profiling-metrics",
     operation: "shutdown",
     totalTriggers: metricsState.totalTriggersCount,

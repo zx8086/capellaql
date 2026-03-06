@@ -1,6 +1,7 @@
 /* src/telemetry/config.ts */
 
 import { z } from "zod";
+import { getLogger } from "../logging/container";
 
 export interface TelemetryConfig {
   ENABLE_OPENTELEMETRY: boolean;
@@ -130,7 +131,7 @@ function validateBusinessRules(config: TelemetryConfig): void {
 
   // Ensure batch sizes are optimal
   if (config.BATCH_SIZE < 1024 && config.DEPLOYMENT_ENVIRONMENT === "production") {
-    console.warn("BATCH_SIZE is below recommended 1024 for production environments");
+    getLogger().warn("BATCH_SIZE is below recommended 1024 for production environments");
   }
 
   // Note: Different hosts for telemetry endpoints is valid (separate collectors per signal)

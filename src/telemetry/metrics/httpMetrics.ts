@@ -2,6 +2,7 @@
 
 import { type Counter, context, type Histogram, metrics, trace } from "@opentelemetry/api";
 import { withCardinalityCheck } from "../../lib/metricsCardinalityManager";
+import { getLogger } from "../../logging/container";
 
 let httpRequestCounter: Counter | undefined;
 let httpResponseTimeHistogram: Histogram | undefined;
@@ -9,7 +10,7 @@ let isInitialized = false;
 
 export function initializeHttpMetrics(): void {
   if (isInitialized) {
-    console.warn("HTTP metrics already initialized");
+    getLogger().warn("HTTP metrics already initialized");
     return;
   }
 
@@ -30,13 +31,16 @@ export function initializeHttpMetrics(): void {
 
     isInitialized = true;
   } catch (error) {
-    console.error("Error initializing HTTP metrics:", error);
+    getLogger().error("Error initializing HTTP metrics", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
 export function recordHttpRequest(method: string, route: string, statusCode?: number): void {
   if (!isInitialized || !httpRequestCounter) {
-    console.warn("HTTP metrics not initialized, skipping request recording");
+    getLogger().warn("HTTP metrics not initialized, skipping request recording");
     return;
   }
 
@@ -52,13 +56,16 @@ export function recordHttpRequest(method: string, route: string, statusCode?: nu
 
     httpRequestCounter.add(1, checkedLabels);
   } catch (error) {
-    console.error("Error recording HTTP request:", error);
+    getLogger().error("Error recording HTTP request", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
 export function recordHttpResponseTime(durationMs: number, method?: string, route?: string, statusCode?: number): void {
   if (!isInitialized || !httpResponseTimeHistogram) {
-    console.warn("HTTP metrics not initialized, skipping response time recording");
+    getLogger().warn("HTTP metrics not initialized, skipping response time recording");
     return;
   }
 
@@ -87,7 +94,10 @@ export function recordHttpResponseTime(durationMs: number, method?: string, rout
 
     httpResponseTimeHistogram.record(durationSeconds, checkedLabels);
   } catch (error) {
-    console.error("Error recording HTTP response time:", error);
+    getLogger().error("Error recording HTTP response time", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -103,7 +113,10 @@ export function recordGraphQLRequest(operationName: string, operationType: strin
 
     httpRequestCounter.add(1, checkedLabels);
   } catch (error) {
-    console.error("Error recording GraphQL request:", error);
+    getLogger().error("Error recording GraphQL request", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
   }
 }
 
@@ -132,7 +145,10 @@ export function recordGraphQLResponseTime(
 
     httpResponseTimeHistogram.record(durationSeconds, checkedLabels);
   } catch (error) {
-    console.error("Error recording GraphQL response time:", error);
+    getLogger().error("Error recording GraphQL response time", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
   }
 }
 

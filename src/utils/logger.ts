@@ -1,147 +1,29 @@
 /* src/utils/logger.ts */
+/* Layer 3: Application logging facade over DI container */
+/* Per golden path: this is the primary import for all application code */
 
-// Stryker disable all: Logger implementation is tested via integration tests and telemetry output verification.
-// String literal mutations in log messages and field names are low-value mutations that don't catch real bugs.
-
-type LoggerConfig = { telemetry: { serviceName: string; environment: string } };
-
-let configInstance: LoggerConfig | null = null;
-
-function getConfig(): LoggerConfig {
-  if (!configInstance) {
-    try {
-      const { telemetryConfig } = require("$config");
-      configInstance = {
-        telemetry: {
-          serviceName: telemetryConfig.SERVICE_NAME,
-          environment: telemetryConfig.DEPLOYMENT_ENVIRONMENT,
-        },
-      };
-    } catch (_error) {
-      configInstance = {
-        telemetry: {
-          serviceName: "capellaql",
-          environment: "development",
-        },
-      };
-    }
-  }
-  // TypeScript can't infer that configInstance is always non-null after the if block
-  // because loadConfig() comes from a dynamic require
-  return configInstance!;
-}
-
-function getWinstonLogger() {
-  // Always get fresh reference to winstonTelemetryLogger
-  // It may be reinitialized after telemetry setup (reinitialize() is called)
-  try {
-    const { winstonTelemetryLogger } = require("../telemetry/winston-logger");
-    return winstonTelemetryLogger;
-  } catch (_error) {
-    console.error("ERROR: Could not load winston logger, falling back to console:", _error);
-    const config = getConfig();
-    return {
-      info: (msg: string, ctx: Record<string, unknown>) =>
-        console.log(
-          JSON.stringify({
-            "@timestamp": new Date().toISOString(),
-            "log.level": "INFO",
-            message: msg,
-            service: {
-              name: config.telemetry.serviceName,
-              environment: config.telemetry.environment,
-            },
-            ...ctx,
-          })
-        ),
-      warn: (msg: string, ctx: Record<string, unknown>) =>
-        console.warn(
-          JSON.stringify({
-            "@timestamp": new Date().toISOString(),
-            "log.level": "WARN",
-            message: msg,
-            service: {
-              name: config.telemetry.serviceName,
-              environment: config.telemetry.environment,
-            },
-            ...ctx,
-          })
-        ),
-      error: (msg: string, ctx: Record<string, unknown>) =>
-        console.error(
-          JSON.stringify({
-            "@timestamp": new Date().toISOString(),
-            "log.level": "ERROR",
-            message: msg,
-            service: {
-              name: config.telemetry.serviceName,
-              environment: config.telemetry.environment,
-            },
-            ...ctx,
-          })
-        ),
-    };
-  }
-}
+import { getChildLogger, getLogger } from "../logging/container";
+export { getChildLogger };
 
 export function log(message: string, context: Record<string, unknown> = {}) {
-  const config = getConfig();
-  getWinstonLogger().info(message, {
-    service: {
-      name: config.telemetry.serviceName,
-      environment: config.telemetry.environment,
-    },
-    ...context,
-  });
+  getLogger().info(message, context);
 }
 
 export function warn(message: string, context: Record<string, unknown> = {}) {
-  const config = getConfig();
-  getWinstonLogger().warn(message, {
-    service: {
-      name: config.telemetry.serviceName,
-      environment: config.telemetry.environment,
-    },
-    ...context,
-  });
+  getLogger().warn(message, context);
 }
 
 export function error(message: string, context: Record<string, unknown> = {}) {
-  const config = getConfig();
-  getWinstonLogger().error(message, {
-    service: {
-      name: config.telemetry.serviceName,
-      environment: config.telemetry.environment,
-    },
-    ...context,
-  });
+  getLogger().error(message, context);
 }
 
 export function audit(eventType: string, context: Record<string, unknown> = {}) {
-  const config = getConfig();
-  getWinstonLogger().info(eventType, {
-    audit: true,
-    event_type: eventType,
-    service: {
-      name: config.telemetry.serviceName,
-      environment: config.telemetry.environment,
-    },
-    ...context,
-  });
+  getLogger().info(eventType, { audit: true, event_type: eventType, ...context });
 }
 
 export function logError(message: string, err: Error, context: Record<string, unknown> = {}) {
-  const config = getConfig();
-  getWinstonLogger().error(message, {
-    service: {
-      name: config.telemetry.serviceName,
-      environment: config.telemetry.environment,
-    },
-    error: {
-      name: err.name,
-      message: err.message,
-      stack: err.stack,
-    },
+  getLogger().error(message, {
+    error: { name: err.name, message: err.message, stack: err.stack },
     ...context,
   });
 }

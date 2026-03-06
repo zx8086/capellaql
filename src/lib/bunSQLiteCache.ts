@@ -842,7 +842,7 @@ export function cacheEntities<T extends Record<string, unknown>>(
       }
     }
     if (cached > 0) {
-      log("Entity cache populated", {
+      debug("Entity cache populated", {
         count: cached,
         total: items.length,
         userScoped: options.userScoped ?? false,

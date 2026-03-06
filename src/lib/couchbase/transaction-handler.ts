@@ -392,7 +392,7 @@ export class CouchbaseTransactionHandler {
       ],
     };
 
-    err("AMBIGUOUS_TRANSACTION_COMMIT", ambiguousLogData);
+    err("AMBIGUOUS_TRANSACTION_COMMIT", undefined, ambiguousLogData);
 
     // Store for investigation dashboard
     try {

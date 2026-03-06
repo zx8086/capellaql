@@ -1,7 +1,7 @@
 /* src/telemetry/lifecycle-logger.ts */
 /* Startup/shutdown logging with batch message delivery */
 
-import { winstonTelemetryLogger } from "./winston-logger";
+import { getLogger } from "../logging/container";
 
 // ============================================================================
 // Types
@@ -43,8 +43,8 @@ export class LifecycleObservabilityLogger {
   private isOTLPEnabled = false;
 
   constructor() {
-    // Check if OTLP is enabled
-    this.isOTLPEnabled = winstonTelemetryLogger.isOTLPEnabled();
+    // Check if OTLP is enabled via environment/config
+    this.isOTLPEnabled = process.env.ENABLE_OPENTELEMETRY === "true";
   }
 
   /**
@@ -67,7 +67,7 @@ export class LifecycleObservabilityLogger {
       this.pendingMessages.push(internalMessage);
 
       // Log immediately to winston (will be captured by OTLP transport if enabled)
-      winstonTelemetryLogger.info(step.message, {
+      getLogger().info(step.message, {
         component: "lifecycle",
         operation: "shutdown_sequence",
         shutdownStep: step.step,
@@ -88,7 +88,7 @@ export class LifecycleObservabilityLogger {
     eventType: "startup" | "shutdown" | "health_check" | "config_reload",
     metadata?: Record<string, unknown>
   ): void {
-    winstonTelemetryLogger.info(message, {
+    getLogger().info(message, {
       component: "lifecycle",
       operation: eventType,
       pid: process.pid,
@@ -107,20 +107,20 @@ export class LifecycleObservabilityLogger {
     }
 
     // Update OTLP status (might have changed since construction)
-    this.isOTLPEnabled = winstonTelemetryLogger.isOTLPEnabled();
+    this.isOTLPEnabled = process.env.ENABLE_OPENTELEMETRY === "true";
 
     if (this.isOTLPEnabled) {
       // Give OTLP transport time to flush
       await this.sleep(500);
 
-      console.info("Lifecycle observability: Successfully flushed shutdown messages", {
+      getLogger().info("Lifecycle observability: Successfully flushed shutdown messages", {
         component: "lifecycle",
         operation: "shutdown_flush_complete",
         messageCount,
         telemetryMode: "otlp",
       });
     } else {
-      console.info("Lifecycle observability: Console-only mode, messages logged", {
+      getLogger().info("Lifecycle observability: Console-only mode, messages logged", {
         component: "lifecycle",
         operation: "console_only_flush",
         messageCount,

@@ -4,6 +4,12 @@ import type { ExportResult } from "@opentelemetry/core";
 import type { LogRecordExporter, ReadableLogRecord } from "@opentelemetry/sdk-logs";
 import type { PushMetricExporter, ResourceMetrics } from "@opentelemetry/sdk-metrics";
 import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
+import {
+  canExecuteSignal,
+  recordSignalFailure,
+  recordSignalSuccess,
+  type TelemetrySignal,
+} from "./telemetry-circuit-breaker";
 
 export type TelemetryType = "traces" | "metrics" | "logs";
 
@@ -112,16 +118,26 @@ export function createExportStatsTracker(): ExportStatsTracker {
   return tracker;
 }
 
-export function wrapSpanExporter(exporter: SpanExporter, tracker: ExportStatsTracker): SpanExporter {
+export function wrapSpanExporter(
+  exporter: SpanExporter,
+  tracker: ExportStatsTracker,
+  signal: TelemetrySignal = "traces"
+): SpanExporter {
   return {
     export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
+      if (!canExecuteSignal(signal)) {
+        resultCallback({ code: 1, error: new Error("Circuit breaker open") });
+        return;
+      }
       tracker.recordExportAttempt();
       exporter.export(spans, (result: ExportResult) => {
         if (result.code === 0) {
           tracker.recordExportSuccess();
+          recordSignalSuccess(signal);
         } else {
           const errorMessage = result.error?.message ?? "Export failed";
           tracker.recordExportFailure(errorMessage);
+          recordSignalFailure(signal);
         }
         resultCallback(result);
       });
@@ -131,16 +147,26 @@ export function wrapSpanExporter(exporter: SpanExporter, tracker: ExportStatsTra
   };
 }
 
-export function wrapLogRecordExporter(exporter: LogRecordExporter, tracker: ExportStatsTracker): LogRecordExporter {
+export function wrapLogRecordExporter(
+  exporter: LogRecordExporter,
+  tracker: ExportStatsTracker,
+  signal: TelemetrySignal = "logs"
+): LogRecordExporter {
   return {
     export(logs: ReadableLogRecord[], resultCallback: (result: ExportResult) => void): void {
+      if (!canExecuteSignal(signal)) {
+        resultCallback({ code: 1, error: new Error("Circuit breaker open") });
+        return;
+      }
       tracker.recordExportAttempt();
       exporter.export(logs, (result: ExportResult) => {
         if (result.code === 0) {
           tracker.recordExportSuccess();
+          recordSignalSuccess(signal);
         } else {
           const errorMessage = result.error?.message ?? "Export failed";
           tracker.recordExportFailure(errorMessage);
+          recordSignalFailure(signal);
         }
         resultCallback(result);
       });
@@ -149,16 +175,26 @@ export function wrapLogRecordExporter(exporter: LogRecordExporter, tracker: Expo
   };
 }
 
-export function wrapMetricExporter(exporter: PushMetricExporter, tracker: ExportStatsTracker): PushMetricExporter {
+export function wrapMetricExporter(
+  exporter: PushMetricExporter,
+  tracker: ExportStatsTracker,
+  signal: TelemetrySignal = "metrics"
+): PushMetricExporter {
   return {
     export(metrics: ResourceMetrics, resultCallback: (result: ExportResult) => void): void {
+      if (!canExecuteSignal(signal)) {
+        resultCallback({ code: 1, error: new Error("Circuit breaker open") });
+        return;
+      }
       tracker.recordExportAttempt();
       exporter.export(metrics, (result: ExportResult) => {
         if (result.code === 0) {
           tracker.recordExportSuccess();
+          recordSignalSuccess(signal);
         } else {
           const errorMessage = result.error?.message ?? "Export failed";
           tracker.recordExportFailure(errorMessage);
+          recordSignalFailure(signal);
         }
         resultCallback(result);
       });

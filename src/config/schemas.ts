@@ -11,6 +11,8 @@ import { z } from "zod";
 
 export interface ApplicationConfig {
   LOG_LEVEL: string;
+  LOGGING_BACKEND: string;
+  TELEMETRY_MODE: string;
   YOGA_RESPONSE_CACHE_TTL: number;
   PORT: number;
   ALLOWED_ORIGINS: string[];
@@ -99,6 +101,8 @@ export const EnvironmentType = z.enum(["development", "staging", "production", "
 // Application schema - validation rules only
 export const ApplicationConfigSchema = z.strictObject({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).describe("Application log level"),
+  LOGGING_BACKEND: z.enum(["pino", "winston"]).describe("Logging backend selection"),
+  TELEMETRY_MODE: z.enum(["console", "otlp", "both"]).describe("Telemetry output mode"),
   YOGA_RESPONSE_CACHE_TTL: z
     .number()
     .min(0, "Cache TTL must be non-negative")

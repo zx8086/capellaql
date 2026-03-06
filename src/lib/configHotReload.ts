@@ -125,7 +125,7 @@ class ConfigurationHotReload extends EventEmitter {
       const validation = await this.validateConfiguration(newEnvVars);
 
       if (!validation.valid) {
-        err("Configuration validation failed:", validation.errors);
+        err("Configuration validation failed", undefined, { errors: validation.errors });
 
         const event: ConfigurationReloadEvent = {
           type: "validation_failed",
@@ -139,7 +139,7 @@ class ConfigurationHotReload extends EventEmitter {
       }
 
       if (validation.warnings.length > 0) {
-        log("Configuration validation warnings:", validation.warnings);
+        log("Configuration validation warnings", { warnings: validation.warnings });
       }
 
       // Apply the new configuration

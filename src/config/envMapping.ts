@@ -34,6 +34,8 @@ export interface EnvVarEntry {
 export const envVarMapping = {
   application: {
     LOG_LEVEL: { envVar: "LOG_LEVEL", type: "string" },
+    LOGGING_BACKEND: { envVar: "LOGGING_BACKEND", type: "string" },
+    TELEMETRY_MODE: { envVar: "TELEMETRY_MODE", type: "string" },
     YOGA_RESPONSE_CACHE_TTL: { envVar: "YOGA_RESPONSE_CACHE_TTL", type: "number" },
     PORT: { envVar: "PORT", type: "number" },
     ALLOWED_ORIGINS: { envVar: "ALLOWED_ORIGINS", type: "array" },

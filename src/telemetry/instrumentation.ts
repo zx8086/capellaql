@@ -35,6 +35,7 @@ import {
 } from "@opentelemetry/semantic-conventions";
 import { type TelemetryConfig, telemetryConfig } from "$config";
 import { BunPerf } from "$utils/bunUtils";
+import { getLogger } from "../logging/container";
 import {
   createExportStatsTracker,
   type ExportStats,
@@ -44,7 +45,11 @@ import {
   wrapSpanExporter,
 } from "./export-stats-tracker";
 import { markTelemetryInitialized } from "./health/telemetryHealth";
-import { log, warn, winstonTelemetryLogger } from "./winston-logger";
+import {
+  initializeTelemetryCircuitBreakers,
+  shutdownTelemetryCircuitBreakers,
+} from "./telemetry-circuit-breaker";
+import { winstonTelemetryLogger } from "./winston-logger";
 
 // ============================================================================
 // Module-level state (per migrate/telemetry/instrumentation.ts)
@@ -84,13 +89,19 @@ let telemetryShutdownInProgress = false;
 
 export async function initializeTelemetry(): Promise<void> {
   if (isInitialized()) {
-    warn("OpenTelemetry already initialized, skipping");
+    getLogger().warn("OpenTelemetry already initialized, skipping");
     return;
   }
 
   try {
     // Load and validate configuration from unified config system
     config = telemetryConfig;
+
+    // Initialize per-signal circuit breakers using config values
+    initializeTelemetryCircuitBreakers({
+      failureThreshold: config.CIRCUIT_BREAKER_THRESHOLD,
+      recoveryTimeoutMs: config.CIRCUIT_BREAKER_TIMEOUT_MS,
+    });
 
     if (!config.ENABLE_OPENTELEMETRY) {
       // Create no-op exporters for disabled mode (per migrate pattern)
@@ -142,20 +153,20 @@ export async function initializeTelemetry(): Promise<void> {
       url: config.TRACES_ENDPOINT,
       timeoutMillis: config.EXPORT_TIMEOUT_MS,
     });
-    const trackingTraceExporter = wrapSpanExporter(baseOtlpTraceExporter, traceExportStats);
+    const trackingTraceExporter = wrapSpanExporter(baseOtlpTraceExporter, traceExportStats, "traces");
 
     const baseOtlpMetricExporter = new OTLPMetricExporter({
       url: config.METRICS_ENDPOINT,
       timeoutMillis: config.EXPORT_TIMEOUT_MS,
     });
-    const trackingMetricExporter = wrapMetricExporter(baseOtlpMetricExporter, metricExportStats);
+    const trackingMetricExporter = wrapMetricExporter(baseOtlpMetricExporter, metricExportStats, "metrics");
     metricExporter = trackingMetricExporter;
 
     const baseOtlpLogExporter = new OTLPLogExporter({
       url: config.LOGS_ENDPOINT,
       timeoutMillis: config.EXPORT_TIMEOUT_MS,
     });
-    const trackingLogExporter = wrapLogRecordExporter(baseOtlpLogExporter, logExportStats);
+    const trackingLogExporter = wrapLogRecordExporter(baseOtlpLogExporter, logExportStats, "logs");
 
     // Create processors per migrate/telemetry/instrumentation.ts lines 122-139
     const traceProcessor = new BatchSpanProcessor(trackingTraceExporter, {
@@ -203,6 +214,15 @@ export async function initializeTelemetry(): Promise<void> {
         ignoreIncomingRequestHook: (req) => {
           return req.url?.includes("/health") || false;
         },
+      },
+      // Pino instrumentation: log sending forwards all Pino log records to
+      // the global LoggerProvider → BatchLogRecordProcessor → OTLPLogExporter.
+      // Log correlation is disabled because PinoAdapter already injects ECS-
+      // compliant trace fields (trace.id, span.id, transaction.id) via its
+      // own mixin — no need for the duplicate trace_id/span_id/trace_flags.
+      "@opentelemetry/instrumentation-pino": {
+        disableLogCorrelation: true,
+        disableLogSending: false,
       },
     });
 
@@ -326,6 +346,9 @@ export async function shutdownTelemetry(): Promise<void> {
   }
   telemetryShutdownInProgress = true;
 
+  // Shutdown circuit breaker state monitoring
+  shutdownTelemetryCircuitBreakers();
+
   if (hostMetrics) {
     hostMetrics = undefined;
   }
@@ -441,14 +464,14 @@ export async function measureDatabaseOperation<T>(
 
   if (isInitialized()) {
     try {
-      log(`Database operation completed`, {
+      getLogger().info(`Database operation completed`, {
         operation: operationName,
         queryType,
         duration,
         status: "success",
       });
     } catch (err) {
-      warn("Failed to record database operation metrics", { error: err });
+      getLogger().warn("Failed to record database operation metrics", { error: err });
     }
   }
 
@@ -464,14 +487,14 @@ export async function measureGraphQLResolver<T>(
 
   if (isInitialized()) {
     try {
-      log(`GraphQL resolver completed`, {
+      getLogger().info(`GraphQL resolver completed`, {
         resolver: resolverName,
         field: fieldName,
         duration,
         status: "success",
       });
     } catch (err) {
-      warn("Failed to record GraphQL resolver metrics", { error: err });
+      getLogger().warn("Failed to record GraphQL resolver metrics", { error: err });
     }
   }
 

@@ -2,6 +2,7 @@
 /* Memory, CPU, and GC metrics with OpenTelemetry instruments */
 
 import { type Counter, type Histogram, metrics, type ObservableGauge } from "@opentelemetry/api";
+import { getLogger } from "../../logging/container";
 import type { GCEvent, GCType } from "../gc-metrics";
 
 // ============================================================================
@@ -150,7 +151,7 @@ export function initializeProcessMetrics(): void {
 
   isMetricsInitialized = true;
 
-  console.info("Process metrics initialized", {
+  getLogger().info("Process metrics initialized", {
     component: "process-metrics",
     operation: "initialize",
   });
@@ -245,7 +246,7 @@ function calculateMemoryPressure(): MemoryPressureState {
  */
 export function startMemoryPressureMonitoring(intervalMs = 5000): void {
   if (memoryPressureInterval) {
-    console.warn("Memory pressure monitoring already running");
+    getLogger().warn("Memory pressure monitoring already running");
     return;
   }
 
@@ -263,7 +264,7 @@ export function startMemoryPressureMonitoring(intervalMs = 5000): void {
 
     // Log level transitions
     if (currentMemoryPressure.level !== previousLevel) {
-      console.warn(`Memory pressure level changed: ${previousLevel} -> ${currentMemoryPressure.level}`, {
+      getLogger().warn(`Memory pressure level changed: ${previousLevel} -> ${currentMemoryPressure.level}`, {
         component: "process-metrics",
         operation: "memory_pressure_change",
         previousLevel,
@@ -275,7 +276,7 @@ export function startMemoryPressureMonitoring(intervalMs = 5000): void {
     }
   }, intervalMs);
 
-  console.info("Memory pressure monitoring started", {
+  getLogger().info("Memory pressure monitoring started", {
     component: "process-metrics",
     operation: "start_monitoring",
     intervalMs,
@@ -292,7 +293,7 @@ export function stopMemoryPressureMonitoring(): void {
     memoryPressureInterval = null;
   }
 
-  console.info("Memory pressure monitoring stopped", {
+  getLogger().info("Memory pressure monitoring stopped", {
     component: "process-metrics",
     operation: "stop_monitoring",
     finalLevel: currentMemoryPressure.level,

@@ -3,7 +3,7 @@ import type { MetricData } from "@opentelemetry/sdk-metrics";
 import type { SpanData } from "@opentelemetry/sdk-trace-base";
 import config from "$config";
 import { getErrorMessage } from "$utils/errorUtils";
-import { error, log, logError, warn } from "$utils/logger";
+import { getLogger } from "../../logging/container";
 
 // Batch data types for coordinated exports
 interface TelemetryBatch {
@@ -103,7 +103,7 @@ export class TelemetryBatchCoordinator {
     this.startBatchTimer();
     this.startMemoryMonitoring();
     if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      log("TelemetryBatchCoordinator initialized with memory management", {
+      getLogger().info("TelemetryBatchCoordinator initialized with memory management", {
         component: "batch-coordinator",
         operation: "init",
         ...this.config,
@@ -240,7 +240,7 @@ export class TelemetryBatchCoordinator {
       };
 
       if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        log("Exporting batch", {
+        getLogger().info("Exporting batch", {
           component: "batch-coordinator",
           operation: "export",
           batchId,
@@ -259,7 +259,7 @@ export class TelemetryBatchCoordinator {
 
       if (exportResult.success) {
         if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-          log("Batch exported successfully", {
+          getLogger().info("Batch exported successfully", {
             component: "batch-coordinator",
             operation: "export",
             batchId,
@@ -267,33 +267,28 @@ export class TelemetryBatchCoordinator {
           });
         }
       } else {
-        error("Batch export failed", {
+        getLogger().error("Batch export failed", {
           component: "batch-coordinator",
           operation: "export",
           batchId,
           exportError: exportResult.error,
         });
       }
-    } catch (err) {
+    } catch (catchError) {
       const duration = Date.now() - startTime;
-      if (err instanceof Error) {
-        logError("Batch export error", err, {
-          component: "batch-coordinator",
-          operation: "export",
-          batchId,
-          durationMs: duration,
-        });
-      } else {
-        error("Batch export error", {
-          component: "batch-coordinator",
-          operation: "export",
-          batchId,
-          durationMs: duration,
-          exportError: String(err),
-        });
-      }
+      getLogger().error("Batch export error", {
+        "error.type": catchError instanceof Error ? catchError.name : "Error",
+        "error.message": catchError instanceof Error ? catchError.message : String(catchError),
+        component: "batch-coordinator",
+        operation: "export",
+        batchId,
+        durationMs: duration,
+      });
 
-      this.updateStatistics({ success: false, exportedCount: 0, duration, error: getErrorMessage(err) }, duration);
+      this.updateStatistics(
+        { success: false, exportedCount: 0, duration, error: getErrorMessage(catchError) },
+        duration
+      );
     } finally {
       this.isExporting = false;
     }
@@ -366,7 +361,7 @@ export class TelemetryBatchCoordinator {
     try {
       // Simulate trace export - in real implementation, this would use actual OTLP exporters
       if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        log("Exporting traces", {
+        getLogger().info("Exporting traces", {
           component: "batch-coordinator",
           operation: "export-traces",
           count: spans.length,
@@ -397,7 +392,7 @@ export class TelemetryBatchCoordinator {
 
     try {
       if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        log("Exporting metrics", {
+        getLogger().info("Exporting metrics", {
           component: "batch-coordinator",
           operation: "export-metrics",
           count: metrics.length,
@@ -428,7 +423,7 @@ export class TelemetryBatchCoordinator {
 
     try {
       if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        log("Exporting logs", {
+        getLogger().info("Exporting logs", {
           component: "batch-coordinator",
           operation: "export-logs",
           count: logs.length,
@@ -501,7 +496,7 @@ export class TelemetryBatchCoordinator {
 
   async forceFlush(): Promise<void> {
     if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      log("Force flushing telemetry batch coordinator", {
+      getLogger().info("Force flushing telemetry batch coordinator", {
         component: "batch-coordinator",
         operation: "force-flush",
       });
@@ -511,7 +506,7 @@ export class TelemetryBatchCoordinator {
 
   async shutdown(): Promise<void> {
     if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-      log("Shutting down telemetry batch coordinator", {
+      getLogger().info("Shutting down telemetry batch coordinator", {
         component: "batch-coordinator",
         operation: "shutdown",
       });
@@ -533,7 +528,7 @@ export class TelemetryBatchCoordinator {
       await this.flushBatch();
     }
 
-    log("Telemetry batch coordinator shutdown complete", {
+    getLogger().info("Telemetry batch coordinator shutdown complete", {
       component: "batch-coordinator",
       ...this.statistics,
     });
@@ -552,7 +547,7 @@ export class TelemetryBatchCoordinator {
 
       // Debug logging for troubleshooting (only in dev with debug flag)
       if (process.env.NODE_ENV === "development" && process.env.DEBUG_OTEL_EXPORTERS === "true") {
-        log(`Memory check: ${memoryPressure.pressureLevel}`, {
+        getLogger().info(`Memory check: ${memoryPressure.pressureLevel}`, {
           component: "batch-coordinator",
           operation: "memory-check",
           heapUsageRatio: memoryPressure.heapUsageRatio.toFixed(3),
@@ -565,7 +560,7 @@ export class TelemetryBatchCoordinator {
       }
 
       if (memoryPressure.pressureLevel === "high" || memoryPressure.pressureLevel === "critical") {
-        warn(`Telemetry memory pressure detected: ${memoryPressure.pressureLevel}`, {
+        getLogger().warn(`Telemetry memory pressure detected: ${memoryPressure.pressureLevel}`, {
           component: "batch-coordinator",
           operation: "memory-check",
           heapUsageRatio: memoryPressure.heapUsageRatio,
@@ -643,7 +638,7 @@ export class TelemetryBatchCoordinator {
     this.lastEmergencyFlush = now;
     this.statistics.emergencyFlushCount++;
 
-    warn("Emergency telemetry flush due to memory pressure", {
+    getLogger().warn("Emergency telemetry flush due to memory pressure", {
       component: "batch-coordinator",
       operation: "emergency-flush",
       traces: this.traceBuffer.length,
@@ -653,39 +648,27 @@ export class TelemetryBatchCoordinator {
     });
 
     // Force immediate flush
-    this.flushBatch().catch((err) => {
-      if (err instanceof Error) {
-        logError("Emergency flush failed", err, {
-          component: "batch-coordinator",
-          operation: "emergency-flush",
-        });
-      } else {
-        error("Emergency flush failed", {
-          component: "batch-coordinator",
-          operation: "emergency-flush",
-          flushError: String(err),
-        });
-      }
+    this.flushBatch().catch((catchError) => {
+      getLogger().error("Emergency flush failed", {
+        "error.type": catchError instanceof Error ? catchError.name : "Error",
+        "error.message": catchError instanceof Error ? catchError.message : String(catchError),
+        component: "batch-coordinator",
+        operation: "emergency-flush",
+      });
     });
 
     // Force garbage collection if available
     if (global.gc) {
       try {
         global.gc();
-      } catch (err) {
+      } catch (catchError) {
         if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-          if (err instanceof Error) {
-            logError("Manual garbage collection failed", err, {
-              component: "batch-coordinator",
-              operation: "gc",
-            });
-          } else {
-            log("Manual garbage collection failed", {
-              component: "batch-coordinator",
-              operation: "gc",
-              gcError: String(err),
-            });
-          }
+          getLogger().error("Manual garbage collection failed", {
+            "error.type": catchError instanceof Error ? catchError.name : "Error",
+            "error.message": catchError instanceof Error ? catchError.message : String(catchError),
+            component: "batch-coordinator",
+            operation: "gc",
+          });
         }
       }
     }
@@ -695,7 +678,7 @@ export class TelemetryBatchCoordinator {
    * Handle critical memory pressure by dropping data
    */
   private handleCriticalMemoryPressure(): void {
-    error("CRITICAL: Telemetry memory pressure - dropping oldest data to prevent OOM", {
+    getLogger().error("CRITICAL: Telemetry memory pressure - dropping oldest data to prevent OOM", {
       component: "batch-coordinator",
       operation: "memory-pressure-critical",
     });
@@ -723,7 +706,7 @@ export class TelemetryBatchCoordinator {
     this.currentMemoryUsage -= droppedSize;
     this.statistics.dataDropCount += tracesToDrop + metricsToDrop + logsToDrop;
 
-    error("Telemetry data dropped due to memory pressure", {
+    getLogger().error("Telemetry data dropped due to memory pressure", {
       component: "batch-coordinator",
       operation: "data-drop",
       droppedTraces: tracesToDrop,
@@ -741,20 +724,14 @@ export class TelemetryBatchCoordinator {
     if (global.gc) {
       try {
         global.gc();
-      } catch (err) {
+      } catch (catchError) {
         if (process.env.DEBUG_OTEL_EXPORTERS === "true") {
-          if (err instanceof Error) {
-            logError("Manual garbage collection failed", err, {
-              component: "batch-coordinator",
-              operation: "gc",
-            });
-          } else {
-            log("Manual garbage collection failed", {
-              component: "batch-coordinator",
-              operation: "gc",
-              gcError: String(err),
-            });
-          }
+          getLogger().error("Manual garbage collection failed", {
+            "error.type": catchError instanceof Error ? catchError.name : "Error",
+            "error.message": catchError instanceof Error ? catchError.message : String(catchError),
+            component: "batch-coordinator",
+            operation: "gc",
+          });
         }
       }
     }

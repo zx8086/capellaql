@@ -1,6 +1,8 @@
 /* src/telemetry/gc-metrics.ts */
 /* GC event monitoring with bun:jsc integration */
 
+import { getLogger } from "../logging/container";
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -215,7 +217,7 @@ function recordGCEvent(heapBefore: number, heapAfter: number, durationMs: number
  */
 export function initializeGCMetrics(callback?: GCEventCallback, intervalMs = 30000): void {
   if (collectionInterval) {
-    console.warn("GC metrics already initialized");
+    getLogger().warn("GC metrics already initialized");
     return;
   }
 
@@ -248,7 +250,7 @@ export function initializeGCMetrics(callback?: GCEventCallback, intervalMs = 300
     lastHeapUsed = heapAfter;
   }, intervalMs);
 
-  console.info("GC metrics initialized", {
+  getLogger().info("GC metrics initialized", {
     component: "gc-metrics",
     operation: "initialize",
     intervalMs,
@@ -323,7 +325,7 @@ export function shutdownGCMetrics(): void {
 
   const state = getGCMetricsState();
 
-  console.info("GC metrics collection shutdown", {
+  getLogger().info("GC metrics collection shutdown", {
     component: "gc-metrics",
     operation: "shutdown",
     totalGCCount: state.gcCount,

@@ -21,6 +21,7 @@ export function parseEnvVar(
         // Special handling for floating point numbers
         const parsed = Number(value);
         if (Number.isNaN(parsed) || !Number.isFinite(parsed)) {
+          // console: runs before telemetry initialization
           console.warn(
             `Warning: Environment variable ${fieldName} has invalid number value: '${value}'. Using default.`
           );
@@ -38,6 +39,7 @@ export function parseEnvVar(
         if (truthyValues.includes(normalized)) return true;
         if (falsyValues.includes(normalized)) return false;
 
+        // console: runs before telemetry initialization
         console.warn(
           `Warning: Environment variable ${fieldName} has ambiguous boolean value: '${value}'. Treating as false.`
         );
@@ -56,6 +58,7 @@ export function parseEnvVar(
         try {
           return JSON.parse(value);
         } catch (_jsonError) {
+          // console: runs before telemetry initialization
           console.warn(`Warning: Environment variable ${fieldName} contains invalid JSON: '${value}'. Using default.`);
           return undefined;
         }
@@ -64,6 +67,7 @@ export function parseEnvVar(
         return value;
     }
   } catch (error) {
+    // console: runs before telemetry initialization
     console.warn(`Warning: Failed to parse environment variable ${fieldName}: ${error}. Using default.`);
     return undefined;
   }

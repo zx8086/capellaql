@@ -58,6 +58,8 @@
       "$config": ["src/config"],
       "$telemetry": ["src/telemetry/index"],
       "$telemetry/*": ["src/telemetry/*"],
+      "$logging": ["src/logging/container"],
+      "$logging/*": ["src/logging/*"],
       "$graphql": ["src/graphql/index"],
       "$graphql/*": ["src/graphql/*"],
       "$types": ["src/types/index"],

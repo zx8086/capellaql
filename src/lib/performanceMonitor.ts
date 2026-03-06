@@ -1,6 +1,6 @@
 import { metrics } from "@opentelemetry/api";
 import { connectionManager } from "$lib/couchbase";
-import { debug, getTelemetryHealth, log } from "$telemetry";
+import { debug, getTelemetryHealth, log, warn } from "$telemetry";
 import { BunPerf } from "$utils/bunUtils";
 import { getGraphQLPerformanceStats, getRecentGraphQLPerformance } from "./graphqlPerformanceTracker";
 
@@ -163,7 +163,7 @@ class PerformanceMonitor {
 
     // If under memory pressure, perform aggressive cleanup
     if (this.checkMemoryPressure()) {
-      console.warn("Memory pressure detected - performing aggressive cleanup");
+      warn("Memory pressure detected - performing aggressive cleanup", { component: "performance-monitor" });
       this.performCleanup();
     }
 
@@ -205,7 +205,7 @@ class PerformanceMonitor {
     if (this.checkMemoryPressure()) {
       // Under memory pressure: keep only recent 50 entries
       this.recentMetrics = this.recentMetrics.slice(-50);
-      console.debug("Memory pressure: Reduced metrics history to 50 entries");
+      debug("Memory pressure: Reduced metrics history to 50 entries", { component: "performance-monitor" });
     } else if (this.recentMetrics.length > this.maxMetricsHistory) {
       // Normal operation: standard cleanup
       this.recentMetrics.shift();

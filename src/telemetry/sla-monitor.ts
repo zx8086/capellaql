@@ -2,8 +2,8 @@
 /* SLA monitoring with percentile calculation using Float64Array rolling buffers */
 
 import { type Counter, type Histogram, metrics } from "@opentelemetry/api";
+import { getLogger } from "../logging/container";
 import { triggerSLAViolationProfiling } from "./profiling-metrics";
-import { log, warn } from "./winston-logger";
 
 // ============================================================================
 // Types
@@ -318,7 +318,7 @@ class SlaMonitor {
           this.lastTriggers.set(endpoint, Date.now());
           this.violationsTriggered++;
 
-          log("Automatic profiling triggered by SLA violation", {
+          getLogger().info("Automatic profiling triggered by SLA violation", {
             component: "sla-monitor",
             endpoint,
             currentP95: percentileMetrics.p95.toFixed(2),
@@ -337,7 +337,7 @@ class SlaMonitor {
         this.recordViolation(endpoint, percentileMetrics, threshold, false, "throttled");
         this.violationsThrottled++;
 
-        warn("SLA violation detected but profiling blocked", {
+        getLogger().warn("SLA violation detected but profiling blocked", {
           component: "sla-monitor",
           endpoint,
           reason: "throttled",

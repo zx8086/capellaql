@@ -2,6 +2,7 @@
 // Meter and instrument creation per monitoring-updated.md line 37
 
 import { type Counter, type Histogram, metrics, type UpDownCounter } from "@opentelemetry/api";
+import { getLogger } from "../../logging/container";
 import { INSTRUMENT_DEFINITIONS } from "./instruments";
 
 // ============================================================================
@@ -48,7 +49,7 @@ export const METER_NAMES = {
  */
 export function initializeMetrics(): void {
   if (isInitialized) {
-    console.warn("Metrics system already initialized");
+    getLogger().warn("Metrics system already initialized");
     return;
   }
 
@@ -108,7 +109,10 @@ export function initializeMetrics(): void {
 
     isInitialized = true;
   } catch (error) {
-    console.error("Error initializing metrics system:", error);
+    getLogger().error("Error initializing metrics system", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
     throw error;
   }
 }

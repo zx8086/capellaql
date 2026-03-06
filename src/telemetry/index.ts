@@ -2,6 +2,21 @@
 
 // Re-export telemetry config from unified system
 export { loadTelemetryConfigFromEnv, telemetryConfig } from "$config";
+// DI container access
+export { getChildLogger, getLogger, loggerContainer } from "../logging/container";
+// Critical lifecycle logging (bypasses LOG_LEVEL, writes directly to stdout/stderr)
+export {
+  criticalLifecycleError,
+  criticalLifecycleLog,
+  criticalLifecycleWarn,
+  logServiceReady,
+  logServiceShutdownCompleted,
+  logServiceShutdownError,
+  logServiceShutdownInitiated,
+  logServiceStartup,
+} from "../logging/critical-lifecycle";
+// Logging exports (via DI container for backend flexibility)
+export type { LogContext } from "../logging/ports/logger.port";
 // Configuration exports (now unified - use $config instead)
 // @deprecated Use unified config.telemetry instead of these exports
 export { type TelemetryConfig, validateTelemetryConfig } from "./config";
@@ -53,6 +68,7 @@ export {
   logShutdownSequence,
   type ShutdownMessage,
 } from "./lifecycle-logger";
+export { debug, err, error, log, warn } from "./logger";
 // Metrics exports (centralized via metrics/index.ts per monitoring-updated.md)
 export {
   type DatabaseMetricsLabels,
@@ -129,6 +145,8 @@ export {
   type SlaViolation,
   shutdownSlaMonitor,
 } from "./sla-monitor";
+// SpanEvents constants and TelemetryEmitter (dual span-event + log emission)
+export { type SpanEventName, SpanEvents } from "./span-event-names";
 // Per-signal circuit breakers
 export {
   canExecuteSignal,
@@ -147,6 +165,7 @@ export {
   type TelemetrySignal,
   traceCircuitBreaker,
 } from "./telemetry-circuit-breaker";
+export { telemetryEmitter } from "./telemetry-emitter";
 // Tracing exports
 export {
   createCouchbaseGetSpan,
@@ -154,6 +173,5 @@ export {
   createCouchbaseSearchSpan,
   createDatabaseSpan,
 } from "./tracing/dbSpans";
-export type { LogContext, LogLevel, StructuredLogData } from "./winston-logger";
-// Logging exports (Winston-based with ECS field mapping and OTLP transport)
-export { debug, err, error, log, telemetryLogger, warn, winstonTelemetryLogger } from "./winston-logger";
+export type { LogLevel, StructuredLogData } from "./winston-logger";
+export { telemetryLogger, winstonTelemetryLogger } from "./winston-logger";

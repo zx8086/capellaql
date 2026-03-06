@@ -85,6 +85,7 @@ export function validateApplicationConfig(config: ApplicationConfig, isProductio
 
   // Validate port availability (basic check)
   if (config.PORT < 1024 && !isProduction) {
+    // console: runs before telemetry initialization
     console.warn(`Port ${config.PORT} is a privileged port - ensure proper permissions`);
   }
 

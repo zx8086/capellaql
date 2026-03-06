@@ -2,6 +2,7 @@
 
 import { type Counter, context, type Histogram, metrics, trace, type UpDownCounter } from "@opentelemetry/api";
 import { withCardinalityCheck } from "../../lib/metricsCardinalityManager";
+import { getLogger } from "../../logging/container";
 import { telemetryHealthMonitor } from "../health/telemetryHealth";
 
 let dbOperationCounter: Counter | undefined;
@@ -20,7 +21,7 @@ export interface DatabaseMetricsLabels {
 
 export function initializeDatabaseMetrics(): void {
   if (isInitialized) {
-    console.warn("Database metrics already initialized");
+    getLogger().warn("Database metrics already initialized");
     return;
   }
 
@@ -47,7 +48,10 @@ export function initializeDatabaseMetrics(): void {
 
     isInitialized = true;
   } catch (error) {
-    console.error("Error initializing database metrics:", error);
+    getLogger().error("Error initializing database metrics", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
     telemetryHealthMonitor.recordExporterFailure("metrics", error as Error);
   }
 }
@@ -62,7 +66,7 @@ export function recordDatabaseOperation(
   errorType?: string
 ): void {
   if (!isInitialized) {
-    console.warn("Database metrics not initialized, skipping operation recording");
+    getLogger().warn("Database metrics not initialized, skipping operation recording");
     return;
   }
 
@@ -114,7 +118,10 @@ export function recordDatabaseOperation(
     telemetryHealthMonitor.recordExporterSuccess("metrics");
     circuitBreaker.recordSuccess();
   } catch (error) {
-    console.error("Error recording database operation metrics:", error);
+    getLogger().error("Error recording database operation metrics", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
     telemetryHealthMonitor.recordExporterFailure("metrics", error as Error);
     circuitBreaker.recordFailure();
   }
@@ -135,7 +142,10 @@ export function recordConnectionChange(delta: number, bucket: string): void {
     telemetryHealthMonitor.recordExporterSuccess("metrics");
     circuitBreaker.recordSuccess();
   } catch (error) {
-    console.error("Error recording connection change:", error);
+    getLogger().error("Error recording connection change", {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
     telemetryHealthMonitor.recordExporterFailure("metrics", error as Error);
     circuitBreaker.recordFailure();
   }
@@ -184,7 +194,10 @@ export function recordSLIMetric(
     telemetryHealthMonitor.recordExporterSuccess("metrics");
     circuitBreaker.recordSuccess();
   } catch (error) {
-    console.error(`Error recording SLI metric ${sliName}:`, error);
+    getLogger().error(`Error recording SLI metric ${sliName}`, {
+      "error.type": error instanceof Error ? error.name : "Error",
+      "error.message": error instanceof Error ? error.message : String(error),
+    });
     telemetryHealthMonitor.recordExporterFailure("metrics", error as Error);
     circuitBreaker.recordFailure();
   }
