@@ -1,92 +1,222 @@
-# CapellaQL Caching Implementation Guide
+# CapellaQL Caching Architecture
 
-This document provides a comprehensive overview of the caching architecture, implementation details, and performance tracking system in CapellaQL.
+Comprehensive documentation of all caching layers in CapellaQL, from HTTP-level ETag validation through GraphQL response caching, SQLite entity storage, DataLoader request batching, and the Map-based fallback cache.
 
 ## Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
-2. [Two-Tier Cache System](#two-tier-cache-system)
-3. [SQLite Cache Implementation](#sqlite-cache-implementation)
-4. [Entity-Level Caching](#entity-level-caching)
-5. [Cache Key Generation](#cache-key-generation)
-6. [Performance Tracking](#performance-tracking)
-7. [Monitoring & Health Endpoints](#monitoring--health-endpoints)
-8. [Best Practices](#best-practices)
+2. [Tier 1: GraphQL Yoga Response Cache](#tier-1-graphql-yoga-response-cache)
+3. [Tier 2: SQLiteGraphQLCache Adapter](#tier-2-sqlitegraphqlcache-adapter)
+4. [Tier 3: Entity-Level SQLite Cache](#tier-3-entity-level-sqlite-cache)
+5. [Tier 4: DataLoader Request Batching](#tier-4-dataloader-request-batching)
+6. [Fallback: QueryCache Map-based Cache](#fallback-querycache-map-based-cache)
+7. [HTTP Caching: ETag Support](#http-caching-etag-support)
+8. [Cache Key Generation](#cache-key-generation)
+9. [Performance Tracking](#performance-tracking)
+10. [Monitoring & Health Endpoints](#monitoring--health-endpoints)
+11. [Configuration Reference](#configuration-reference)
+12. [Cache Cleanup & Lifecycle](#cache-cleanup--lifecycle)
+13. [Debugging & Bypass](#debugging--bypass)
+14. [Best Practices](#best-practices)
+15. [File Reference](#file-reference)
 
 ---
 
 ## Architecture Overview
 
-CapellaQL implements a sophisticated two-tier caching system designed for high-performance GraphQL operations:
+CapellaQL implements a multi-tier caching architecture with four distinct layers plus HTTP-level ETag caching for health endpoints:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    GraphQL Request                              │
+│                    Client Request                                │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│              GraphQL Yoga Response Cache (HTTP Level)           │
-│         - ETag-based HTTP caching for identical queries         │
-│         - Automatic cache invalidation                          │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               withPerformanceTracking Wrapper                   │
-│         - Records execution time for every resolver call        │
-│         - Emits OpenTelemetry histogram metrics                 │
-│         - Stores recent operations for analysis                 │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│               Entity-Level SQLite Cache                         │
-│         - Individual entity caching per resolver                │
-│         - Cross-query entity reuse                              │
-│         - Fire-and-forget cache population                      │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                     Couchbase Database                          │
-│         - Primary data source (only on cache miss)              │
-└─────────────────────────────────────────────────────────────────┘
+                    ┌─────────┴──────────┐
+                    │                    │
+                    ▼                    ▼
+┌──────────────────────────┐ ┌──────────────────────────────────┐
+│   HTTP ETag Layer        │ │   GraphQL Endpoint (/graphql)    │
+│   (health endpoints)     │ │                                  │
+│   304 Not Modified       │ └──────────────────────────────────┘
+│   Cache-Control: 5s      │                │
+└──────────────────────────┘                ▼
+                          ┌──────────────────────────────────────┐
+                          │  Tier 1: GraphQL Yoga Response Cache │
+                          │  useResponseCache plugin             │
+                          │  Per-operation TTLs, session-aware   │
+                          │  x-yoga-cache: HIT header            │
+                          └──────────────────────────────────────┘
+                                            │
+                                            ▼
+                          ┌──────────────────────────────────────┐
+                          │  Tier 2: SQLiteGraphQLCache Adapter  │
+                          │  gql_response: key prefix            │
+                          │  100MB / 5-min cleanup               │
+                          └──────────────────────────────────────┘
+                                            │
+                                            ▼
+                          ┌──────────────────────────────────────┐
+                          │  withPerformanceTracking Wrapper     │
+                          │  Records duration, emits OTel        │
+                          └──────────────────────────────────────┘
+                                            │
+                                            ▼
+                          ┌──────────────────────────────────────┐
+                          │  Tier 3: Entity-Level SQLite Cache   │
+                          │  Per-resolver entity caching         │
+                          │  50MB / 1-min cleanup                │
+                          │  Cross-query entity reuse            │
+                          └──────────────────────────────────────┘
+                                            │
+                                            ▼
+                          ┌──────────────────────────────────────┐
+                          │  Tier 4: DataLoader Request Batching │
+                          │  Per-request, collection-grouped     │
+                          │  maxBatchSize: 100                   │
+                          └──────────────────────────────────────┘
+                                            │
+                                            ▼
+                          ┌──────────────────────────────────────┐
+                          │          Couchbase Database           │
+                          │  Primary data source (cache miss)    │
+                          └──────────────────────────────────────┘
+```
+
+### Summary Table
+
+| Tier | Scope | Storage | Typical TTL | Source File |
+|------|-------|---------|-------------|-------------|
+| HTTP ETag | Health endpoints | Client-side | 5 seconds (`max-age=5`) | `src/utils/etag.ts` |
+| Tier 1: Yoga Response Cache | Full GraphQL responses | In-memory (plugin) + SQLite adapter | 2-15 min per operation | `src/server/handlers/graphql.ts` |
+| Tier 2: SQLiteGraphQLCache | Response cache backing store | SQLite `:memory:` | Config-driven (default 15 min) | `src/lib/graphqlResponseCache.ts` |
+| Tier 3: Entity SQLite Cache | Individual entities per resolver | SQLite `:memory:` | 5-10 min | `src/lib/bunSQLiteCache.ts` |
+| Tier 4: DataLoader | Document batching per request | JavaScript Map (per-request) | Request-scoped (no TTL) | `src/lib/couchbase/data-loader.ts` |
+| Fallback: QueryCache | Non-Bun environments | JavaScript Map | 5 min (30 min stale) | `src/lib/queryCache.ts` |
+
+---
+
+## Tier 1: GraphQL Yoga Response Cache
+
+**Source**: `src/server/handlers/graphql.ts` (lines 26-131)
+
+The first caching tier operates at the GraphQL Yoga plugin level using `@graphql-yoga/plugin-response-cache`. It caches entire GraphQL responses keyed by operation, variables, and session.
+
+### CACHE_TTL Configuration
+
+Defined at the top of the handler file:
+
+```typescript
+const CACHE_TTL = {
+  default: config.application.YOGA_RESPONSE_CACHE_TTL, // 15 min from config
+  looks: 10 * 60 * 1000,                               // 10 min
+  lookDetails: 10 * 60 * 1000,                          // 10 min
+  looksSummary: 10 * 60 * 1000,                          // 10 min
+  optionsSummary: 5 * 60 * 1000,                         // 5 min
+  optionsProductView: 5 * 60 * 1000,                     // 5 min
+  getAllSeasonalAssignments: 5 * 60 * 1000,               // 5 min
+  getDivisionAssignment: 5 * 60 * 1000,                   // 5 min
+  imageDetails: 15 * 60 * 1000,                           // 15 min
+  searchDocuments: 2 * 60 * 1000,                         // 2 min
+};
+```
+
+### Per-Operation TTL Table
+
+| Schema Coordinate | TTL | Rationale |
+|-------------------|-----|-----------|
+| `Query.looks` | 10 min | Looks data changes infrequently |
+| `Query.lookDetails` | 10 min | Looks data changes infrequently |
+| `Query.looksSummary` | 10 min | Looks data changes infrequently |
+| `Query.optionsSummary` | 5 min | Options change moderately |
+| `Query.optionsProductView` | 5 min | Options change moderately |
+| `Query.getAllSeasonalAssignments` | 5 min | Assignments change infrequently |
+| `Query.getDivisionAssignment` | 5 min | Assignments change infrequently |
+| `Query.imageDetails` | 15 min | Static image data |
+| `Query.searchDocuments` | 2 min | Dynamic search results |
+| `__Schema`, `__Type`, `__Field`, `__InputValue`, `__EnumValue`, `__Directive` | 1 hour | Introspection types (dev tools) |
+| All other queries | 15 min | Default from `YOGA_RESPONSE_CACHE_TTL` |
+
+### Plugin Configuration
+
+```typescript
+useResponseCache({
+  enabled: (request) => {
+    const noCache = request.headers.get("x-no-cache");
+    const cacheControl = request.headers.get("cache-control");
+    if (noCache === "true" || cacheControl?.includes("no-cache")) {
+      return false;
+    }
+    return true;
+  },
+  session: (request) => {
+    const authHeader = request.headers.get("authorization");
+    return authHeader || null; // null = global cache
+  },
+  ttl: CACHE_TTL.default,
+  ttlPerSchemaCoordinate: { /* per-operation TTLs */ },
+  invalidateViaMutation: true,
+  includeExtensionMetadata: config.runtime.NODE_ENV === "development",
+})
+```
+
+### Key Behaviors
+
+- **Cache bypass**: Send `x-no-cache: true` or `Cache-Control: no-cache` to skip the response cache
+- **Session-based caching**: The `Authorization` header value is used as the session key. Authenticated requests are cached separately per user token. Unauthenticated requests share a global cache.
+- **Mutation invalidation**: `invalidateViaMutation: true` automatically purges cached responses when mutations return affected entities
+- **Response header**: Cached responses include `x-yoga-cache: HIT`
+- **Extension metadata**: In development mode, cache metadata is included in the GraphQL response extensions
+- **Cache hit logging**: A plugin logs `"Cache HIT"` for each response served from cache
+
+---
+
+## Tier 2: SQLiteGraphQLCache Adapter
+
+**Source**: `src/lib/graphqlResponseCache.ts`
+
+The `SQLiteGraphQLCache` class wraps a dedicated `BunSQLiteCache` instance to serve as the backing store for the Yoga response cache plugin. It implements the `Cache` interface (`get`, `set`, `delete`).
+
+### Configuration
+
+This adapter creates its **own** `BunSQLiteCache` instance, separate from the default entity cache singleton:
+
+| Setting | SQLiteGraphQLCache (Response) | Default `bunSQLiteCache` (Entity) |
+|---------|-------------------------------|-----------------------------------|
+| `maxMemoryMB` | 100 MB | 50 MB |
+| `defaultTtlMs` | `config.application.YOGA_RESPONSE_CACHE_TTL` (default 900,000ms / 15 min) | 300,000ms (5 min) |
+| `cleanupIntervalMs` | 300,000ms (5 min) | 60,000ms (1 min) |
+| `maxEntries` | 10,000 | 10,000 |
+| `compressionThreshold` | 1,024 bytes (1 KB) | 1,024 bytes (1 KB) |
+| Key prefix | `gql_response:` | None |
+
+### Helper Functions
+
+| Function | Purpose |
+|----------|---------|
+| `buildGraphQLCacheKey(data)` | Creates a deterministic string key from `operationName`, `source` (first 200 chars), and sorted `variableValues` |
+| `shouldCacheOperation(name, source)` | Returns `false` for mutations and `IntrospectionQuery`/`__schema` queries |
+| `getOperationTTL(operationName)` | Returns TTL in **seconds** for known operations (looks: 300s, optionsSummary: 180s, imageDetails: 600s, searchDocuments: 120s, assignments: 300s; default: 300s) |
+| `getSessionId()` | Currently returns `null` (global caching); placeholder for future user-specific cache partitioning |
+
+### Singleton
+
+A global instance is exported as `sqliteGraphQLCache`:
+
+```typescript
+export const sqliteGraphQLCache = new SQLiteGraphQLCache();
 ```
 
 ---
 
-## Two-Tier Cache System
+## Tier 3: Entity-Level SQLite Cache
 
-### Tier 1: GraphQL Yoga Response Cache
+**Source**: `src/lib/bunSQLiteCache.ts`
 
-The first tier operates at the HTTP level using GraphQL Yoga's built-in response cache:
+The entity-level cache stores individual records (entities) in an in-memory SQLite database using Bun's native `bun:sqlite`. This enables cross-query entity reuse: an entity cached by one resolver can be returned by another without hitting Couchbase.
 
-- **ETag-based validation**: Clients can use `If-None-Match` headers
-- **Automatic cache invalidation**: Based on mutation operations
-- **Response-level caching**: Caches entire GraphQL responses
-
-**Location**: Configured in GraphQL Yoga server setup
-
-### Tier 2: Entity-Level SQLite Cache
-
-The second tier operates at the resolver level using Bun's native SQLite:
-
-- **Entity-level granularity**: Individual records are cached
-- **Cross-query reuse**: Entities cached by one query can be reused by others
-- **Fire-and-forget**: Cache population doesn't block responses
-
-**Location**: `src/lib/bunSQLiteCache.ts`
-
----
-
-## SQLite Cache Implementation
+This tier uses the **default `bunSQLiteCache` singleton** (50 MB, 1-min cleanup, 5-min TTL). See the comparison table in [Tier 2](#configuration) for differences from the response cache instance.
 
 ### Core Class: `BunSQLiteCache`
-
-The cache uses Bun's native SQLite database for high-performance key-value storage.
-
-**Configuration options:**
 
 ```typescript
 interface BunSQLiteCacheConfig {
@@ -111,7 +241,6 @@ CREATE TABLE cache (
   size INTEGER DEFAULT 0
 ) WITHOUT ROWID;
 
--- Performance indexes
 CREATE INDEX idx_expires_at ON cache(expires_at);
 CREATE INDEX idx_last_accessed ON cache(last_accessed);
 CREATE INDEX idx_hit_count ON cache(hit_count DESC);
@@ -120,60 +249,44 @@ CREATE INDEX idx_hit_count ON cache(hit_count DESC);
 ### Key Features
 
 1. **Prepared Statements**: All queries use prepared statements for maximum performance
-2. **Automatic Cleanup**: Expired entries are cleaned up every minute
-3. **LRU Eviction**: When memory limits are reached, least-recently-used entries are evicted
+2. **Automatic Cleanup**: Expired entries purged on configurable interval
+3. **LRU Eviction**: When memory or entry count limits are reached, entries are evicted by `last_accessed ASC, hit_count ASC`
 4. **Memory Management**: Automatic eviction when `maxMemoryMB` is exceeded
-5. **Hit Tracking**: Each cache entry tracks hit count and last access time
+5. **Hit Tracking**: Each entry tracks `hit_count` and `last_accessed` timestamp
 
 ### Usage Pattern
 
 ```typescript
 import { withSQLiteCache, SQLiteCacheKeys } from "$lib/bunSQLiteCache";
 
-// Basic usage with helper function
 const result = await withSQLiteCache(
   SQLiteCacheKeys.looks(brand, season, division),
   async () => {
-    // Fetch from database
     return await cluster.query(...);
   },
   5 * 60 * 1000 // 5-minute TTL
 );
 ```
 
----
+### Entity Caching Functions
 
-## Entity-Level Caching
-
-### Concept
-
-Entity-level caching stores individual records (entities) separately from query results, enabling cache reuse across different queries that access the same data.
-
-### Implementation
-
-**Location**: `src/lib/bunSQLiteCache.ts` - `cacheEntities()` and `getEntity()` functions
+**`cacheEntities(data, keyExtractor, options)`**: Fire-and-forget cache population. Uses `setImmediate` to avoid blocking the response.
 
 ```typescript
-// Cache entities from a query result
-cacheEntities(
-  data,                                    // Array or single entity
-  (item) => SQLiteCacheKeys.entityLook(item.documentKey),  // Key extractor
-  {
-    requiredFields: ['documentKey'],       // Fields that must exist
-    ttlMs: 10 * 60 * 1000,                // 10-minute TTL
-    userScoped: false,                     // User-specific caching
-  }
-);
-
-// Retrieve a cached entity
-const cached = await getEntity<LookType>(
-  SQLiteCacheKeys.entityLook(documentKey)
-);
+cacheEntities(data, (item) => SQLiteCacheKeys.entityLook(item.documentKey), {
+  requiredFields: ['documentKey'],
+  ttlMs: 10 * 60 * 1000,
+  userScoped: false,
+});
 ```
 
-### Entity Cache Keys
+**`getEntity<T>(baseKey, options?)`**: Retrieve a cached entity with optional user scoping.
 
-Predefined entity cache key generators:
+```typescript
+const cached = await getEntity<LookType>(SQLiteCacheKeys.entityLook(documentKey));
+```
+
+### Entity Cache Key Table
 
 | Key Generator | Pattern | Usage |
 |--------------|---------|-------|
@@ -185,13 +298,12 @@ Predefined entity cache key generators:
 ### Resolver Implementation Example
 
 ```typescript
-// src/graphql/resolvers/getDivisionalAssignment.ts
 const getDivisionAssignmentResolver = withValidation(
   GetDivisionAssignmentArgsSchema,
   async (_: unknown, args: GetDivisionAssignmentArgs, context: GraphQLContext) => {
     const { styleSeasonCode, companyCode, divisionCode } = args;
 
-    // 1. Check entity cache first (may be populated by another query)
+    // 1. Check entity cache first
     const entityKey = SQLiteCacheKeys.entityDivisionAssignment(
       styleSeasonCode, companyCode, divisionCode
     );
@@ -199,32 +311,145 @@ const getDivisionAssignmentResolver = withValidation(
       userScoped: true,
       userId: context.user?.id,
     });
-    if (cached) {
-      return cached;  // Cache hit - return immediately
-    }
+    if (cached) return cached;
 
-    // 2. Cache miss - fetch from database with query-level caching
-    return await withSQLiteCache(
-      entityKey,
-      async () => {
-        const result = await cluster.query(...);
-        const data = result.rows[0][0];
+    // 2. Cache miss - fetch with query-level caching
+    return await withSQLiteCache(entityKey, async () => {
+      const result = await cluster.query(...);
+      const data = result.rows[0][0];
 
-        // 3. Cache as entity for future reuse
-        cacheEntities(data, () => entityKey, {
-          requiredFields: ['styleSeasonCode', 'companyCode'],
-          ttlMs: 5 * 60 * 1000,
-          userScoped: true,
-          userId: context.user?.id,
-        });
+      // 3. Cache as entity for future reuse
+      cacheEntities(data, () => entityKey, {
+        requiredFields: ['styleSeasonCode', 'companyCode'],
+        ttlMs: 5 * 60 * 1000,
+        userScoped: true,
+        userId: context.user?.id,
+      });
 
-        return data;
-      },
-      5 * 60 * 1000
-    );
+      return data;
+    }, 5 * 60 * 1000);
   }
 );
 ```
+
+---
+
+## Tier 4: DataLoader Request Batching
+
+**Source**: `src/lib/couchbase/data-loader.ts`, `src/graphql/context.ts`
+
+DataLoader provides per-request document batching and deduplication. A new `DataLoader` instance is created for each GraphQL request in `contextFactory()`.
+
+### How It Works
+
+1. **Per-request creation**: `contextFactory()` calls `createDocumentDataLoader()` for every incoming request
+2. **Key grouping**: Keys are grouped by `{bucket}.{scope}.{collection}` for parallel execution
+3. **Batch execution**: All document `get()` calls within the same tick are batched together
+4. **Request-scoped caching**: Results are cached within the request's lifetime — no TTL, no eviction, garbage collected after the request completes
+
+### Configuration
+
+```typescript
+new DataLoader(batchGetDocuments, {
+  cache: true,            // Cache results within this request
+  maxBatchSize: 100,      // Maximum keys per batch
+  batchScheduleFn: (callback) => process.nextTick(callback), // Immediate batching
+});
+```
+
+### Context Factory
+
+```typescript
+// src/graphql/context.ts
+export function contextFactory({ request }: { request: Request }): GraphQLContext {
+  const dataLoader = createDocumentDataLoader(); // New instance per request
+  return {
+    requestId: ulid(),
+    dataLoader,
+    // ...
+  };
+}
+```
+
+### Key Characteristics
+
+- **No cross-request caching**: Each request gets a fresh DataLoader. Entities fetched in request A are not available to request B via DataLoader.
+- **Deduplication**: If the same document key is requested multiple times within a single request, it is fetched only once.
+- **Parallel collection execution**: Keys targeting different collections are fetched in parallel via `Promise.all`.
+- **Error isolation**: Per-key error handling with specific Couchbase error classification (DocumentNotFoundError, AuthenticationFailureError, AmbiguousTimeoutError, etc.).
+
+---
+
+## Fallback: QueryCache Map-based Cache
+
+**Source**: `src/lib/queryCache.ts`
+
+A `Map`-based LRU cache with stale-while-revalidate semantics. Used as a fallback when `BunSQLiteCache` is unavailable (non-Bun environments).
+
+### Configuration
+
+```typescript
+const defaultConfig: CacheConfig = {
+  defaultTtl: 5 * 60 * 1000,       // 5 minutes
+  maxSize: 1000,                     // 1,000 entries
+  maxMemory: 10 * 1024 * 1024,      // 10 MB
+  cleanupInterval: 60 * 1000,       // 1 minute
+  staleTolerance: 30 * 60 * 1000,   // 30 minutes
+};
+```
+
+### Stale-While-Revalidate Pattern
+
+When a primary cache entry expires:
+1. The expired entry is moved to a **stale cache** via `moveToStale()`
+2. The fetcher function is called for fresh data
+3. If the fetcher **fails**, `getStale()` returns the stale entry (if within the 30-minute tolerance window)
+4. `stats.staleHits` tracks how often stale data is served
+
+### Exports
+
+| Export | Type | Purpose |
+|--------|------|---------|
+| `defaultQueryCache` | `QueryCache` | Singleton instance |
+| `withCache(key, fetcher, ttl?)` | Function | Get-or-set helper |
+| `CacheKeys` | Object | Predefined key generators for common operations |
+
+### When Used
+
+The `QueryCache` is the fallback for environments where `BunSQLiteCache` cannot initialize (Bun runtime not detected). In standard Bun deployments, the SQLite cache is preferred. Both caches are instantiated, and the `/health/cache` endpoint reports stats for both.
+
+---
+
+## HTTP Caching: ETag Support
+
+**Source**: `src/utils/etag.ts`, `src/server/handlers/health.ts`
+
+Health endpoints use HTTP ETag caching for efficient conditional requests.
+
+### Functions
+
+| Function | Purpose |
+|----------|---------|
+| `generateETag(body)` | SHA-256 weak ETag: `W/"<first 16 hex chars>"` using `Bun.CryptoHasher` |
+| `isETagMatch(request, etag)` | Checks `If-None-Match` header against current ETag (supports multiple tags and `*`) |
+| `jsonResponseWithETag(request, data, maxAge?, status?)` | Returns JSON with `ETag` + `Cache-Control: public, max-age={maxAge}` headers, or `304 Not Modified` if ETag matches |
+
+### Endpoint Coverage
+
+| Endpoint | Caching Strategy |
+|----------|-----------------|
+| `/health` | `jsonResponseWithETag` (ETag + `max-age=5`) |
+| `/health/telemetry` | `jsonResponseWithETag` (ETag + `max-age=5`) |
+| `/health/system` | `jsonResponseWithETag` (ETag + `max-age=5`) |
+| `/health/performance` | `jsonResponseWithETag` (ETag + `max-age=5`) |
+| `/health/cache` | `jsonResponseWithETag` (ETag + `max-age=5`) |
+| `/health/comprehensive` | `jsonResponseWithETag` (ETag + `max-age=5`) |
+| `/health/status` | `Cache-Control: no-cache, no-store, must-revalidate` (no caching) |
+| `/health/ready` | `Cache-Control: no-cache, no-store, must-revalidate` (no caching) |
+| `/health/live` | `Cache-Control: no-cache, no-store, must-revalidate` (no caching) |
+| `/health/summary` | No cache headers (plain JSON) |
+| `/health/performance/history` | No cache headers (plain JSON) |
+| `/health/telemetry/detailed` | No cache headers (plain JSON) |
 
 ---
 
@@ -232,7 +457,7 @@ const getDivisionAssignmentResolver = withValidation(
 
 ### Query Fingerprinting
 
-**Location**: `src/lib/queryFingerprint.ts`
+**Source**: `src/lib/queryFingerprint.ts`
 
 The `QueryFingerprintBuilder` uses Bun's SIMD-accelerated hashing for fast, collision-resistant cache key generation.
 
@@ -242,11 +467,11 @@ The `QueryFingerprintBuilder` uses Bun's SIMD-accelerated hashing for fast, coll
 import { QueryFingerprintBuilder } from "$lib/queryFingerprint";
 
 const cacheKey = QueryFingerprintBuilder
-  .for("getDivisionAssignment")           // Operation name
+  .for("getDivisionAssignment")
   .withVariables({ styleSeasonCode, companyCode, divisionCode })
-  .withUser(context.user?.id)             // Optional: user-specific caching
-  .withTimeBucket("hour")                 // Optional: time-based invalidation
-  .withPrefix("gql")                      // Optional: key prefix
+  .withUser(context.user?.id)
+  .withTimeBucket("hour")
+  .withPrefix("gql")
   .build();
 ```
 
@@ -254,14 +479,12 @@ const cacheKey = QueryFingerprintBuilder
 
 | Function | Purpose | Example Output |
 |----------|---------|----------------|
-| `generateHashedKey(input)` | SIMD-accelerated hashing | `"a7c3f8e2b1d9"` |
-| `generateOperationKey(op, vars)` | Operation + variables | `"hash-of-op-and-vars"` |
+| `generateHashedKey(input)` | SIMD-accelerated hashing via `Bun.hash()` | `"a7c3f8e2b1d9"` |
+| `generateOperationKey(op, vars)` | Operation + variables hash | `"hash-of-op-and-vars"` |
 | `createQueryFingerprint(name, vars, opts)` | Full fingerprint | `"prefix:hash"` |
 | `createPersistedQueryId(query)` | Normalized query hash | `"query-hash"` |
 
-### Predefined Cache Keys
-
-The `SQLiteCacheKeys` object provides consistent key generation:
+### Predefined Cache Keys (SQLiteCacheKeys)
 
 ```typescript
 SQLiteCacheKeys.looks(brand, season, division)
@@ -282,18 +505,7 @@ SQLiteCacheKeys.optionsSummary(salesOrg, season, div, active, channels)
 
 Every GraphQL resolver is wrapped with `withPerformanceTracking` to capture execution metrics.
 
-**Location**: `src/lib/graphqlPerformanceTracker.ts`
-
-### How It Works
-
-```typescript
-// Wrapping a resolver
-const wrappedResolver = withPerformanceTracking(
-  "Query",                    // Operation type
-  "getDivisionAssignment",    // Field name
-  getDivisionAssignmentResolver
-);
-```
+**Source**: `src/lib/graphqlPerformanceTracker.ts`
 
 ### Metrics Collected
 
@@ -305,29 +517,35 @@ const wrappedResolver = withPerformanceTracking(
 
 ### In-Memory Performance Data
 
-Recent operations are stored in memory for analysis:
+Recent operations are stored in memory (max 100 entries) for analysis:
 
 ```typescript
 interface GraphQLPerformanceData {
-  operationName: string;    // "Query"
-  fieldName: string;        // "looks"
-  duration: number;         // 373 (milliseconds)
-  success: boolean;         // true
-  error?: string;           // undefined or error message
-  timestamp: number;        // Date.now()
+  operationName: string;
+  fieldName: string;
+  duration: number;      // milliseconds
+  success: boolean;
+  error?: string;
+  timestamp: number;     // Date.now()
 }
 ```
 
-**Maximum stored operations**: 100 (configurable via `MAX_STORED_OPERATIONS`)
-
 ### Source Detection
 
-The performance tracker determines if a response came from cache or database based on timing:
+Cache vs database source is inferred from timing:
 
 ```typescript
-// Cache hits are typically < 10ms, DB fetches > 50ms
 source: op.duration < 10 ? "cache" : "database"
 ```
+
+### Performance Characteristics
+
+| Operation | Typical Timing |
+|-----------|---------------|
+| Database fetch | 100-500ms |
+| SQLite cache hit | 0-5ms |
+| Cache key generation | <1ms |
+| Entity cache lookup | 1-3ms |
 
 ---
 
@@ -335,7 +553,7 @@ source: op.duration < 10 ? "cache" : "database"
 
 ### `/health/graphql` Endpoint
 
-Provides comprehensive GraphQL resolver performance metrics.
+Provides per-resolver performance metrics with cache hit/miss analysis.
 
 **Example Response:**
 
@@ -362,24 +580,7 @@ Provides comprehensive GraphQL resolver performance metrics.
       "p95DurationMs": 373
     }
   ],
-  "recentOperations": [
-    {
-      "operationName": "Query",
-      "fieldName": "looks",
-      "duration": 373,
-      "success": true,
-      "timestamp": 1705315800000,
-      "source": "database"
-    },
-    {
-      "operationName": "Query",
-      "fieldName": "looks",
-      "duration": 2,
-      "success": true,
-      "timestamp": 1705315802000,
-      "source": "cache"
-    }
-  ],
+  "recentOperations": [...],
   "insights": {
     "cacheEffectiveness": 1,
     "slowResolvers": [],
@@ -391,7 +592,7 @@ Provides comprehensive GraphQL resolver performance metrics.
 
 ### `/health/cache` Endpoint
 
-Provides cache statistics and analytics:
+Reports stats for **both** cache instances (SQLite entity cache and Map-based fallback) with a `preferredCache` indicator:
 
 ```json
 {
@@ -426,6 +627,137 @@ Provides cache statistics and analytics:
 }
 ```
 
+The `preferredCache` field indicates which cache backend is active: `"sqlite"` when Bun is detected, `"map"` otherwise.
+
+---
+
+## Configuration Reference
+
+All cache-related configuration settings in one place.
+
+### Environment-Configurable Settings
+
+| Setting | Env Var | Zod Validation | Default | Source |
+|---------|---------|----------------|---------|--------|
+| Yoga Response Cache TTL | `YOGA_RESPONSE_CACHE_TTL` | `number`, min 0, max 3,600,000 | 900,000ms (15 min) | `src/config/defaults.ts` |
+
+### Constructor Defaults: BunSQLiteCache Instances
+
+| Setting | Entity Cache (default singleton) | Response Cache (SQLiteGraphQLCache) |
+|---------|----------------------------------|-------------------------------------|
+| `maxMemoryMB` | 50 | 100 |
+| `defaultTtlMs` | 300,000 (5 min) | `YOGA_RESPONSE_CACHE_TTL` (900,000 / 15 min) |
+| `cleanupIntervalMs` | 60,000 (1 min) | 300,000 (5 min) |
+| `maxEntries` | 10,000 | 10,000 |
+| `compressionThreshold` | 1,024 bytes | 1,024 bytes |
+| Source file | `src/lib/bunSQLiteCache.ts:700` | `src/lib/graphqlResponseCache.ts:16-22` |
+
+### Constructor Defaults: QueryCache (Map-based)
+
+| Setting | Default |
+|---------|---------|
+| `defaultTtl` | 300,000ms (5 min) |
+| `maxSize` | 1,000 entries |
+| `maxMemory` | 10 MB |
+| `cleanupInterval` | 60,000ms (1 min) |
+| `staleTolerance` | 1,800,000ms (30 min) |
+
+### Per-Operation TTLs (Yoga Response Cache)
+
+| Operation | `CACHE_TTL` value | `getOperationTTL()` value |
+|-----------|-------------------|---------------------------|
+| looks / lookDetails / looksSummary | 600,000ms (10 min) | 300s (5 min) |
+| optionsSummary / optionsProductView | 300,000ms (5 min) | 180s (3 min) |
+| getAllSeasonalAssignments / getDivisionAssignment | 300,000ms (5 min) | 300s (5 min) |
+| imageDetails | 900,000ms (15 min) | 600s (10 min) |
+| searchDocuments | 120,000ms (2 min) | 120s (2 min) |
+| Introspection types (`__Schema` etc.) | 3,600,000ms (1 hr) | N/A |
+
+> **Note**: `CACHE_TTL` (in `graphql.ts`) uses milliseconds for the Yoga plugin. `getOperationTTL()` (in `graphqlResponseCache.ts`) returns seconds for the SQLite adapter layer. Only `YOGA_RESPONSE_CACHE_TTL` is configurable via environment variable; all other TTLs are hardcoded.
+
+---
+
+## Cache Cleanup & Lifecycle
+
+### Cleanup Intervals
+
+| Cache Instance | Cleanup Interval | What It Does |
+|----------------|-----------------|--------------|
+| Entity cache (`bunSQLiteCache` singleton) | Every 1 minute | Deletes rows where `expires_at <= now` |
+| Response cache (`SQLiteGraphQLCache`) | Every 5 minutes | Deletes rows where `expires_at <= now` |
+| QueryCache (`defaultQueryCache`) | Every 1 minute | Moves expired entries to stale cache; purges expired stale entries |
+
+### Cleanup Log Format
+
+When entries are cleaned, the entity cache logs:
+
+```
+"SQLite cache cleanup completed" { cleaned: <n>, remaining: <n>, cacheOperation: "cleanup" }
+```
+
+**Interpreting the logs**: If you see `cleaned: 3972, remaining: 0`, it means 3,972 entries expired and were purged in that cleanup cycle, with zero entries left. This is normal behavior during low-traffic periods or after a TTL window expires — cached entries drain down to zero when no new requests repopulate them.
+
+### Eviction Strategy
+
+When capacity limits are reached during a `set()` operation:
+
+1. **Expired entries first**: `DELETE FROM cache WHERE expires_at <= ?`
+2. **LRU eviction**: If still over limit, evict in batches of 10% of `maxEntries`, ordered by `last_accessed ASC, hit_count ASC`
+3. **Memory pressure eviction**: If `totalSize + newEntrySize > maxMemoryBytes`, evict LRU entries until enough space is freed (with 10% buffer)
+
+### Shutdown
+
+Calling `destroy()` on either cache:
+- **BunSQLiteCache**: Stops the cleanup `setInterval` timer, closes the SQLite database
+- **QueryCache**: Stops the cleanup timer, calls `clear()` on all internal Maps
+
+---
+
+## Debugging & Bypass
+
+### Bypass Headers (Request)
+
+| Header | Value | Effect |
+|--------|-------|--------|
+| `x-no-cache` | `true` | Disables Yoga response cache for this request |
+| `Cache-Control` | `no-cache` | Disables Yoga response cache for this request |
+| `If-None-Match` | ETag value | Triggers 304 Not Modified for health endpoints (if ETag matches) |
+
+### Response Headers
+
+| Header | Value | Meaning |
+|--------|-------|---------|
+| `x-yoga-cache` | `HIT` | Response was served from Yoga response cache |
+| `ETag` | `W/"<hash>"` | Weak ETag for conditional requests (health endpoints) |
+| `Cache-Control` | `public, max-age=5` | Client-side caching for health endpoints |
+
+### Debugging Commands
+
+```bash
+# Check GraphQL resolver cache hit rates
+curl -sf http://localhost:4000/health/graphql | jq '.resolvers[] | {resolver, cacheHitRate}'
+
+# View cache stats (both SQLite and Map)
+curl -sf http://localhost:4000/health/cache | jq '.'
+
+# View top cached keys
+curl -sf http://localhost:4000/health/cache | jq '.sqlite.analytics.topKeys'
+
+# Force cache bypass for a GraphQL query
+curl -sf http://localhost:4000/graphql \
+  -H "Content-Type: application/json" \
+  -H "x-no-cache: true" \
+  -d '{"query":"{ looks(brand:\"TH\", season:\"F25\", division:\"01\") { documentKey } }"}'
+
+# Test ETag 304 response on health endpoint
+ETAG=$(curl -si http://localhost:4000/health | grep -i etag | awk '{print $2}' | tr -d '\r')
+curl -si http://localhost:4000/health -H "If-None-Match: $ETAG" | head -1
+# Expected: HTTP/1.1 304 Not Modified
+
+# View recent operations timing
+curl -sf http://localhost:4000/health/graphql | jq '.recentOperations[-5:]'
+```
+
 ---
 
 ## Best Practices
@@ -433,12 +765,10 @@ Provides cache statistics and analytics:
 ### 1. Use Entity Caching for Cross-Query Reuse
 
 ```typescript
-// Check entity cache before query cache
 const entityKey = SQLiteCacheKeys.entityLook(documentKey);
 const cached = await getEntity<LookType>(entityKey);
 if (cached) return cached;
 
-// Then use query cache with entity population
 return await withSQLiteCache(entityKey, async () => {
   const data = await fetchFromDb();
   cacheEntities(data, keyExtractor, options);
@@ -469,30 +799,36 @@ cacheEntities(data, keyExtractor, {
 
 ```typescript
 cacheEntities(data, keyExtractor, {
-  requiredFields: ['documentKey', 'title'],  // Only cache complete entities
+  requiredFields: ['documentKey', 'title'],
 });
 ```
 
 ### 5. Monitor Cache Performance
 
-Use the Zed tasks or curl commands to regularly check:
-
 ```bash
-# Cache hit rate
 curl -sf http://localhost:4000/health/graphql | jq '.resolvers[] | {resolver, cacheHitRate}'
-
-# Recent operations timing
 curl -sf http://localhost:4000/health/graphql | jq '.recentOperations[-5:]'
 ```
 
 ### 6. Log Cache Operations
 
-The cache system logs all operations for debugging:
-
+The cache system logs all operations:
 - Cache hits: `"SQLite cache hit"` with key, hit count, age
 - Cache sets: `"SQLite cache set"` with key, size, TTL
 - Evictions: `"SQLite cache LRU eviction"` with count
 - Entity population: `"Entity cache populated"` with count
+
+### 7. Understand the Cache Hierarchy
+
+Don't duplicate caching across tiers. The Yoga response cache (Tier 1) caches entire GraphQL responses. If Tier 1 returns a HIT, Tiers 2-4 are never invoked for that request. Entity caching (Tier 3) is for cross-query reuse at the resolver level. DataLoader (Tier 4) deduplicates within a single request. Each tier serves a different purpose.
+
+### 8. Configure TTLs Per Operation Type
+
+Use `ttlPerSchemaCoordinate` in the Yoga plugin for response-level TTLs and `withSQLiteCache()` TTL parameter for entity-level TTLs. Static data (images) should have longer TTLs; dynamic data (search) should have shorter ones.
+
+### 9. Monitor the Dual-Instance Setup
+
+The `/health/cache` endpoint reports the default entity cache singleton stats. The response cache (Tier 2) is a separate SQLiteGraphQLCache instance. Be aware that the health endpoint's `sqlite` section reflects only the entity cache, not the response cache.
 
 ---
 
@@ -500,40 +836,17 @@ The cache system logs all operations for debugging:
 
 | File | Purpose |
 |------|---------|
-| `src/lib/bunSQLiteCache.ts` | SQLite cache implementation, entity caching |
+| `src/server/handlers/graphql.ts` | Yoga response cache plugin configuration, CACHE_TTL definitions |
+| `src/lib/graphqlResponseCache.ts` | SQLiteGraphQLCache adapter wrapping BunSQLiteCache for Yoga |
+| `src/lib/bunSQLiteCache.ts` | SQLite cache implementation, entity caching, key generation |
+| `src/lib/queryCache.ts` | Map-based LRU cache with stale-while-revalidate (fallback) |
+| `src/lib/couchbase/data-loader.ts` | DataLoader batch function and factory |
+| `src/graphql/context.ts` | Per-request DataLoader creation in contextFactory |
+| `src/utils/etag.ts` | ETag generation, matching, and jsonResponseWithETag helper |
+| `src/server/handlers/health.ts` | Health check endpoints using ETag caching |
 | `src/lib/queryFingerprint.ts` | Cache key generation utilities |
 | `src/lib/graphqlPerformanceTracker.ts` | Performance tracking wrapper |
-| `src/lib/queryCache.ts` | Map-based cache (fallback) |
-| `src/server/handlers/health.ts` | Health check endpoints |
-| `src/graphql/resolvers/*.ts` | Resolver implementations using caching |
-
----
-
-## SQLite Cache (Bun-Native Implementation)
-
-The `BunSQLiteCache` class (`src/lib/bunSQLiteCache.ts`) provides a high-performance, Bun-native in-memory SQLite cache as the primary caching layer.
-
-- **Engine**: Uses `bun:sqlite` with an in-memory database (`:memory:`) and prepared statements for maximum throughput.
-- **TTL management**: Each entry has an `expires_at` timestamp. Expired entries are automatically purged on a configurable interval (default: 60 seconds).
-- **Eviction**: When `maxEntries` (default: 10,000) or `maxMemoryMB` (default: 50 MB) is exceeded, the cache evicts expired entries first, then falls back to LRU eviction (least recently accessed + lowest hit count).
-- **Compression support**: A `compressionThreshold` (default: 1 KB) is defined for future compression of large values. Values above the threshold are flagged for compression (currently a no-op with the infrastructure in place).
-- **Hit/miss analytics**: The cache tracks hits, misses, evictions, and per-entry hit counts. Detailed analytics (top keys, expiration distribution, memory distribution) are available via `getAnalytics()` and exposed at the `/health/cache` endpoint.
-- **Key generation**: Uses `Bun.hash()` (SIMD-accelerated) for fast, collision-resistant cache key hashing via `generateHashedKey()` and `generateOperationKey()`.
-- **Cleanup**: Call `destroy()` during shutdown to stop the cleanup timer and close the SQLite database.
-
----
-
-## Performance Characteristics
-
-| Operation | Typical Timing |
-|-----------|---------------|
-| Database fetch | 100-500ms |
-| SQLite cache hit | 0-5ms |
-| Cache key generation | <1ms |
-| Entity cache lookup | 1-3ms |
-
-**Expected cache hit improvement**: 50-200x faster than database fetches
-
----
-
-*Last updated: 2024*
+| `src/config/defaults.ts` | Default YOGA_RESPONSE_CACHE_TTL value (900,000ms) |
+| `src/config/schemas.ts` | Zod validation for YOGA_RESPONSE_CACHE_TTL (0-3,600,000) |
+| `src/config/envMapping.ts` | Environment variable mapping for YOGA_RESPONSE_CACHE_TTL |
+| `src/graphql/resolvers/*.ts` | Resolver implementations using entity caching |
