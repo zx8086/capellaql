@@ -113,7 +113,7 @@ class MetricsCardinalityManager {
       });
     }
 
-    log(`Cardinality limit set for metric: ${metricName}`, newLimit);
+    log(`Cardinality limit set for metric: ${metricName}`, newLimit as unknown as Record<string, unknown>);
   }
 
   /**

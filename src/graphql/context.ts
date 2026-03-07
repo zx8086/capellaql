@@ -26,7 +26,7 @@ export function contextFactory({ request }: { request: Request }): GraphQLContex
 
   // Extract client information for security and debugging
   const clientIp = getClientIp(request);
-  const userAgent = request.headers.get("user-agent");
+  const userAgent = request.headers.get("user-agent") ?? undefined;
 
   // Create a new DataLoader instance per request for proper caching isolation
   const dataLoader = createDocumentDataLoader();

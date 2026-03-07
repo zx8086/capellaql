@@ -15,7 +15,7 @@ import {
   CasMismatchError,
   DocumentExistsError,
   DocumentNotFoundError,
-  type TransactionAttempt,
+  type TransactionAttemptContext,
   TransactionCommitAmbiguousError,
   type TransactionGetResult,
   Transactions,
@@ -67,7 +67,7 @@ export class CouchbaseTransactionHandler {
    * Execute a transaction with comprehensive error handling.
    */
   static async executeTransaction<T>(
-    transactionLogic: (ctx: TransactionAttempt) => Promise<T>,
+    transactionLogic: (ctx: TransactionAttemptContext) => Promise<T>,
     context: TransactionOperationContext,
     config: TransactionConfig = {}
   ): Promise<T> {
@@ -102,12 +102,15 @@ export class CouchbaseTransactionHandler {
           });
 
           // Execute transaction
-          const transactions = Transactions.create();
+          const { connectionManager } = await import("$lib/couchbase");
+          const conn = await connectionManager.getConnection();
+          const transactions = new Transactions(conn.cluster);
 
-          const txnResult = await transactions.run(
-            async (ctx: TransactionAttempt) => {
+          let txnResult: T | undefined;
+          await transactions.run(
+            async (ctx: TransactionAttemptContext) => {
               try {
-                return await transactionLogic(ctx);
+                txnResult = await transactionLogic(ctx);
               } catch (error) {
                 // Handle transaction-specific errors within the transaction
                 CouchbaseTransactionHandler.handleInTransactionError(error, enhancedContext);
@@ -138,7 +141,7 @@ export class CouchbaseTransactionHandler {
             collection: context.collection,
           });
 
-          return txnResult;
+          return txnResult as T;
         } catch (error) {
           _lastError = error as Error;
 
@@ -201,7 +204,7 @@ export class CouchbaseTransactionHandler {
    * Safe get operation within a transaction.
    */
   static async safeGet(
-    ctx: TransactionAttempt,
+    ctx: TransactionAttemptContext,
     collection: any,
     key: string,
     operationContext: TransactionOperationContext
@@ -230,7 +233,7 @@ export class CouchbaseTransactionHandler {
    * Safe insert operation within a transaction.
    */
   static async safeInsert(
-    ctx: TransactionAttempt,
+    ctx: TransactionAttemptContext,
     collection: any,
     key: string,
     content: any,
@@ -254,7 +257,7 @@ export class CouchbaseTransactionHandler {
    * Safe replace operation within a transaction.
    */
   static async safeReplace(
-    ctx: TransactionAttempt,
+    ctx: TransactionAttemptContext,
     doc: TransactionGetResult,
     content: any,
     operationContext: TransactionOperationContext
@@ -463,7 +466,7 @@ export class CouchbaseTransactionHandler {
    * Utility method for batch operations within a transaction.
    */
   static async batchOperation<T>(
-    operations: Array<(ctx: TransactionAttempt) => Promise<T>>,
+    operations: Array<(ctx: TransactionAttemptContext) => Promise<T>>,
     context: TransactionOperationContext,
     config?: TransactionConfig
   ): Promise<T[]> {

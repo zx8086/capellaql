@@ -13,7 +13,22 @@ describe("Configuration Hot-Reload System", () => {
 
   // Store original environment for restoration
   const originalEnv = { ...process.env };
-  const originalBunEnv = typeof Bun !== "undefined" ? { ...Bun.env } : {};
+
+  /** Restore environment variables to their original state without reassigning process.env */
+  function restoreEnv() {
+    // Remove keys that weren't in the original environment
+    for (const key of Object.keys(process.env)) {
+      if (!(key in originalEnv)) {
+        delete process.env[key];
+      }
+    }
+    // Restore original values
+    for (const [key, value] of Object.entries(originalEnv)) {
+      if (value !== undefined) {
+        process.env[key] = value;
+      }
+    }
+  }
 
   beforeAll(async () => {
     // Create test config directory
@@ -29,19 +44,11 @@ describe("Configuration Hot-Reload System", () => {
       // Ignore cleanup errors
     }
 
-    // Restore original environment
-    process.env = { ...originalEnv };
-    if (typeof Bun !== "undefined") {
-      Object.assign(Bun.env, originalBunEnv);
-    }
+    restoreEnv();
   });
 
   beforeEach(async () => {
-    // Reset environment before each test
-    process.env = { ...originalEnv };
-    if (typeof Bun !== "undefined") {
-      Object.assign(Bun.env, originalBunEnv);
-    }
+    restoreEnv();
   });
 
   afterEach(async () => {
@@ -75,7 +82,13 @@ describe("Configuration Hot-Reload System", () => {
       const nonExistentFile = path.join(testConfigDir, ".env.nonexistent");
 
       // Should not throw error for missing files
-      await expect(configHotReload.initialize([nonExistentFile])).resolves.not.toThrow();
+      let threw = false;
+      try {
+        await configHotReload.initialize([nonExistentFile]);
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(false);
 
       const status = configHotReload.getStatus();
       expect(status.enabled).toBe(true);
@@ -95,12 +108,21 @@ describe("Configuration Hot-Reload System", () => {
 
   describe("Configuration Validation", () => {
     test("should reject configuration with missing required variables", async () => {
+      const validConfig = `
+        COUCHBASE_URL=couchbase://test-cluster
+        COUCHBASE_USERNAME=test-user
+        COUCHBASE_BUCKET=test-bucket
+        APPLICATION_PORT=4001
+      `;
+
       const invalidConfig = `
         # Missing COUCHBASE_URL, COUCHBASE_USERNAME, COUCHBASE_BUCKET
         APPLICATION_PORT=4001
       `;
 
-      await writeFile(testEnvFile, invalidConfig);
+      // Initialize with valid config first
+      await writeFile(testEnvFile, validConfig);
+      await configHotReload.initialize([testEnvFile]);
 
       let validationFailedEventFired = false;
       let validationErrors: string[] = [];
@@ -110,11 +132,9 @@ describe("Configuration Hot-Reload System", () => {
         validationErrors = event.errors || [];
       });
 
-      await configHotReload.initialize([testEnvFile]);
-
-      // Trigger reload by modifying the file
-      await writeFile(testEnvFile, `${invalidConfig}\n# Modified`);
-      await setTimeout(500); // Wait for file watcher to detect change
+      // Trigger reload by writing invalid config (removes required vars)
+      await writeFile(testEnvFile, invalidConfig);
+      await setTimeout(2500); // Wait for file watcher debounce (1000ms) + OS detection + processing
 
       expect(validationFailedEventFired).toBe(true);
       expect(validationErrors.some((err) => err.includes("COUCHBASE_URL"))).toBe(true);
@@ -123,13 +143,21 @@ describe("Configuration Hot-Reload System", () => {
     });
 
     test("should reject invalid URL formats", async () => {
+      const validConfig = `
+        COUCHBASE_URL=couchbase://test-cluster
+        COUCHBASE_USERNAME=test-user
+        COUCHBASE_BUCKET=test-bucket
+      `;
+
       const invalidUrlConfig = `
         COUCHBASE_URL=invalid-url-format
         COUCHBASE_USERNAME=test-user
         COUCHBASE_BUCKET=test-bucket
       `;
 
-      await writeFile(testEnvFile, invalidUrlConfig);
+      // Initialize with valid config first
+      await writeFile(testEnvFile, validConfig);
+      await configHotReload.initialize([testEnvFile]);
 
       let validationFailedEventFired = false;
       let validationErrors: string[] = [];
@@ -139,15 +167,23 @@ describe("Configuration Hot-Reload System", () => {
         validationErrors = event.errors || [];
       });
 
-      await configHotReload.initialize([testEnvFile]);
-      await writeFile(testEnvFile, `${invalidUrlConfig}\n# Modified`);
-      await setTimeout(500);
+      // Trigger reload by writing config with invalid URL
+      await writeFile(testEnvFile, invalidUrlConfig);
+      await setTimeout(2500);
 
       expect(validationFailedEventFired).toBe(true);
       expect(validationErrors.some((err) => err.includes("couchbase://"))).toBe(true);
     });
 
     test("should reject invalid numeric values", async () => {
+      const validConfig = `
+        COUCHBASE_URL=couchbase://test-cluster
+        COUCHBASE_USERNAME=test-user
+        COUCHBASE_BUCKET=test-bucket
+        COUCHBASE_KV_TIMEOUT=5000
+        APPLICATION_PORT=4001
+      `;
+
       const invalidNumericConfig = `
         COUCHBASE_URL=couchbase://test-cluster
         COUCHBASE_USERNAME=test-user
@@ -156,7 +192,9 @@ describe("Configuration Hot-Reload System", () => {
         APPLICATION_PORT=invalid-port
       `;
 
-      await writeFile(testEnvFile, invalidNumericConfig);
+      // Initialize with valid config first
+      await writeFile(testEnvFile, validConfig);
+      await configHotReload.initialize([testEnvFile]);
 
       let validationFailedEventFired = false;
       let validationErrors: string[] = [];
@@ -166,9 +204,9 @@ describe("Configuration Hot-Reload System", () => {
         validationErrors = event.errors || [];
       });
 
-      await configHotReload.initialize([testEnvFile]);
-      await writeFile(testEnvFile, `${invalidNumericConfig}\n# Modified`);
-      await setTimeout(500);
+      // Trigger reload by writing config with invalid numeric values
+      await writeFile(testEnvFile, invalidNumericConfig);
+      await setTimeout(2500);
 
       expect(validationFailedEventFired).toBe(true);
       expect(validationErrors.some((err) => err.includes("COUCHBASE_KV_TIMEOUT"))).toBe(true);
@@ -182,6 +220,14 @@ describe("Configuration Hot-Reload System", () => {
         (Bun.env as any).NODE_ENV = "production";
       }
 
+      const validProductionConfig = `
+        NODE_ENV=production
+        COUCHBASE_URL=couchbases://test-cluster
+        COUCHBASE_USERNAME=test-user
+        COUCHBASE_PASSWORD=secure-p@ssw0rd-123
+        COUCHBASE_BUCKET=test-bucket
+      `;
+
       const productionConfigWithDefaultPassword = `
         NODE_ENV=production
         COUCHBASE_URL=couchbases://test-cluster
@@ -190,7 +236,9 @@ describe("Configuration Hot-Reload System", () => {
         COUCHBASE_BUCKET=test-bucket
       `;
 
-      await writeFile(testEnvFile, productionConfigWithDefaultPassword);
+      // Initialize with valid production config first
+      await writeFile(testEnvFile, validProductionConfig);
+      await configHotReload.initialize([testEnvFile]);
 
       let validationFailedEventFired = false;
       let validationErrors: string[] = [];
@@ -200,9 +248,9 @@ describe("Configuration Hot-Reload System", () => {
         validationErrors = event.errors || [];
       });
 
-      await configHotReload.initialize([testEnvFile]);
-      await writeFile(testEnvFile, `${productionConfigWithDefaultPassword}\n# Modified`);
-      await setTimeout(500);
+      // Trigger reload by changing password to a default one
+      await writeFile(testEnvFile, productionConfigWithDefaultPassword);
+      await setTimeout(2500);
 
       expect(validationFailedEventFired).toBe(true);
       expect(validationErrors.some((err) => err.includes("Default password not allowed"))).toBe(true);
@@ -215,6 +263,15 @@ describe("Configuration Hot-Reload System", () => {
         (Bun.env as any).NODE_ENV = "production";
       }
 
+      const initialProductionConfig = `
+        NODE_ENV=production
+        COUCHBASE_URL=couchbases://test-cluster
+        COUCHBASE_USERNAME=test-user
+        COUCHBASE_PASSWORD=secure-password
+        COUCHBASE_BUCKET=test-bucket
+        ALLOWED_ORIGINS=https://example.com
+      `;
+
       const productionConfigWithWildcardCors = `
         NODE_ENV=production
         COUCHBASE_URL=couchbases://test-cluster
@@ -224,7 +281,9 @@ describe("Configuration Hot-Reload System", () => {
         ALLOWED_ORIGINS=*
       `;
 
-      await writeFile(testEnvFile, productionConfigWithWildcardCors);
+      // Initialize with valid config first
+      await writeFile(testEnvFile, initialProductionConfig);
+      await configHotReload.initialize([testEnvFile]);
 
       let configReloadedEventFired = false;
 
@@ -232,9 +291,9 @@ describe("Configuration Hot-Reload System", () => {
         configReloadedEventFired = true;
       });
 
-      await configHotReload.initialize([testEnvFile]);
-      await writeFile(testEnvFile, `${productionConfigWithWildcardCors}\n# Modified`);
-      await setTimeout(500);
+      // Trigger reload by changing ALLOWED_ORIGINS to wildcard
+      await writeFile(testEnvFile, productionConfigWithWildcardCors);
+      await setTimeout(2500);
 
       // Should succeed with warning, not fail
       expect(configReloadedEventFired).toBe(true);
@@ -270,7 +329,7 @@ describe("Configuration Hot-Reload System", () => {
 
       // Update the config file
       await writeFile(testEnvFile, updatedConfig);
-      await setTimeout(500); // Wait for file watcher
+      await setTimeout(2500); // Wait for file watcher
 
       expect(configReloadedEventFired).toBe(true);
       expect(reloadChanges.changed).toContain("COUCHBASE_URL");
@@ -312,7 +371,7 @@ describe("Configuration Hot-Reload System", () => {
       });
 
       await writeFile(testEnvFile, updatedConfig);
-      await setTimeout(500);
+      await setTimeout(2500);
 
       expect(configReloadedEventFired).toBe(true);
       expect(reloadChanges.added).toContain("APPLICATION_PORT");
@@ -337,7 +396,7 @@ describe("Configuration Hot-Reload System", () => {
 
       // Write the same config (should not trigger reload)
       await writeFile(testEnvFile, config);
-      await setTimeout(500);
+      await setTimeout(2500);
 
       expect(configReloadedEventFired).toBe(false);
     });
@@ -378,7 +437,7 @@ describe("Configuration Hot-Reload System", () => {
 
       // Apply invalid configuration
       await writeFile(testEnvFile, invalidConfig);
-      await setTimeout(500);
+      await setTimeout(2500);
 
       // Environment should still have original values
       expect(process.env.COUCHBASE_URL).toBe(initialUrl);
@@ -400,7 +459,13 @@ describe("Configuration Hot-Reload System", () => {
       expect(status.enabled).toBe(true);
 
       // Should not throw even if rollback has issues
-      await expect(configHotReload.reloadConfiguration()).resolves.not.toThrow();
+      let threw = false;
+      try {
+        await configHotReload.reloadConfiguration();
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(false);
     });
   });
 
@@ -455,7 +520,13 @@ describe("Configuration Hot-Reload System", () => {
       const nonWritableFile = "/root/readonly-config.env"; // Likely to be non-writable
 
       // Should not crash on file system errors
-      await expect(configHotReload.initialize([nonWritableFile])).resolves.not.toThrow();
+      let threw = false;
+      try {
+        await configHotReload.initialize([nonWritableFile]);
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(false);
     });
 
     test("should handle JSON parsing errors in configuration", async () => {
@@ -470,21 +541,34 @@ describe("Configuration Hot-Reload System", () => {
       await writeFile(testEnvFile, problematicConfig);
 
       // Should handle parsing issues gracefully
-      await expect(configHotReload.initialize([testEnvFile])).resolves.not.toThrow();
+      let threw = false;
+      try {
+        await configHotReload.initialize([testEnvFile]);
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(false);
     });
   });
 
   describe("OpenTelemetry Configuration Validation", () => {
     test("should warn when OpenTelemetry is enabled but missing required vars", async () => {
+      const initialConfig = `
+        COUCHBASE_URL=couchbase://test-cluster
+        COUCHBASE_USERNAME=test-user
+        COUCHBASE_BUCKET=test-bucket
+        ENABLE_OPENTELEMETRY=false
+      `;
+
       const otelConfigIncomplete = `
         COUCHBASE_URL=couchbase://test-cluster
         COUCHBASE_USERNAME=test-user
         COUCHBASE_BUCKET=test-bucket
         ENABLE_OPENTELEMETRY=true
-        # Missing SERVICE_NAME and SERVICE_VERSION
       `;
 
-      await writeFile(testEnvFile, otelConfigIncomplete);
+      // Initialize with OTEL disabled
+      await writeFile(testEnvFile, initialConfig);
       await configHotReload.initialize([testEnvFile]);
 
       let configReloadedEventFired = false;
@@ -494,8 +578,9 @@ describe("Configuration Hot-Reload System", () => {
         // Should succeed with warnings
       });
 
-      await writeFile(testEnvFile, `${otelConfigIncomplete}\n# Modified`);
-      await setTimeout(500);
+      // Trigger reload by enabling OTEL (changes ENABLE_OPENTELEMETRY value)
+      await writeFile(testEnvFile, otelConfigIncomplete);
+      await setTimeout(2500);
 
       expect(configReloadedEventFired).toBe(true);
     });
@@ -513,7 +598,13 @@ describe("Configuration Hot-Reload System", () => {
       await configHotReload.initialize([testEnvFile]);
 
       // Manual reload should work
-      await expect(configHotReload.reloadConfiguration()).resolves.not.toThrow();
+      let threw = false;
+      try {
+        await configHotReload.reloadConfiguration();
+      } catch {
+        threw = true;
+      }
+      expect(threw).toBe(false);
     });
   });
 });

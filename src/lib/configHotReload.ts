@@ -27,19 +27,26 @@ class ConfigurationHotReload extends EventEmitter {
   private backupEnvVars: Record<string, string> = {};
   private watchedFiles: string[] = [];
   private enabled = false;
+  private unsubscribeWatcher?: () => void;
 
   /**
    * Initialize hot-reload system
    */
   async initialize(configFiles: string[] = [".env", ".env.local"]): Promise<void> {
     try {
+      // Clean up any previous initialization
+      if (this.unsubscribeWatcher) {
+        this.unsubscribeWatcher();
+      }
+      configWatcher.stopWatching();
+
       this.watchedFiles = configFiles.map((file) => path.resolve(file));
 
       // Load current configuration
       await this.loadCurrentConfiguration();
 
-      // Set up file watcher
-      configWatcher.onConfigChange(this.handleConfigurationChange.bind(this));
+      // Set up file watcher — store unsubscribe for cleanup
+      this.unsubscribeWatcher = configWatcher.onConfigChange(this.handleConfigurationChange.bind(this));
       configWatcher.startWatching(this.watchedFiles);
 
       this.enabled = true;
@@ -57,6 +64,10 @@ class ConfigurationHotReload extends EventEmitter {
    * Disable hot-reload system
    */
   disable(): void {
+    if (this.unsubscribeWatcher) {
+      this.unsubscribeWatcher();
+      this.unsubscribeWatcher = undefined;
+    }
     configWatcher.stopWatching();
     this.enabled = false;
     this.removeAllListeners();

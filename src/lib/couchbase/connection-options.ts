@@ -12,8 +12,7 @@
  * - DNS SRV support detection
  */
 
-import type { ConnectOptions } from "couchbase";
-import centralConfig from "$config";
+import { type ConnectOptions, DurabilityLevel } from "couchbase";
 import { parseConnectionString } from "./config";
 import type { ConnectionStringMeta, CouchbaseConfig } from "./types";
 
@@ -28,8 +27,6 @@ export { parseConnectionString };
  * @returns ConnectOptions optimized for the connection type
  */
 export function buildConnectionOptions(config: CouchbaseConfig, meta: ConnectionStringMeta): ConnectOptions {
-  const isDevelopment = centralConfig.runtime.NODE_ENV !== "production";
-
   const options: ConnectOptions = {
     // Authentication
     username: config.username,
@@ -49,39 +46,13 @@ export function buildConnectionOptions(config: CouchbaseConfig, meta: Connection
       managementTimeout: config.timeouts?.managementTimeout || 15000,
     },
 
-    // LOW PRIORITY FIX: Compression (saves bandwidth, especially for Capella)
-    compression: {
-      enabled: config.compression?.enabled ?? true,
-      minSize: config.compression?.minSize ?? 32, // Compress documents > 32 bytes
-      minRatio: config.compression?.minRatio ?? 0.83, // Only compress if achieves 17%+ reduction
-    },
-
-    // LOW PRIORITY FIX: Orphan response logging (diagnostics for lost responses)
-    orphanResponseLogging: {
-      enabled: true,
-      sampleSize: 10,
-      interval: 10000, // Every 10 seconds
-    },
-
-    // LOW PRIORITY FIX: Threshold logging (slow operation detection)
-    thresholdLogging: {
-      enabled: config.thresholdLogging?.enabled ?? true,
-      sampleSize: 10,
-      interval: config.thresholdLogging?.interval ?? 10000,
-      kvThreshold: config.thresholdLogging?.kvThreshold ?? 500, // Warn if KV ops > 500ms
-      queryThreshold: config.thresholdLogging?.queryThreshold ?? 1000, // Warn if queries > 1s
-      analyticsThreshold: config.thresholdLogging?.analyticsThreshold ?? 1000,
-      searchThreshold: config.thresholdLogging?.searchThreshold ?? 1000,
-      viewThreshold: 1000,
-    },
-
     // Transaction configuration
     transactions: {
       cleanupConfig: {
         cleanupWindow: 60000,
-        cleanupLostAttempts: true,
+        disableLostAttemptCleanup: false,
       },
-      durabilityLevel: "majority",
+      durabilityLevel: DurabilityLevel.Majority,
       timeout: 15000,
     },
   };
@@ -94,14 +65,7 @@ export function buildConnectionOptions(config: CouchbaseConfig, meta: Connection
   // TLS/Security configuration (only when using secure connection)
   if (meta.isTls) {
     options.security = {
-      // For Capella: trust system CA store (no custom certs needed)
-      trustOnlyCertificates: meta.isCapella ? undefined : [],
-
-      // For custom certificates (on-premise deployments)
       trustStorePath: config.trustStorePath,
-
-      // Disable certificate verification (DEV ONLY - never in production)
-      disableCertificateVerification: isDevelopment && !meta.isCapella,
     };
   }
 
@@ -140,22 +104,11 @@ export function getOptimizedTimeouts(meta: ConnectionStringMeta): {
 /**
  * Validate that connection options are suitable for production.
  */
-export function validateConnectionOptions(options: ConnectOptions, meta: ConnectionStringMeta): string[] {
+export function validateConnectionOptions(_options: ConnectOptions, meta: ConnectionStringMeta): string[] {
   const warnings: string[] = [];
 
-  // Check for disabled security in production
-  if (centralConfig.runtime.NODE_ENV === "production" && options.security?.disableCertificateVerification) {
-    warnings.push("Certificate verification is disabled in production - security risk");
-  }
-
-  // Check for missing TLS on Capella
   if (meta.isCapella && !meta.isTls) {
     warnings.push("Capella Cloud requires secure connection (couchbases://)");
-  }
-
-  // Check compression settings
-  if (!options.compression?.enabled) {
-    warnings.push("Compression is disabled - may increase bandwidth costs for Capella");
   }
 
   return warnings;

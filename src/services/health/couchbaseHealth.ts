@@ -70,12 +70,12 @@ export class CouchbaseHealthService {
       }
 
       // Get service health - handle both SDK naming (n1ql, fts) and common naming (query, search)
-      const serviceHealth = health.details.serviceHealth || {};
+      const serviceHealth = health.details?.serviceHealth || ({} as Record<string, any>);
       const kvHealthy = serviceHealth.kv?.healthy || false;
       // n1ql is the SDK name, query is the common name
-      const queryHealthy = serviceHealth.n1ql?.healthy || serviceHealth.query?.healthy || false;
+      const queryHealthy = (serviceHealth as any).n1ql?.healthy || serviceHealth.query?.healthy || false;
       // fts is the SDK name, search is the common name
-      const searchHealthy = serviceHealth.fts?.healthy || serviceHealth.search?.healthy || false;
+      const searchHealthy = (serviceHealth as any).fts?.healthy || serviceHealth.search?.healthy || false;
 
       // If no service info available but connection succeeded, assume services are healthy
       // This handles the case where diagnostics() returns empty services on a working connection
@@ -117,8 +117,8 @@ export class CouchbaseHealthService {
     try {
       const result = await connectionManager.ping();
       return {
-        success: result.success,
-        latencyMs: result.latency || 0,
+        success: result.status === "healthy" || result.status === "degraded",
+        latencyMs: result.details?.latency || 0,
         error: result.error,
       };
     } catch (error) {

@@ -164,7 +164,9 @@ function generateBusinessMetrics(telemetryHealth: TelemetryHealthData, memoryUsa
   };
 
   // Calculate telemetry cost efficiency
-  const exportSuccessRate = telemetryHealth.exporters?.logs?.successRate || 0.95;
+  const rawSuccessRate = telemetryHealth.exporters?.logs?.successRate;
+  const exportSuccessRate =
+    typeof rawSuccessRate === "number" ? rawSuccessRate : parseFloat(String(rawSuccessRate)) || 0.95;
   const circuitBreakerEfficiency = telemetryHealth.circuitBreaker?.state === "CLOSED" ? 1.0 : 0.7;
   const telemetryCostEfficiency = exportSuccessRate * circuitBreakerEfficiency * (1 - memoryUsagePercent / 100);
 

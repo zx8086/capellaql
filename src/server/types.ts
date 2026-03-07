@@ -12,7 +12,11 @@ export interface RequestContext {
   method: string;
 }
 
-export type RouteHandler = (request: Request, context: RequestContext, server?: Server) => Response | Promise<Response>;
+export type RouteHandler = (
+  request: Request,
+  context: RequestContext,
+  server?: Server<any>
+) => Response | Promise<Response>;
 
 export type Middleware = (
   request: Request,

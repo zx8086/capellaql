@@ -11,11 +11,27 @@
  * - Batch operations with parallel execution
  */
 
-import type { Collection, DurabilityLevel, GetOptions, GetResult, MutationResult, UpsertOptions } from "couchbase";
+import {
+  type Collection,
+  DurabilityLevel,
+  type GetOptions,
+  type GetResult,
+  LookupInSpec,
+  MutateInSpec,
+  type MutationResult,
+  type UpsertOptions,
+} from "couchbase";
 import { getErrorMessage } from "$utils/errorUtils";
 import { warn } from "../../telemetry/logger";
 import { DocumentNotFoundError } from "./errors";
 import type { KVGetOptions, KVUpsertOptions, SubdocOperation } from "./types";
+
+const DURABILITY_MAP: Record<string, DurabilityLevel> = {
+  none: DurabilityLevel.None,
+  majority: DurabilityLevel.Majority,
+  majorityAndPersistToActive: DurabilityLevel.MajorityAndPersistOnMaster,
+  persistToMajority: DurabilityLevel.PersistToMajority,
+};
 
 // Re-export types
 export type { KVGetOptions, KVUpsertOptions, SubdocOperation };
@@ -66,10 +82,7 @@ export class KVOperations {
 
       const result = await collection.get(id, getOptions);
 
-      return {
-        ...result,
-        value: result.content as T,
-      };
+      return Object.assign(result, { value: result.content as T }) as GetResult & { value: T };
     } catch (error) {
       if (error instanceof DocumentNotFoundError) {
         return null;
@@ -99,13 +112,10 @@ export class KVOperations {
     const upsertOptions: UpsertOptions = {
       // SDK BEST PRACTICE: Use durability for critical writes
       // Options: "none", "majority", "majorityAndPersistToActive", "persistToMajority"
-      durabilityLevel: (options.durability as DurabilityLevel) || undefined,
+      durabilityLevel: options.durability ? DURABILITY_MAP[options.durability] : undefined,
 
       // Set expiry (TTL) if provided
       expiry: options.expiry,
-
-      // MEDIUM PRIORITY FIX: CAS for optimistic locking
-      cas: options.cas as any,
 
       timeout: options.timeout || 7500,
     };
@@ -123,7 +133,7 @@ export class KVOperations {
     options: Omit<KVUpsertOptions, "cas"> = {}
   ): Promise<MutationResult> {
     return await collection.insert(id, document, {
-      durabilityLevel: (options.durability as DurabilityLevel) || undefined,
+      durabilityLevel: options.durability ? DURABILITY_MAP[options.durability] : undefined,
       expiry: options.expiry,
       timeout: options.timeout || 7500,
     });
@@ -139,7 +149,7 @@ export class KVOperations {
     options: KVUpsertOptions = {}
   ): Promise<MutationResult> {
     return await collection.replace(id, document, {
-      durabilityLevel: (options.durability as DurabilityLevel) || undefined,
+      durabilityLevel: options.durability ? DURABILITY_MAP[options.durability] : undefined,
       expiry: options.expiry,
       cas: options.cas as any,
       timeout: options.timeout || 7500,
@@ -178,10 +188,7 @@ export class KVOperations {
   ): Promise<(GetResult & { value: T }) | null> {
     try {
       const result = await collection.getAndLock(id, lockTime);
-      return {
-        ...result,
-        value: result.content as T,
-      };
+      return Object.assign(result, { value: result.content as T }) as GetResult & { value: T };
     } catch (error) {
       if (error instanceof DocumentNotFoundError) {
         return null;
@@ -231,38 +238,36 @@ export class KVOperations {
       timeout?: number;
     } = {}
   ): Promise<MutationResult> {
-    // Build the spec
-    let spec = collection.mutateIn(id);
+    const specs: MutateInSpec[] = [];
 
     for (const op of operations) {
       switch (op.type) {
         case "upsert":
-          spec = spec.upsert(op.path, op.value);
+          specs.push(MutateInSpec.upsert(op.path, op.value));
           break;
         case "insert":
-          spec = spec.insert(op.path, op.value);
+          specs.push(MutateInSpec.insert(op.path, op.value));
           break;
         case "replace":
-          spec = spec.replace(op.path, op.value);
+          specs.push(MutateInSpec.replace(op.path, op.value));
           break;
         case "remove":
-          spec = spec.remove(op.path);
+          specs.push(MutateInSpec.remove(op.path));
           break;
         case "arrayAppend":
-          spec = spec.arrayAppend(op.path, op.value);
+          specs.push(MutateInSpec.arrayAppend(op.path, op.value));
           break;
         case "arrayPrepend":
-          spec = spec.arrayPrepend(op.path, op.value);
+          specs.push(MutateInSpec.arrayPrepend(op.path, op.value));
           break;
       }
     }
 
-    // Execute with options
-    return await (spec as any).execute({
+    return (await collection.mutateIn(id, specs, {
       cas: options.cas as any,
-      durabilityLevel: options.durability as DurabilityLevel,
+      durabilityLevel: options.durability ? DURABILITY_MAP[options.durability] : undefined,
       timeout: options.timeout || 7500,
-    });
+    })) as unknown as MutationResult;
   }
 
   /**
@@ -274,18 +279,13 @@ export class KVOperations {
     paths: string[]
   ): Promise<T | null> {
     try {
-      let spec = collection.lookupIn(id);
-
-      for (const path of paths) {
-        spec = spec.get(path);
-      }
-
-      const result = await spec.execute();
+      const specs = paths.map((p) => LookupInSpec.get(p));
+      const result = await collection.lookupIn(id, specs);
       const data: Record<string, any> = {};
 
       paths.forEach((path, index) => {
         try {
-          data[path] = result.content(index)?.value;
+          data[path] = result.content[index]?.value;
         } catch {
           data[path] = undefined;
         }

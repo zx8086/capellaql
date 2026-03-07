@@ -499,7 +499,7 @@ export {
  */
 export class ConnectionError extends Error {
   public readonly code = "CONNECTION_ERROR";
-  public readonly cause?: Error;
+  public override readonly cause?: Error;
   public readonly context?: CouchbaseErrorContext;
 
   constructor(message: string, cause?: Error, context?: CouchbaseErrorContext) {

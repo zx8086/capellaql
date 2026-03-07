@@ -130,7 +130,7 @@ export function getEnvVarForPath(configPath: string): string | undefined {
   const entry = sectionMapping[key as keyof typeof sectionMapping];
   if (!entry) return undefined;
 
-  return entry.envVar;
+  return (entry as { envVar: string }).envVar;
 }
 
 // Backward compatibility alias

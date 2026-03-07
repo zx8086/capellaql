@@ -1,7 +1,7 @@
 /* src/server/middleware/logging.ts */
 
 import { metrics } from "@opentelemetry/api";
-import { err, recordHttpRequest, recordHttpResponseTime, warn } from "../../telemetry";
+import { err, log, recordHttpRequest, recordHttpResponseTime, warn } from "../../telemetry";
 import type { Middleware, RequestContext } from "../types";
 
 // Create custom metrics
@@ -50,35 +50,27 @@ export const loggingMiddleware: Middleware = async (
       status_code: status.toString(),
     });
 
-    // Log based on status/duration
+    // Log every request for observability (OTEL logs + console)
+    const meta = {
+      requestId: context.requestId,
+      method,
+      route,
+      status,
+      duration: `${duration}ms`,
+    };
+
     const isSlowRequest = duration > 1000;
     const isVerySlowRequest = duration > 5000;
     const isError = status >= 400;
 
     if (isError) {
-      err("Request failed", undefined, {
-        requestId: context.requestId,
-        method,
-        route,
-        status,
-        duration: `${duration}ms`,
-      });
+      err("Request failed", undefined, meta);
     } else if (isVerySlowRequest) {
-      warn("Very slow request detected", {
-        requestId: context.requestId,
-        method,
-        route,
-        status,
-        duration: `${duration}ms`,
-      });
+      warn("Very slow request detected", meta);
     } else if (isSlowRequest) {
-      warn("Slow request", {
-        requestId: context.requestId,
-        method,
-        route,
-        status,
-        duration: `${duration}ms`,
-      });
+      warn("Slow request", meta);
+    } else {
+      log(`${method} ${route} ${status}`, meta);
     }
 
     return response;

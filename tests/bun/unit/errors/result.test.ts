@@ -313,7 +313,7 @@ describe("Go-style Result Utilities", () => {
     test("should pass through error unchanged", () => {
       const error: ErrorDetails = { message: "Error", name: "E" };
       const result: Result<number> = [undefined, error];
-      const mapped = mapResult(result, (n) => n * 2);
+      const mapped = mapResult(result, (n) => n! * 2);
 
       expect(isError(mapped)).toBe(true);
       expect(mapped[1]).toBe(error);
@@ -348,7 +348,7 @@ describe("Go-style Result Utilities", () => {
       let called = false;
       const chained = await chainResult(result, async (n) => {
         called = true;
-        return [n * 2, undefined];
+        return [n! * 2, undefined];
       });
 
       expect(called).toBe(false);

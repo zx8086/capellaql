@@ -327,7 +327,7 @@ describe("BunUtils - Resilience Patterns", () => {
   describe("Retry with Backoff", () => {
     test("should retry failed operations", async () => {
       let attempts = 0;
-      const mockOperation = mock(() => {
+      const mockOperation = mock(async () => {
         attempts++;
         if (attempts < 3) {
           throw new Error("Temporary failure");

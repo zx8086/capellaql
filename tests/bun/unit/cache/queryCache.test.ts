@@ -1,6 +1,7 @@
 // Unit tests for query cache
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { QueryCache, CacheKeys, defaultQueryCache } from "../../../../src/lib/queryCache";
+import { CircuitBreaker } from "../../../../src/lib/couchbase/circuit-breaker";
 
 describe("QueryCache", () => {
   let cache: QueryCache;
@@ -103,6 +104,27 @@ describe("QueryCache", () => {
         })
       ).rejects.toThrow("Fetch failed");
     });
+
+    test("custom TTL is respected", async () => {
+      let fetcherCalls = 0;
+      const fetcher = async () => {
+        fetcherCalls++;
+        return { data: "value" };
+      };
+
+      await cache.getOrSet("custom-ttl-key", fetcher, 50); // 50ms TTL
+
+      // Should be cached
+      await cache.getOrSet("custom-ttl-key", fetcher);
+      expect(fetcherCalls).toBe(1);
+
+      // Wait for expiration
+      await new Promise((resolve) => setTimeout(resolve, 100));
+
+      // Should re-fetch
+      await cache.getOrSet("custom-ttl-key", fetcher);
+      expect(fetcherCalls).toBe(2);
+    });
   });
 
   describe("TTL expiration", () => {
@@ -180,6 +202,120 @@ describe("QueryCache", () => {
 
       expect(stats1).not.toBe(stats2);
       expect(stats1).toEqual(stats2);
+    });
+
+    test("clear preserves hit/miss stats", () => {
+      cache.set("key1", "value1");
+      cache.get("key1"); // hit
+      cache.get("missing"); // miss
+
+      cache.clear();
+
+      const stats = cache.getStats();
+      expect(stats.size).toBe(0);
+      expect(stats.hits).toBe(1);
+      expect(stats.misses).toBe(1);
+    });
+  });
+
+  describe("stale fallback", () => {
+    test("serves stale data when fetcher fails", async () => {
+      const staleCache = new QueryCache({
+        defaultTtl: 50,
+        maxSize: 100,
+        maxMemory: 1024 * 1024,
+        cleanupInterval: 60000,
+        staleTolerance: 5000,
+      });
+
+      // Prime the cache
+      await staleCache.getOrSet("key1", () => Promise.resolve({ data: "original" }), 50);
+
+      // Wait for primary TTL to expire
+      await new Promise((r) => setTimeout(r, 100));
+
+      // Fetcher fails — should get stale data
+      const result = await staleCache.getOrSet<{ data: string }>(
+        "key1",
+        () => Promise.reject(new Error("DB down")),
+        50,
+      );
+
+      expect(result).toEqual({ data: "original" });
+      expect(staleCache.getStats().staleHits).toBe(1);
+      staleCache.destroy();
+    });
+
+    test("throws when fetcher fails and no stale data exists", async () => {
+      const staleCache = new QueryCache({
+        defaultTtl: 50,
+        maxSize: 100,
+        maxMemory: 1024 * 1024,
+        cleanupInterval: 60000,
+        staleTolerance: 5000,
+      });
+
+      try {
+        await staleCache.getOrSet("new-key", () => Promise.reject(new Error("DB down")), 50);
+        expect.unreachable("Should have thrown");
+      } catch (error) {
+        expect((error as Error).message).toBe("DB down");
+      }
+      staleCache.destroy();
+    });
+
+    test("stale data expires after staleTolerance", async () => {
+      const staleCache = new QueryCache({
+        defaultTtl: 50,
+        maxSize: 100,
+        maxMemory: 1024 * 1024,
+        cleanupInterval: 60000,
+        staleTolerance: 80,
+      });
+
+      // Prime cache
+      await staleCache.getOrSet("key1", () => Promise.resolve("data"), 50);
+
+      // Wait for primary TTL to expire
+      await new Promise((r) => setTimeout(r, 80));
+
+      // Stale data still within tolerance
+      const staleResult = await staleCache.getOrSet<string>(
+        "key1",
+        () => Promise.reject(new Error("DB down")),
+        50,
+      );
+      expect(staleResult).toBe("data");
+
+      // Wait for stale tolerance to expire
+      await new Promise((r) => setTimeout(r, 120));
+
+      // Should throw since stale data has also expired
+      try {
+        await staleCache.getOrSet("key1", () => Promise.reject(new Error("DB down")), 50);
+        expect.unreachable("Should have thrown");
+      } catch (error) {
+        expect((error as Error).message).toBe("DB down");
+      }
+      staleCache.destroy();
+    });
+
+    test("fresh data replaces stale data", async () => {
+      const staleCache = new QueryCache({
+        defaultTtl: 50,
+        maxSize: 100,
+        maxMemory: 1024 * 1024,
+        cleanupInterval: 60000,
+        staleTolerance: 5000,
+      });
+
+      await staleCache.getOrSet("key1", () => Promise.resolve("v1"), 50);
+      await new Promise((r) => setTimeout(r, 100));
+
+      const result = await staleCache.getOrSet("key1", () => Promise.resolve("v2"), 50);
+      expect(result).toBe("v2");
+      expect(staleCache.getStats().staleHits).toBe(0);
+      staleCache.destroy();
     });
   });
 
@@ -279,6 +415,135 @@ describe("QueryCache", () => {
       expect(stats.evictions).toBeGreaterThanOrEqual(1);
 
       smallCache.destroy();
+    });
+  });
+
+  describe("lifecycle", () => {
+    test("destroy stops cleanup timer and clears cache", () => {
+      cache.set("key1", "value1");
+      cache.set("key2", "value2");
+
+      cache.destroy();
+
+      const stats = cache.getStats();
+      expect(stats.size).toBe(0);
+    });
+  });
+
+  describe("stale cache with circuit breaker", () => {
+    test("stale cache serves data when circuit breaker is open", async () => {
+      const staleCache = new QueryCache({
+        defaultTtl: 100,
+        maxSize: 100,
+        maxMemory: 1024 * 1024,
+        cleanupInterval: 60000,
+        staleTolerance: 5000,
+      });
+      const breaker = new CircuitBreaker({
+        failureThreshold: 2,
+        successThreshold: 1,
+        timeout: 100,
+        monitoringPeriod: 1000,
+      });
+
+      // Prime cache through circuit breaker
+      const result1 = await staleCache.getOrSet("data", () =>
+        breaker.execute(() => Promise.resolve({ value: 42 })),
+      );
+      expect(result1).toEqual({ value: 42 });
+
+      // Wait for cache to expire
+      await new Promise((r) => setTimeout(r, 150));
+
+      // Trip the circuit breaker
+      const failOp = () => Promise.reject(new Error("Network partition"));
+      try { await breaker.execute(failOp); } catch {}
+      try { await breaker.execute(failOp); } catch {}
+
+      // Cache should return stale data even with breaker open
+      const result2 = await staleCache.getOrSet("data", () =>
+        breaker.execute(() => Promise.resolve({ value: 99 })),
+      );
+      expect(result2).toEqual({ value: 42 });
+
+      staleCache.destroy();
+    });
+
+    test("fresh data flows after breaker recovery", async () => {
+      const staleCache = new QueryCache({
+        defaultTtl: 50,
+        maxSize: 100,
+        maxMemory: 1024 * 1024,
+        cleanupInterval: 60000,
+        staleTolerance: 5000,
+      });
+      const breaker = new CircuitBreaker({
+        failureThreshold: 2,
+        successThreshold: 1,
+        timeout: 100,
+        monitoringPeriod: 1000,
+      });
+
+      // Prime cache
+      await staleCache.getOrSet("config", () =>
+        breaker.execute(() => Promise.resolve({ version: 1 })),
+      );
+
+      // Expire cache + trip breaker
+      await new Promise((r) => setTimeout(r, 100));
+      for (let i = 0; i < 2; i++) {
+        try {
+          await breaker.execute(() => Promise.reject(new Error("Partition")));
+        } catch {}
+      }
+
+      // Stale data during partition
+      const staleResult = await staleCache.getOrSet("config", () =>
+        breaker.execute(() => Promise.resolve({ version: 2 })),
+      );
+      expect(staleResult).toEqual({ version: 1 });
+
+      // Wait for breaker to half-open, then fresh data
+      await new Promise((r) => setTimeout(r, 150));
+      const freshResult = await staleCache.getOrSet(
+        "config",
+        () => breaker.execute(() => Promise.resolve({ version: 3 })),
+        50,
+      );
+      expect(freshResult).toEqual({ version: 3 });
+
+      staleCache.destroy();
+    });
+  });
+
+  describe("edge cases", () => {
+    test("handles null values", () => {
+      cache.set("null-key", null);
+      const result = cache.get("null-key");
+      expect(result).toBeNull();
+    });
+
+    test("handles complex objects", () => {
+      const complexObj = {
+        nested: { array: [1, 2, 3], map: { a: 1, b: 2 } },
+        date: new Date().toISOString(),
+        number: 42,
+        boolean: true,
+      };
+
+      cache.set("complex-key", complexObj);
+      expect(cache.get("complex-key") as unknown).toEqual(complexObj);
+    });
+
+    test("handles empty string keys", () => {
+      cache.set("", "empty-key-value");
+      expect(cache.get("") as unknown).toBe("empty-key-value");
+    });
+
+    test("handles large values", () => {
+      const largeValue = "x".repeat(10000);
+      cache.set("large-key", largeValue);
+      expect(cache.get("large-key") as unknown).toBe(largeValue);
     });
   });
 });

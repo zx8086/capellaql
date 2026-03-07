@@ -14,7 +14,7 @@ export abstract class AppError extends Error {
 
   constructor(
     message: string,
-    public readonly cause?: Error,
+    public override readonly cause?: Error,
     context?: Record<string, any>
   ) {
     super(message);
@@ -76,8 +76,8 @@ export abstract class AppError extends Error {
  * Database-related errors
  */
 export class DatabaseError extends AppError {
-  readonly statusCode = 500;
-  readonly code = "DATABASE_ERROR";
+  readonly statusCode: number = 500;
+  readonly code: string = "DATABASE_ERROR";
 
   constructor(message: string, cause?: Error, context?: Record<string, any>) {
     super(`Database operation failed: ${message}`, cause, context);
@@ -92,8 +92,8 @@ export class DatabaseError extends AppError {
  * Document not found errors (specific type of database error)
  */
 export class DocumentNotFoundError extends DatabaseError {
-  readonly statusCode = 404;
-  readonly code = "DOCUMENT_NOT_FOUND";
+  override readonly statusCode = 404;
+  override readonly code = "DOCUMENT_NOT_FOUND";
 
   constructor(documentId: string, collection?: string, cause?: Error) {
     const message = collection

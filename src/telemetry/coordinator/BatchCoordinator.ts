@@ -1,6 +1,6 @@
 import type { LogRecord } from "@opentelemetry/api-logs";
 import type { MetricData } from "@opentelemetry/sdk-metrics";
-import type { SpanData } from "@opentelemetry/sdk-trace-base";
+import type { ReadableSpan as SpanData } from "@opentelemetry/sdk-trace-base";
 import config from "$config";
 import { getErrorMessage } from "$utils/errorUtils";
 import { getLogger } from "../../logging/container";

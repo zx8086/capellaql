@@ -1,12 +1,11 @@
 /* src/graphql/types.ts - TypeScript Types for GraphQL */
 
-import type { capellaConn } from "../lib/couchbaseConnector";
-
 /**
  * GraphQL resolver context interface
+ * Note: Resolvers access the database via connectionManager.getConnection() directly,
+ * so no connection field is needed in the context.
  */
 export interface ResolverContext {
-  cluster: capellaConn;
   requestId: string;
   clientIp: string;
   userAgent?: string;

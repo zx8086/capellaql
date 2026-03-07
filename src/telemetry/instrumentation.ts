@@ -33,7 +33,7 @@ import {
   SEMRESATTRS_SERVICE_INSTANCE_ID,
   SEMRESATTRS_SERVICE_NAMESPACE,
 } from "@opentelemetry/semantic-conventions";
-import { type TelemetryConfig, telemetryConfig } from "$config";
+import { getConfig, type TelemetryConfig, telemetryConfig } from "$config";
 import { BunPerf } from "$utils/bunUtils";
 import { getLogger } from "../logging/container";
 import {
@@ -45,10 +45,7 @@ import {
   wrapSpanExporter,
 } from "./export-stats-tracker";
 import { markTelemetryInitialized } from "./health/telemetryHealth";
-import {
-  initializeTelemetryCircuitBreakers,
-  shutdownTelemetryCircuitBreakers,
-} from "./telemetry-circuit-breaker";
+import { initializeTelemetryCircuitBreakers, shutdownTelemetryCircuitBreakers } from "./telemetry-circuit-breaker";
 import { winstonTelemetryLogger } from "./winston-logger";
 
 // ============================================================================
@@ -304,13 +301,15 @@ export async function initializeTelemetry(): Promise<void> {
   }
 }
 
-function createResource(config: TelemetryConfig) {
+function createResource(telConfig: TelemetryConfig) {
+  const fullConfig = getConfig();
   const attributes = {
-    [ATTR_SERVICE_NAME]: config.SERVICE_NAME,
-    [ATTR_SERVICE_VERSION]: config.SERVICE_VERSION,
-    [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: config.DEPLOYMENT_ENVIRONMENT,
-    [SEMRESATTRS_SERVICE_NAMESPACE]: config.SERVICE_NAMESPACE,
-    [SEMRESATTRS_SERVICE_INSTANCE_ID]: config.runtime?.HOSTNAME || config.runtime?.INSTANCE_ID || os.hostname(),
+    [ATTR_SERVICE_NAME]: telConfig.SERVICE_NAME,
+    [ATTR_SERVICE_VERSION]: telConfig.SERVICE_VERSION,
+    [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: telConfig.DEPLOYMENT_ENVIRONMENT,
+    [SEMRESATTRS_SERVICE_NAMESPACE]: telConfig.SERVICE_NAME,
+    [SEMRESATTRS_SERVICE_INSTANCE_ID]:
+      fullConfig.deployment?.HOSTNAME || fullConfig.deployment?.INSTANCE_ID || os.hostname(),
     [ATTR_TELEMETRY_SDK_NAME]: "opentelemetry",
     [ATTR_TELEMETRY_SDK_LANGUAGE]: "nodejs",
     [ATTR_TELEMETRY_SDK_VERSION]: "2.0.1",
@@ -326,9 +325,9 @@ function createResource(config: TelemetryConfig) {
     "host.arch": os.arch(),
     "host.type": os.type(),
     "host.cpu.family": os.cpus()[0]?.model || "unknown",
-    ...(config.runtime?.CONTAINER_ID && { "container.id": config.runtime.CONTAINER_ID }),
-    ...(config.runtime?.K8S_POD_NAME && { "k8s.pod.name": config.runtime.K8S_POD_NAME }),
-    ...(config.runtime?.K8S_NAMESPACE && { "k8s.namespace.name": config.runtime.K8S_NAMESPACE }),
+    ...(fullConfig.deployment?.CONTAINER_ID && { "container.id": fullConfig.deployment.CONTAINER_ID }),
+    ...(fullConfig.deployment?.K8S_POD_NAME && { "k8s.pod.name": fullConfig.deployment.K8S_POD_NAME }),
+    ...(fullConfig.deployment?.K8S_NAMESPACE && { "k8s.namespace.name": fullConfig.deployment.K8S_NAMESPACE }),
   };
 
   return resourceFromAttributes(attributes);

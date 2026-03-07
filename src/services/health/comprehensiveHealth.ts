@@ -242,14 +242,16 @@ export class ComprehensiveHealthService {
             responseTime: "N/A",
           },
           entries: {
-            primary: 0,
-            primaryActive: 0,
-            stale: 0,
-            staleCacheAvailable: false,
+            total: 0,
+            active: 0,
+            expired: 0,
+            evictions: 0,
           },
           performance: {
+            hits: 0,
+            misses: 0,
             hitRate: "0.00%",
-            avgLatencyMs: 0,
+            memoryUsageBytes: 0,
           },
           healthMonitor: {
             status: "unhealthy",

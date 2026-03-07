@@ -277,7 +277,6 @@ export class CouchbaseConnectionManager {
       try {
         const health = await this.getHealthWithDiagnostics();
         this.isHealthy = health.status === "healthy" || health.status === "degraded";
-        this.lastHealthCheck = new Date();
 
         if (!this.isHealthy && this.config) {
           warn("Couchbase unhealthy connection detected", { component: "couchbase", operation: "health_check" });

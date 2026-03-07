@@ -3,7 +3,7 @@
   "version": "2.0.0",
   "scripts": {
     "test": "bun run --sequential test:bun test:playwright",
-    "test:bun": "bun test --coverage",
+    "test:bun": "bun test",
     "test:bun:watch": "bun test --watch",
     "test:bun:unit": "bun test tests/bun/unit",
     "test:bun:integration": "bun test tests/bun/integration",

@@ -8,11 +8,10 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
-  reporter: [["html"], ["list"]],
   timeout: 30000,
 
   use: {
-    baseURL: process.env.API_BASE_URL || "http://localhost:4000",
+    baseURL: process.env.BASE_URL || "http://localhost:4000",
     extraHTTPHeaders: {
       "Content-Type": "application/json",
     },
@@ -26,10 +25,13 @@ export default defineConfig({
     },
   ],
 
-  webServer: {
-    command: "bun run start",
-    url: "http://localhost:4000/health",
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  // In CI, the platform starts the app as a sidecar — no webServer needed
+  ...(!process.env.CI && {
+    webServer: {
+      command: "bun run start",
+      url: "http://localhost:4000/health",
+      reuseExistingServer: true,
+      timeout: 120_000,
+    },
+  }),
 });

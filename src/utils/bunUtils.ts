@@ -77,15 +77,16 @@ export namespace BunFile {
       return Bun.file(path).stream();
     }
 
-    // Fallback for Node.js environments
+    // Fallback for Node.js environments using createReadStream from fs (not fs/promises)
+    const fsSync = require("fs") as typeof import("fs");
     const stream = new ReadableStream({
       start(controller) {
-        const readStream = fs.createReadStream(path);
-        readStream.on("data", (chunk) => {
+        const readStream = fsSync.createReadStream(path);
+        readStream.on("data", (chunk: any) => {
           controller.enqueue(new Uint8Array(chunk));
         });
         readStream.on("end", () => controller.close());
-        readStream.on("error", (err) => controller.error(err));
+        readStream.on("error", (streamErr: Error) => controller.error(streamErr));
       },
     });
     return stream;

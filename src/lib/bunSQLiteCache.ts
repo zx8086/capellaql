@@ -39,6 +39,7 @@ export class BunSQLiteCache {
     hits: 0,
     misses: 0,
     evictions: 0,
+    staleHits: 0,
     memoryUsage: 0,
   };
   private cleanupTimer?: Timer;
@@ -149,7 +150,7 @@ export class BunSQLiteCache {
       this.updateHitStmt?.run(now, key);
       this.stats.hits++;
 
-      const data = this.deserializeValue(result.value);
+      const data = this.deserializeValue(result.value) as T;
 
       log("SQLite cache hit", {
         key: key.substring(0, 50) + (key.length > 50 ? "..." : ""),
@@ -273,6 +274,7 @@ export class BunSQLiteCache {
         hits: this.stats.hits,
         misses: this.stats.misses,
         evictions: this.stats.evictions,
+        staleHits: 0,
         memoryUsage: 0,
       };
 

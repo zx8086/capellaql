@@ -10,7 +10,7 @@ import {
 import type { ExportResult } from "@opentelemetry/core";
 import type { ReadableSpan, SpanExporter } from "@opentelemetry/sdk-trace-base";
 import type { LogRecordExporter, ReadableLogRecord } from "@opentelemetry/sdk-logs";
-import type { PushMetricExporter, ResourceMetrics } from "@opentelemetry/sdk-metrics";
+import { InstrumentType, type PushMetricExporter, type ResourceMetrics } from "@opentelemetry/sdk-metrics";
 
 describe("Export Stats Tracker", () => {
   let tracker: ExportStatsTracker;
@@ -272,7 +272,7 @@ describe("Exporter Wrappers", () => {
         receivedResult = result;
       });
 
-      expect(receivedResult).toEqual(expectedResult);
+      expect(receivedResult!).toEqual(expectedResult);
     });
 
     test("delegates shutdown to original exporter", async () => {
@@ -411,7 +411,7 @@ describe("Exporter Wrappers", () => {
       };
 
       const wrapped = wrapMetricExporter(mockExporter, tracker);
-      wrapped.selectAggregationTemporality?.(0);
+      wrapped.selectAggregationTemporality?.(InstrumentType.COUNTER);
 
       expect(temporalityCalled).toBe(true);
     });

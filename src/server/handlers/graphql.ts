@@ -3,6 +3,7 @@
 import { makeExecutableSchema } from "@graphql-tools/schema";
 import { useResponseCache } from "@graphql-yoga/plugin-response-cache";
 import { trace } from "@opentelemetry/api";
+// @ts-expect-error - graphql-depth-limit has no type declarations
 import depthLimit from "graphql-depth-limit";
 import { createYoga } from "graphql-yoga";
 import { config } from "../../config";
@@ -10,6 +11,7 @@ import { contextFactory } from "../../graphql/context";
 import resolvers from "../../graphql/resolvers";
 import typeDefs from "../../graphql/typeDefs";
 import { debug, err, log, warn } from "../../telemetry";
+import type { RouteHandler } from "../types";
 
 // Create executable schema from typeDefs and resolvers
 const schema = makeExecutableSchema({
@@ -55,16 +57,17 @@ const yoga = createYoga({
   // Mask errors to prevent stack traces in responses
   // But allow BAD_USER_INPUT errors through unmasked since they're expected
   maskedErrors: {
-    maskError: (error, message) => {
+    maskError: (error: unknown, message: string): Error => {
+      const err = error as any;
       // Don't mask user input validation errors - they should be shown to clients
-      if (error?.extensions?.code === "BAD_USER_INPUT" || error?.message?.includes("Input validation failed")) {
-        return error;
+      if (err?.extensions?.code === "BAD_USER_INPUT" || err?.message?.includes("Input validation failed")) {
+        return err instanceof Error ? err : new Error(String(err));
       }
       // Mask other errors in production
       if (config.runtime.NODE_ENV === "production") {
         return new Error(message);
       }
-      return error;
+      return err instanceof Error ? err : new Error(String(err));
     },
   },
   plugins: [
@@ -128,7 +131,7 @@ const yoga = createYoga({
     }),
     // Query size validation plugin
     {
-      onParse({ params, addError }) {
+      onParse({ params, addError }: { params: any; addError: any }) {
         if (params.source.length > 10000) {
           // 10KB limit
           addError(new Error("Query too large - maximum 10KB allowed"));
@@ -137,7 +140,7 @@ const yoga = createYoga({
     },
     // Error logging plugin - skip verbose logging for user input errors
     {
-      onError: ({ error }) => {
+      onError: ({ error }: { error: any }) => {
         // Check if this is a user input validation error (BAD_USER_INPUT)
         const isUserInputError =
           error?.extensions?.code === "BAD_USER_INPUT" || error?.message?.includes("Input validation failed");
@@ -156,7 +159,7 @@ const yoga = createYoga({
     },
     // OpenTelemetry span attributes plugin
     {
-      onParse: ({ params }) => {
+      onParse: ({ params }: { params: any }) => {
         const span = trace.getActiveSpan();
         if (span && params) {
           span.setAttribute("graphql.operation_name", params.operationName || "Unknown");
@@ -165,7 +168,7 @@ const yoga = createYoga({
           }
         }
       },
-      onValidate: ({ document }) => {
+      onValidate: ({ document }: { document: any }) => {
         const span = trace.getActiveSpan();
         if (span && document?.definitions) {
           const firstDef = document.definitions[0];
@@ -184,9 +187,13 @@ const yoga = createYoga({
         }
       },
     },
+    // Depth limit validation plugin
+    {
+      onValidate({ addValidationRule }: { addValidationRule: any }) {
+        addValidationRule(depthLimit(10));
+      },
+    },
   ],
-  // GraphQL Yoga has built-in validation rules support
-  validationRules: [depthLimit(10)],
 });
 
 // Log cache configuration on startup

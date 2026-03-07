@@ -173,10 +173,10 @@ describe("HTTP Metrics Edge Cases", () => {
   });
 
   test("handles undefined status code", () => {
-    const statusCode: number | undefined = undefined;
+    const statusCode = undefined as number | undefined;
     const labels: Record<string, string> = {};
 
-    if (statusCode) {
+    if (statusCode !== undefined) {
       labels.status_code = statusCode.toString();
     }
 

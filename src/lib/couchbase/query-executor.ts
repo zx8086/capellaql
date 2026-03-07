@@ -11,7 +11,7 @@
  * - Slow query logging
  */
 
-import type { Cluster, QueryOptions, QueryResult } from "couchbase";
+import { type Cluster, type QueryOptions, QueryProfileMode, type QueryResult, QueryScanConsistency } from "couchbase";
 import { log, warn } from "../../telemetry/logger";
 import { CouchbaseErrorClassifier } from "./errors";
 import type { QueryExecutionOptions } from "./types";
@@ -157,11 +157,12 @@ export class QueryExecutor {
       // Instead of: SELECT * FROM `bucket`.`scope`.`collection`
       queryContext: options.queryContext,
 
-      scanConsistency: options.scanConsistency || "request_plus",
+      scanConsistency:
+        options.scanConsistency === "notBounded" ? QueryScanConsistency.NotBounded : QueryScanConsistency.RequestPlus,
       timeout: options.timeout || 30000,
 
       // Enable query profiling if requested
-      profile: options.profile ? "timings" : undefined,
+      profile: options.profile ? QueryProfileMode.Timings : undefined,
 
       // Enable metrics collection (default: true)
       metrics: options.metrics !== false,
@@ -169,7 +170,7 @@ export class QueryExecutor {
       // Client context ID for tracing
       clientContextId: options.clientContextId || QueryExecutor.generateClientContextId(),
 
-      readonly: options.readonly,
+      readOnly: options.readonly,
     };
 
     // Add request ID if provided (for correlation)

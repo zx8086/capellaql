@@ -68,20 +68,33 @@ export async function getSystemHealth(): Promise<SystemHealthStatus> {
     const dbHealth = databaseHealth.status === "fulfilled" ? databaseHealth.value : null;
     const dbPing = databasePing.status === "fulfilled" ? databasePing.value : null;
 
+    // Map Couchbase HealthStatus to SystemHealthStatus (exclude "critical"/"disconnected")
+    let dbStatus: "healthy" | "degraded" | "unhealthy" = "unhealthy";
+    if (dbHealth?.status === "healthy") dbStatus = "healthy";
+    else if (dbHealth?.status === "degraded") dbStatus = "degraded";
+
     const databaseComponent = {
-      status: dbHealth?.status || ("unhealthy" as const),
-      latency: dbPing?.latency,
-      circuitBreaker: dbHealth?.details.circuitBreaker || { state: "unknown", failures: 0, successes: 0 },
-      details: dbHealth?.details.ping,
-      error:
-        dbHealth?.details.error || (databaseHealth.status === "rejected" ? databaseHealth.reason?.message : undefined),
+      status: dbStatus,
+      latency: dbPing?.details?.latency,
+      circuitBreaker: dbHealth?.details?.circuitBreaker || { state: "unknown", failures: 0, successes: 0 },
+      details: dbHealth?.details?.ping,
+      error: dbHealth?.error || (databaseHealth.status === "rejected" ? databaseHealth.reason?.message : undefined),
     };
 
     // Process runtime health
     const rtHealth = runtimeHealth.status === "fulfilled" ? runtimeHealth.value : null;
+    const rtMemory = rtHealth?.memory;
     const runtimeComponent = {
       status: rtHealth?.status === "healthy" ? ("healthy" as const) : ("unhealthy" as const),
-      memory: rtHealth?.memory || { used: 0, free: 0, total: 0, heapUsed: 0, heapTotal: 0 },
+      memory: rtMemory
+        ? {
+            used: rtMemory.heapUsed,
+            free: rtMemory.heapTotal - rtMemory.heapUsed,
+            total: rtMemory.rss,
+            heapUsed: rtMemory.heapUsed,
+            heapTotal: rtMemory.heapTotal,
+          }
+        : { used: 0, free: 0, total: 0, heapUsed: 0, heapTotal: 0 },
       environment: rtHealth?.config.environment || "unknown",
       version: rtHealth?.runtime.version || "unknown",
       error: runtimeHealth.status === "rejected" ? runtimeHealth.reason?.message : undefined,
@@ -89,11 +102,20 @@ export async function getSystemHealth(): Promise<SystemHealthStatus> {
 
     // Process telemetry health
     const telHealth = telemetryHealth.status === "fulfilled" ? telemetryHealth.value : null;
+    const telExporters = telHealth?.exporters;
     const telemetryComponent = {
       status: telHealth?.status || ("unhealthy" as const),
-      exporters: telHealth?.exporters || { traces: false, metrics: false, logs: false },
-      circuitBreaker: telHealth?.circuitBreaker || { state: "unknown", failures: 0 },
-      error: telHealth?.error || (telemetryHealth.status === "rejected" ? telemetryHealth.reason?.message : undefined),
+      exporters: telExporters
+        ? {
+            traces: telExporters.traces?.status === "healthy",
+            metrics: telExporters.metrics?.status === "healthy",
+            logs: telExporters.logs?.status === "healthy",
+          }
+        : { traces: false, metrics: false, logs: false },
+      circuitBreaker: telHealth?.circuitBreaker
+        ? { state: telHealth.circuitBreaker.state, failures: telHealth.circuitBreaker.totalFailures || 0 }
+        : { state: "unknown", failures: 0 },
+      error: telemetryHealth.status === "rejected" ? telemetryHealth.reason?.message : undefined,
     };
 
     // Calculate overall health status

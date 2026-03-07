@@ -461,5 +461,4 @@ export {
   EnvArray,
 };
 
-// Re-export individual section types for backward compatibility
-export type { ApplicationConfig, CapellaConfig, RuntimeConfig, DeploymentConfig, TelemetryConfig, Config };
+// Note: Individual section types are already exported via the interface declarations above

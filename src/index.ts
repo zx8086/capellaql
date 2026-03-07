@@ -84,16 +84,8 @@ const {
 } = middleware;
 
 const { StaticResponses } = types;
-type RequestContext = typeof types.RequestContext extends new (
-  ...args: infer _
-) => infer R
-  ? R
-  : typeof types.RequestContext;
-type WebSocketData = typeof types.WebSocketData extends new (
-  ...args: infer _
-) => infer R
-  ? R
-  : typeof types.WebSocketData;
+type RequestContext = import("./server/types").RequestContext;
+type WebSocketData = import("./server/types").WebSocketData;
 
 const { shouldUpgradeWebSocket, websocketHandlers } = websocket;
 
@@ -158,7 +150,7 @@ function createRequestContext(request: Request): RequestContext {
  * Wrap a handler with the middleware pipeline
  */
 function withMiddleware(
-  handler: (request: Request, context: RequestContext) => Promise<Response>
+  handler: (request: Request, context: RequestContext) => Response | Promise<Response>
 ): (request: Request, context: RequestContext) => Promise<Response> {
   const pipeline = compose(
     methodValidationMiddleware,
@@ -171,7 +163,7 @@ function withMiddleware(
   );
 
   return async (request: Request, context: RequestContext) => {
-    return pipeline(request, context, () => handler(request, context));
+    return pipeline(request, context, async () => handler(request, context));
   };
 }
 
@@ -195,13 +187,13 @@ const wrappedHealthHandlers = {
 
 const wrappedGraphqlHandler = withMiddleware(graphqlHandler);
 
-let server: Server | null = null;
+let server: Server<WebSocketData> | null = null;
 let isShuttingDown = false;
 
 /**
  * Create and start the Bun HTTP server
  */
-async function createServer(): Promise<Server> {
+async function createServer(): Promise<Server<WebSocketData>> {
   log("Server starting...");
   telemetryLogger.initialize();
   initializeHttpMetrics();

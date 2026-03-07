@@ -97,7 +97,7 @@ class ConfigurationWatcher {
         timestamp: Date.now(),
       };
 
-      log(`Configuration file changed:`, event);
+      log(`Configuration file changed:`, event as unknown as Record<string, unknown>);
 
       // Notify all handlers
       for (const handler of this.handlers) {

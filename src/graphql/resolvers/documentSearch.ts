@@ -7,13 +7,14 @@ import { createCouchbaseSearchSpan, debug, err, log } from "../../telemetry";
 import type { GraphQLContext } from "../context";
 import { type DocumentSearchArgs, DocumentSearchArgsSchema, withValidation } from "../validation/schemas";
 
-interface SearchResult {
+export interface SearchResult {
   bucket: string;
   scope: string;
   collection: string;
   data: { id: string; [key: string]: any } | null;
   timeTaken: number;
   error?: string;
+  [key: string]: unknown;
 }
 
 /**

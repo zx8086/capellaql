@@ -10,6 +10,8 @@ function createMockContext(overrides: Partial<RequestContext> = {}): RequestCont
     startTime: Date.now(),
     url: new URL("http://localhost:4000/graphql"),
     clientIp: "127.0.0.1",
+    headers: new Headers(),
+    method: "GET",
     ...overrides,
   };
 }

@@ -1,10 +1,11 @@
 /* tests/shared/test-skip-conditions.ts - Graceful test skipping for unavailable services */
 
-import { test } from "bun:test";
-
 /**
  * Skip test if a service is unavailable at the given health URL
  * Following testing-implementation-guide-v1.md patterns for live backend testing
+ *
+ * Throws an error to abort the test when the service is unavailable.
+ * Callers should invoke this at the top of their test body.
  */
 export async function skipIfServiceUnavailable(
   serviceName: string,
@@ -17,11 +18,16 @@ export async function skipIfServiceUnavailable(
     });
 
     if (!response.ok) {
-      test.skip(`${serviceName} unavailable (HTTP ${response.status})`);
+      console.warn(`[SKIP] ${serviceName} unavailable (HTTP ${response.status})`);
+      throw new Error(`[SKIP] ${serviceName} unavailable (HTTP ${response.status})`);
     }
   } catch (error) {
+    if (error instanceof Error && error.message.startsWith("[SKIP]")) {
+      throw error;
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    test.skip(`${serviceName} unavailable at ${healthUrl}: ${errorMessage}`);
+    console.warn(`[SKIP] ${serviceName} unavailable at ${healthUrl}: ${errorMessage}`);
+    throw new Error(`[SKIP] ${serviceName} unavailable at ${healthUrl}: ${errorMessage}`);
   }
 }
 
@@ -30,7 +36,7 @@ export async function skipIfServiceUnavailable(
  * Checks via the application's health endpoint
  */
 export async function skipIfCouchbaseUnavailable(appBaseUrl: string = "http://localhost:4000"): Promise<void> {
-  await skipIfServiceUnavailable("Couchbase", `${appBaseUrl}/health/database`);
+  await skipIfServiceUnavailable("Couchbase", `${appBaseUrl}/health/system`);
 }
 
 /**

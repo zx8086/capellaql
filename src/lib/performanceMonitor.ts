@@ -218,8 +218,8 @@ class PerformanceMonitor {
     const { result: pingResult, duration: latency } = await BunPerf.measure(() => connectionManager.ping());
 
     let connectionStatus: "connected" | "disconnected" | "degraded" = "disconnected";
-    if (pingResult.success) {
-      connectionStatus = pingResult.latency && pingResult.latency < 1000 ? "connected" : "degraded";
+    if (pingResult.status === "healthy" || pingResult.status === "degraded") {
+      connectionStatus = pingResult.details?.latency && pingResult.details.latency < 1000 ? "connected" : "degraded";
     }
 
     return {

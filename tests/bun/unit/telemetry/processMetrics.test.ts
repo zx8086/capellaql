@@ -177,6 +177,7 @@ describe("Process Metrics Module", () => {
         durationMs: 5,
         heapBefore: 100000000,
         heapAfter: 80000000,
+        freedBytes: 20000000,
         timestamp: Date.now(),
       };
 
@@ -191,6 +192,7 @@ describe("Process Metrics Module", () => {
         durationMs: 50,
         heapBefore: 200000000,
         heapAfter: 100000000,
+        freedBytes: 100000000,
         timestamp: Date.now(),
       };
 
@@ -353,8 +355,8 @@ describe("Memory Monitoring Lifecycle", () => {
   describe("pressure level transitions", () => {
     test("level changes are logged appropriately", () => {
       // Simulate level change detection
-      const previousLevel = "normal";
-      const newLevel = "medium";
+      const previousLevel: string = "normal";
+      const newLevel: string = "medium";
 
       const shouldLog = previousLevel !== newLevel;
       expect(shouldLog).toBe(true);

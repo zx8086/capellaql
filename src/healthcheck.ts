@@ -12,7 +12,7 @@ async function main() {
 
     try {
       const response = await fetch(healthUrl, {
-        timeout: 5000, // 5 second timeout
+        signal: AbortSignal.timeout(5000), // 5 second timeout
       });
 
       if (response.ok) {
