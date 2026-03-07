@@ -6,9 +6,15 @@ import { createRandomSelector } from "../utils/graphql-helpers.ts";
 // Load test data using SharedArray for memory efficiency
 export const brands = new SharedArray("brands", () => JSON.parse(open("./brands.json")));
 
-export const queries = new SharedArray("queries", () => JSON.parse(open("./queries.json")));
+const queriesData = JSON.parse(open("./queries.json"));
+export const queries = new SharedArray("queries", () =>
+  Object.entries(queriesData).map(([name, data]) => ({ name, ...(data as Record<string, unknown>) }))
+);
 
-export const scenarios = new SharedArray("test-scenarios", () => JSON.parse(open("./test-scenarios.json")));
+const scenariosData = JSON.parse(open("./test-scenarios.json"));
+export const scenarios = new SharedArray("test-scenarios", () =>
+  Object.entries(scenariosData).map(([name, data]) => ({ name, ...(data as Record<string, unknown>) }))
+);
 
 // Create selectors for randomization
 export const brandSelector = createRandomSelector(brands);
@@ -102,12 +108,11 @@ export const variableGenerators: Record<string, () => any> = {
 };
 
 export const getQueryWithVariables = (operationName: string) => {
-  const queryDef = queries.find((q: any) => Object.keys(q)[0] === operationName);
-  if (!queryDef) {
+  const queryData = queries.find((q: any) => q.name === operationName);
+  if (!queryData) {
     throw new Error(`Query '${operationName}' not found`);
   }
 
-  const queryData = queryDef[operationName];
   const generator = variableGenerators[operationName];
 
   if (!generator) {
@@ -124,7 +129,7 @@ export const getQueryWithVariables = (operationName: string) => {
 
 // Scenario-based test data generators
 export const getScenarioStep = (scenarioName: string) => {
-  const scenario = scenarios[scenarioName];
+  const scenario = scenarios.find((s: any) => s.name === scenarioName);
   if (!scenario) {
     throw new Error(`Scenario '${scenarioName}' not found`);
   }

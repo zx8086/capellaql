@@ -2,32 +2,12 @@
 
 import { check, sleep } from "k6";
 import http from "k6/http";
-import type { Options } from "k6/options";
-import { getConfig, getHealthEndpoint, performanceThresholds } from "../utils/config.ts";
+import { getConfig, getHealthEndpoint } from "../utils/config.ts";
 import { httpDuration, httpSuccessRate } from "../utils/metrics.ts";
 
-export const options: Options = {
-  vus: 3,
-  duration: "3m",
-  thresholds: {
-    http_req_duration: performanceThresholds.health.smoke,
-    http_req_failed: performanceThresholds.errors.smoke,
-    http_success_rate: ["rate>0.99"],
-  },
-  tags: {
-    test_type: "smoke",
-    component: "health",
-  },
-};
-
 const config = getConfig();
-console.log(`Health Smoke Test Configuration:
-- VUs: ${options.vus}
-- Duration: ${options.duration}
-- Target: ${config.baseUrl}/health
-- Thresholds: P95<50ms, P99<100ms`);
 
-export default function healthSmokeTest(): void {
+export function healthSmokeTest(): void {
   const startTime = Date.now();
 
   const params = {

@@ -1,33 +1,10 @@
 /* test/k6/smoke/graphql-smoke.ts */
 
 import { sleep } from "k6";
-import type { Options } from "k6/options";
-import { getAllOperations, getQueryWithVariables } from "../data/test-data-loader.ts";
-import { performanceThresholds } from "../utils/config.js";
+import { getQueryWithVariables } from "../data/test-data-loader.ts";
 import { executeGraphQLQuery, validateGraphQLResponse } from "../utils/graphql-helpers.ts";
 
-export const options: Options = {
-  vus: 2,
-  duration: "2m",
-  thresholds: {
-    http_req_duration: performanceThresholds.graphql.simple,
-    http_req_failed: performanceThresholds.errors.smoke,
-    graphql_success_rate: ["rate>0.99"],
-    graphql_errors: ["count<5"],
-  },
-  tags: {
-    test_type: "smoke",
-    component: "graphql",
-  },
-};
-
-console.log(`GraphQL Smoke Test Configuration:
-- VUs: ${options.vus}
-- Duration: ${options.duration}
-- Testing ${getAllOperations().length} GraphQL operations
-- Thresholds: P95<200ms, P99<500ms`);
-
-export default function graphqlSmokeTest(): void {
+export function graphqlSmokeTest(): void {
   // Test a subset of operations for smoke testing
   const smokeOperations = ["looksSummary", "looks", "getAllSeasonalAssignments"];
   const operation = smokeOperations[Math.floor(Math.random() * smokeOperations.length)];

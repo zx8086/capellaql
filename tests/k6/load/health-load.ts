@@ -2,37 +2,12 @@
 
 import { check, sleep } from "k6";
 import http from "k6/http";
-import type { Options } from "k6/options";
-import { getConfig, getHealthEndpoint, performanceThresholds } from "../utils/config.ts";
+import { getConfig, getHealthEndpoint } from "../utils/config.ts";
 import { httpDuration, httpSuccessRate } from "../utils/metrics.ts";
 
-export const options: Options = {
-  stages: [
-    { duration: "2m", target: 20 }, // Warm-up
-    { duration: "5m", target: 20 }, // Steady state
-    { duration: "2m", target: 40 }, // Ramp up
-    { duration: "3m", target: 40 }, // Peak load
-    { duration: "3m", target: 0 }, // Ramp down
-  ],
-  thresholds: {
-    http_req_duration: performanceThresholds.health.load,
-    http_req_failed: performanceThresholds.errors.load,
-    http_success_rate: ["rate>0.99"],
-  },
-  tags: {
-    test_type: "load",
-    component: "health",
-  },
-};
-
 const config = getConfig();
-console.log(`Health Load Test Configuration:
-- Peak Load: 40 VUs
-- Duration: 15 minutes total
-- Target: ${config.baseUrl}/health
-- Thresholds: P95<100ms, P99<200ms`);
 
-export default function healthLoadTest(): void {
+export function healthLoadTest(): void {
   const startTime = Date.now();
 
   const params = {

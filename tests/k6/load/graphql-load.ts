@@ -1,59 +1,11 @@
 /* test/k6/load/graphql-load.ts */
 
 import { sleep } from "k6";
-import type { Options } from "k6/options";
 import { getQueryWithVariables } from "../data/test-data-loader.ts";
-import { performanceThresholds } from "../utils/config.ts";
 import { executeGraphQLQuery, validateGraphQLResponse } from "../utils/graphql-helpers.ts";
-
-export const options: Options = {
-  scenarios: {
-    simpleQueries: {
-      executor: "ramping-vus",
-      stages: [
-        { duration: "2m", target: 10 }, // Warm-up
-        { duration: "5m", target: 20 }, // Steady state
-        { duration: "2m", target: 30 }, // Peak
-        { duration: "3m", target: 30 }, // Hold peak
-        { duration: "3m", target: 0 }, // Ramp down
-      ],
-      exec: "runSimpleQueries",
-      tags: { operation_type: "simple" },
-    },
-    complexQueries: {
-      executor: "ramping-vus",
-      stages: [
-        { duration: "3m", target: 5 }, // Warm-up
-        { duration: "5m", target: 10 }, // Steady state
-        { duration: "2m", target: 15 }, // Peak
-        { duration: "3m", target: 15 }, // Hold peak
-        { duration: "2m", target: 0 }, // Ramp down
-      ],
-      exec: "runComplexQueries",
-      tags: { operation_type: "complex" },
-    },
-  },
-  thresholds: {
-    "http_req_duration{operation_type:simple}": performanceThresholds.graphql.simple,
-    "http_req_duration{operation_type:complex}": performanceThresholds.graphql.complex,
-    http_req_failed: performanceThresholds.errors.load,
-    graphql_success_rate: ["rate>0.98"],
-    graphql_errors: ["count<20"],
-  },
-  tags: {
-    test_type: "load",
-    component: "graphql",
-  },
-};
 
 const simpleOperations = ["looksSummary", "looks", "getImageUrlCheck", "imageDetails"];
 const complexOperations = ["getAllSeasonalAssignments", "optionsSummary", "optionsProductView"];
-
-console.log(`GraphQL Load Test Configuration:
-- Simple Queries: Peak 30 VUs (${simpleOperations.join(", ")})
-- Complex Queries: Peak 15 VUs (${complexOperations.join(", ")})
-- Duration: 15 minutes total
-- Thresholds: Simple P95<200ms, Complex P95<1000ms`);
 
 export function runSimpleQueries(): void {
   const operation = simpleOperations[Math.floor(Math.random() * simpleOperations.length)];

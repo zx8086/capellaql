@@ -6,4 +6,4 @@
  *
  * @see https://gitlab.com/platform_engineering/platform-components/quality-assurance-runner
  */
-export { options, default } from "./soak-test";
+export { options, default } from "./soak-test.ts";

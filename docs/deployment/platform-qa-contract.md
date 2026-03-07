@@ -1,6 +1,6 @@
 # Application Contract: Platform QA Components
 
-> **Version:** 1.0
+> **Version:** 1.2
 > **Audience:** Developers, tech leads, and platform consumers
 > **Last updated:** March 2026
 
@@ -118,11 +118,39 @@ tests/k6/
 └── soak/index.ts            # Required for soak profile
 ```
 
-**Entry point pattern:**
+**Entry point patterns:**
+
+K6 requires exactly one `default` export and one `options` export per entry point. When a profile directory has multiple test files, use one of two patterns:
+
+**Pattern A — Single re-export** (when one test is the primary test):
+```typescript
+// tests/k6/stress/index.ts
+export { options, default } from "./system-stress.ts";
+```
+
+**Pattern B — Multi-scenario** (when all tests should run together):
 ```typescript
 // tests/k6/smoke/index.ts
-export { options, default } from './health-smoke';
+import { healthSmokeTest } from "./health-smoke.ts";
+import { graphqlSmokeTest } from "./graphql-smoke.ts";
+
+export const options = {
+  scenarios: {
+    health: { executor: "constant-vus", exec: "healthSmoke", vus: 3, duration: "3m" },
+    graphql: { executor: "constant-vus", exec: "graphqlSmoke", vus: 2, duration: "2m" },
+  },
+  thresholds: { http_req_duration: ["p(95)<50"], http_req_failed: ["rate<0.001"] },
+};
+
+export function healthSmoke() { healthSmokeTest(); }
+export function graphqlSmoke() { graphqlSmokeTest(); }
 ```
+
+Sibling files export named functions (not `default`) and have no `options` export.
+
+**CapellaQL uses:**
+- `smoke/` and `load/` — Pattern B (multi-scenario combining health + GraphQL tests)
+- `stress/`, `spike/`, `soak/` — Pattern A (single re-export)
 
 ### Playwright Tests
 

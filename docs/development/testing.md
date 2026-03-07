@@ -2566,37 +2566,62 @@ This validates:
 ```
 tests/k6/
 ├── smoke/
-│   ├── index.ts              # Platform entry point (REQUIRED)
-│   ├── health-smoke.ts
-│   └── graphql-smoke.ts
+│   ├── index.ts              # Multi-scenario entry point (health + graphql)
+│   ├── health-smoke.ts       # Exports: healthSmokeTest()
+│   └── graphql-smoke.ts      # Exports: graphqlSmokeTest()
 ├── load/
-│   ├── index.ts              # Platform entry point (REQUIRED)
-│   ├── health-load.ts
-│   └── graphql-load.ts
+│   ├── index.ts              # Multi-scenario entry point (health + graphql)
+│   ├── health-load.ts        # Exports: healthLoadTest()
+│   ├── graphql-load.ts       # Exports: runSimpleQueries(), runComplexQueries()
+│   ├── complete-graphql-coverage.ts  # Supplementary (standalone)
+│   └── graphql-endpoints-modern.ts   # Supplementary (standalone)
 ├── stress/
-│   ├── index.ts              # Platform entry point (REQUIRED)
+│   ├── index.ts              # Re-exports system-stress.ts
 │   └── system-stress.ts
 ├── spike/
-│   ├── index.ts              # Platform entry point (REQUIRED)
+│   ├── index.ts              # Re-exports spike-test.ts
 │   └── spike-test.ts
 ├── soak/
-│   ├── index.ts              # Platform entry point (REQUIRED)
+│   ├── index.ts              # Re-exports soak-test.ts
 │   └── soak-test.ts
-├── data/                     # Test data loaders
+├── data/                     # Test data loaders (SharedArray)
 ├── utils/                    # Shared utilities (config, helpers, metrics)
 └── scenarios/                # Business scenario tests
 ```
 
-### Entry Point Pattern
+### Entry Point Patterns
 
-Each profile directory must have an `index.ts` that re-exports the primary test:
+The platform runs `k6 run tests/k6/{profile}/index.ts`, so each profile directory **must** have an `index.ts`.
 
+**Pattern A — Single re-export** (stress, spike, soak):
 ```typescript
-// tests/k6/smoke/index.ts
-export { options, default } from "./health-smoke";
+// tests/k6/stress/index.ts
+export { options, default } from "./system-stress.ts";
 ```
 
-The platform runs `k6 run tests/k6/{profile}/index.ts`, so this entry point is **mandatory**.
+**Pattern B — Multi-scenario** (smoke, load):
+
+When a profile has multiple test files, combine them using K6 scenarios:
+```typescript
+// tests/k6/smoke/index.ts
+import { healthSmokeTest } from "./health-smoke.ts";
+import { graphqlSmokeTest } from "./graphql-smoke.ts";
+
+export const options: Options = {
+  scenarios: {
+    health: { executor: "constant-vus", exec: "healthSmoke", vus: 3, duration: "3m" },
+    graphql: { executor: "constant-vus", exec: "graphqlSmoke", vus: 2, duration: "2m" },
+  },
+  thresholds: { ... },
+};
+
+export function healthSmoke() { healthSmokeTest(); }
+export function graphqlSmoke() { graphqlSmokeTest(); }
+```
+
+Sibling files export named functions (not `export default`) and have no `export const options`.
+Supplementary tests (e.g., `complete-graphql-coverage.ts`) remain standalone and can be run
+via the platform's `test_script` input or locally with `k6 run tests/k6/load/complete-graphql-coverage.ts`.
 
 ### Platform Environment Variables
 
