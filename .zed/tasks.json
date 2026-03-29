@@ -1,4 +1,7 @@
 [
+  // ============================================================
+  // GRAPHQL - PERFORMANCE & QUERIES
+  // ============================================================
   {
     "label": "graphql: performance stats",
     "command": "echo '=== GraphQL Performance Stats ===' && curl -sf http://localhost:4000/health/graphql | jq '{resolvers: .resolvers, insights: .insights}'",
@@ -41,6 +44,16 @@
     "use_new_terminal": false,
     "reveal": "always"
   },
+  {
+    "label": "graphql: playground",
+    "command": "open http://localhost:4000/graphql",
+    "use_new_terminal": false,
+    "reveal": "always"
+  },
+
+  // ============================================================
+  // HEALTH ENDPOINTS
+  // ============================================================
   {
     "label": "health: basic",
     "command": "echo '=== Health Check ===' && curl -sf http://localhost:4000/health | jq .",
@@ -137,6 +150,10 @@
     "use_new_terminal": false,
     "reveal": "always"
   },
+
+  // ============================================================
+  // DEV / SERVER
+  // ============================================================
   {
     "label": "dev: start",
     "command": "bun run dev",
@@ -161,6 +178,10 @@
     "use_new_terminal": false,
     "reveal": "always"
   },
+
+  // ============================================================
+  // TESTING
+  // ============================================================
   {
     "label": "test: k6 smoke",
     "command": "k6 run test/k6/smoke-test-health.js",
@@ -185,6 +206,10 @@
     "use_new_terminal": true,
     "allow_concurrent_runs": false
   },
+
+  // ============================================================
+  // BUILD & QUALITY
+  // ============================================================
   {
     "label": "build: production",
     "command": "bun run build",
@@ -203,6 +228,10 @@
     "use_new_terminal": false,
     "reveal": "always"
   },
+
+  // ============================================================
+  // OPENTELEMETRY
+  // ============================================================
   {
     "label": "otel: telemetry detailed",
     "command": "echo '=== Telemetry Detailed ===' && curl -sf http://localhost:4000/health/telemetry/detailed | jq .",
@@ -275,24 +304,10 @@
     "use_new_terminal": false,
     "reveal": "always"
   },
-  {
-    "label": "graphql: playground",
-    "command": "open http://localhost:4000/graphql",
-    "use_new_terminal": false,
-    "reveal": "always"
-  },
-  {
-    "label": "docker: ps",
-    "command": "echo '=== Running Containers ===' && docker ps --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}'",
-    "use_new_terminal": false,
-    "reveal": "always"
-  },
-  {
-    "label": "docker: ps (all)",
-    "command": "echo '=== All Containers ===' && docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}'",
-    "use_new_terminal": false,
-    "reveal": "always"
-  },
+
+  // ============================================================
+  // DOCKER - BUILD & COMPOSE
+  // ============================================================
   {
     "label": "docker: build",
     "command": "./scripts/docker-build.sh",
@@ -365,6 +380,10 @@
     "use_new_terminal": false,
     "reveal": "always"
   },
+
+  // ============================================================
+  // DOCKER SCOUT & SECURITY
+  // ============================================================
   {
     "label": "docker: scout CVEs",
     "command": "echo '=== Docker Scout CVE Scan ===' && echo 'Image: docker.io/zx8086/capellaql:latest' && echo 'Filter: CRITICAL, HIGH' && echo '---' && docker scout cves docker.io/zx8086/capellaql:latest --only-severities critical,high 2>&1 | head -50",
@@ -413,6 +432,10 @@
     "use_new_terminal": false,
     "reveal": "always"
   },
+
+  // ============================================================
+  // GITHUB WORKFLOWS
+  // ============================================================
   {
     "label": "github: workflow runs (CI/CD)",
     "command": "echo '=== Docker CI/CD Workflow Runs ===' && gh run list --workflow='Docker CI/CD Pipeline' --limit=5",

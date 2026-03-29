@@ -3,342 +3,256 @@
 ## Getting Started
 
 ### Prerequisites
-- **Bun Runtime**: v1.1.35+ (recommended: v1.2.23+)
-- **Kong Admin API**: Access to Kong instance for integration testing
-- **Redis** (optional): For high-availability cache testing
+- Bun runtime v1.0+ (install from bun.sh)
+- Couchbase Capella cluster access (or local Couchbase Server)
+- OpenTelemetry Collector (optional, for observability)
 
 ### Quick Start
-
-#### 1. Install Dependencies
 ```bash
 bun install
-```
-
-#### 2. Environment Setup
-Copy and configure environment variables:
-```bash
 cp .env.example .env
-# Edit .env with your Kong configuration
-```
-
-#### 3. Start Development Server
-```bash
+# Configure Couchbase credentials in .env
 bun run dev
 ```
 
-### DevContainer Development (Optional)
-
-For isolated local development with Docker-based Kong, Redis, and PostgreSQL:
-
-1. **Zed IDE**: Open project folder -> Click "Open in Dev Container"
-2. **Command Line**:
-   ```bash
-   bun run devcontainer:up      # Start infrastructure
-   bun run dev:devcontainer     # Start with local Docker config
-   ```
-
-See [devcontainer.md](devcontainer.md) for detailed instructions.
-
-**Note:** DevContainer mode uses `.env.devcontainer` with `KONG_ADMIN_URL=http://localhost:8001`.
-For live endpoint testing, use the standard `.env` with production Kong URLs.
+Server starts at http://localhost:4000
+- GraphQL endpoint: http://localhost:4000/graphql
+- Health check: http://localhost:4000/health
 
 ## Development Commands
 
-### Local Development
+### Server
 ```bash
-# Install dependencies
-bun install
+bun run dev                    # Start dev server
+bun run dev:verbose            # Dev with verbose fetch logging
+bun run dev:debug              # Dev with inspector
+bun run start                  # Start server
+bun run start:prod             # Start with NODE_ENV=production
+```
 
-# Start development server with hot reload
-bun run dev
-
-# Start with specific environments
-bun run dev:env:development    # Development environment
-bun run dev:env:staging        # Staging environment
-bun run dev:env:production     # Production environment
-
-# Clean development restart
-bun run dev:clean          # Kill existing processes and start fresh
-bun run server:kill        # Kill processes on port 3000
-
-# Run with specific telemetry mode
-TELEMETRY_MODE=both bun run dev
+### Build
+```bash
+bun run build                  # Default build
+bun run build:dev              # Development build
+bun run build:prod             # Production build (optimized)
+bun run build:docker           # Docker-specific build
+bun run build:analyze          # Build with bundle analysis
 ```
 
 ### Code Quality
 ```bash
-# Type checking
-bun run typecheck
-
-# Code quality checks
-bun run quality:check      # Full quality check (TypeScript + Biome + YAML)
-bun run quality:fix        # Auto-fix quality issues
-
-# Individual checks
-bun run biome:check        # Biome linting and formatting
-bun run biome:fix          # Auto-fix Biome issues
+bun run typecheck              # TypeScript type checking
+bun run lint                   # Biome linting
+bun run lint:fix               # Auto-fix lint issues
+bun run format                 # Biome formatting
+bun run quality                # Typecheck + lint combined
+bun run quality:fix            # Typecheck + lint:fix + format
 ```
 
-### Testing Commands
+### Testing
 ```bash
-# Unit and integration tests
-bun run test:bun           # All Bun tests (unit + integration)
-bun run test:bun:watch     # Watch mode
+# Bun tests
+bun run test:bun               # All Bun tests
+bun run test:bun:unit          # Unit tests only
+bun run test:bun:integration   # Integration tests only
+bun run test:bun:e2e           # End-to-end tests
+bun run test:bun:watch         # Watch mode
+bun run test:bun:ci            # CI mode with coverage + JUnit XML
 
-# End-to-end tests
-bun run test:e2e           # All Playwright E2E tests (direct mode)
-bun run test:e2e:kong      # E2E tests via Kong (captures http-log)
-bun run test:e2e:ui        # Playwright UI mode
+# Playwright E2E
+bun run test:playwright        # Headless
+bun run test:playwright:ui     # Interactive UI mode
+bun run test:playwright:debug  # Debug mode
 
-# Performance tests (K6)
-bun run test:k6:smoke:health    # Health endpoint smoke test
-bun run test:k6:smoke:tokens    # Token endpoint smoke test
-bun run test:k6:smoke:openapi   # OpenAPI endpoint smoke test
-bun run test:k6:load            # Load testing suite
-bun run test:k6:stress          # Stress testing suite
+# K6 Performance
+bun run test:k6:smoke:all      # Smoke tests (quick validation)
+bun run test:k6:load:all       # Load tests (sustained traffic)
+bun run test:k6:stress:all     # Stress tests (high load)
+bun run test:k6:spike          # Spike test (traffic bursts)
+bun run test:k6:soak           # Soak test (long-duration)
+bun run test:k6:scenario:all   # Business scenario tests
 
-# Test suites
-bun run test:suite         # Run all tests (Bun + Playwright + K6)
-bun run test:suite:quick   # Quick test suite (smoke tests only)
+# Full suites
+bun run test                   # Bun + Playwright
+bun run test:all               # Bun + Playwright + K6 smoke
+
+# Mutation testing
+bun run test:mutation          # StrykerJS mutation tests
 ```
 
-### Script Organization
-
-The project uses **16 hierarchical script categories**:
-
-| Category | Purpose | Example Commands |
-|----------|---------|------------------|
-| **dev** | Development servers | `dev`, `dev:clean`, `dev:env:development` |
-| **test** | All testing | `test:bun`, `test:e2e`, `test:k6:*` |
-| **docker** | Container operations | `docker:build`, `docker:local`, `docker:security:*` |
-| **redis** | Redis operations | `redis:start`, `redis:stop`, `redis:restart` |
-| **profile** | Performance profiling | `profile:scenario:tokens`, `profile:k6:smoke` |
-| **kong** | Kong operations | `kong:simulator`, `kong:test` |
-| **quality** | Code quality | `quality:check`, `quality:fix` |
-| **biome** | Biome linting | `biome:check`, `biome:check:write` |
-| **typecheck** | TypeScript validation | `typecheck` |
-| **health** | Service health | `server:health-check` |
-| **server** | Process management | `server:kill` |
-| **docs** | API documentation | `docs:generate` |
-| **mutation** | Mutation testing | `test:mutation`, `test:mutation:fresh` |
-| **ci** | CI/CD utilities | `ci:smoke`, `ci:validate` |
-| **fix** | Quick fixes | `fix:bun-symlink`, `fix:bun-full` |
-| **devcontainer** | DevContainer | `devcontainer:up`, `devcontainer:down` |
-
-**Example Workflows:**
+### Health Checks
 ```bash
-# Full development workflow
-bun install                    # Install dependencies
-bun run dev                    # Start development server
-bun run test:bun               # Run unit tests
-bun run quality:check          # Validate code quality
-
-# Testing workflow
-bun run test:suite:quick       # Quick validation
-bun run test:k6:smoke:health   # Performance smoke test
-bun run test:e2e               # Full E2E tests
-
-# Docker workflow
-bun run docker:build           # Build container
-bun run docker:security:full   # Security validation
-bun run docker:local           # Test locally
-```
-
-### Health and Debugging
-```bash
-# Health checks
-bun run health-check       # Quick health check via curl
-
-# Debug endpoints
-curl http://localhost:3000/health
-curl http://localhost:3000/metrics
-curl http://localhost:3000/debug/metrics/test
-```
-
-## Development Workflow
-
-### 1. Code Changes
-1. Make your changes in the `src/` directory
-2. The development server will automatically reload
-3. Check the console for any TypeScript errors
-
-### 2. Testing Changes
-```bash
-# Quick validation
-curl http://localhost:3000/health
-
-# Run tests
-bun run test:bun           # Unit tests
-bun run test:e2e           # E2E tests (requires Kong)
-```
-
-### 3. Quality Checks
-```bash
-# Before committing
-bun run quality:check      # Ensures code quality
-bun run typecheck          # Validates TypeScript
+bun run health:check           # Basic health check
+bun run health:all             # Comprehensive health report
 ```
 
 ## Project Structure
 
 ```
 src/
-├── adapters/              # External service adapters
-│   └── kong.adapter.ts    # Kong Admin API integration
-├── config/                # Configuration management
-│   ├── config.ts          # 4-pillar configuration
-│   └── schemas.ts         # Zod validation schemas
-├── handlers/              # HTTP request handlers
-│   ├── health.ts          # Health check endpoints
-│   ├── metrics.ts         # Metrics and monitoring
-│   ├── openapi.ts         # API documentation
-│   ├── profiling.ts       # Performance profiling
-│   └── tokens.ts          # JWT token generation
-├── middleware/            # HTTP middleware
-│   ├── cors.ts            # CORS handling
-│   └── error-handler.ts   # Error handling
-├── routes/                # HTTP routing
-│   └── router.ts          # Bun Routes API integration
-├── services/              # Business logic services
-│   ├── cache/             # Caching implementations
-│   ├── circuit-breaker/   # Circuit breaker services
-│   ├── jwt/               # JWT generation
-│   ├── legacy/            # Legacy Kong services
-│   └── telemetry/         # OpenTelemetry services
-└── index.ts               # Application entry point
+├── index.ts                    # Main entry point (Bun.serve)
+├── config/                     # 4-pillar configuration system
+│   ├── defaults.ts            # Default values (5 domains)
+│   ├── envMapping.ts          # Env var -> config path mapping
+│   ├── loader.ts              # Config loading and validation
+│   └── schemas.ts             # Zod validation schemas
+├── server/                     # HTTP server layer
+│   ├── handlers/
+│   │   ├── graphql.ts         # GraphQL Yoga handler
+│   │   └── health.ts         # 13 health check handlers
+│   ├── middleware/             # 7-stage middleware pipeline
+│   │   ├── compose.ts         # Middleware composition
+│   │   ├── rateLimit.ts       # Rate limiting
+│   │   ├── security.ts        # Security headers
+│   │   ├── cors.ts            # CORS handling
+│   │   ├── tracing.ts         # OpenTelemetry spans
+│   │   ├── logging.ts         # Request logging
+│   │   ├── backpressure.ts    # Request queuing
+│   │   └── methodValidation.ts # HTTP method validation
+│   ├── websocket/
+│   │   └── subscriptions.ts   # GraphQL subscriptions
+│   └── types.ts               # Server type definitions
+├── graphql/                    # GraphQL schema and resolvers
+│   ├── schema.ts              # makeExecutableSchema
+│   ├── typeDefs.ts            # GraphQL type definitions
+│   ├── context.ts             # Request context factory
+│   ├── types.ts               # TypeScript types
+│   ├── validation/            # Input validation
+│   └── resolvers/             # Domain resolvers (12+)
+├── lib/                        # Core libraries
+│   ├── couchbase/             # Database layer
+│   │   ├── connection-manager.ts  # Singleton connection
+│   │   ├── circuit-breaker.ts     # Resilience pattern
+│   │   ├── data-loader.ts         # Batch operations
+│   │   ├── kv-operations.ts       # Key-value operations
+│   │   ├── query-executor.ts      # N1QL queries
+│   │   ├── repository.ts          # Repository pattern
+│   │   ├── transaction-handler.ts # ACID transactions
+│   │   ├── errors.ts              # 25+ error types
+│   │   └── metrics.ts             # Query metrics
+│   ├── queryCache.ts          # Query result caching
+│   ├── graphqlResponseCache.ts # Response caching
+│   ├── bunSQLiteCache.ts      # SQLite cache layer
+│   ├── systemHealth.ts        # Health aggregation
+│   ├── memoryGuardian.ts      # Memory monitoring
+│   └── performanceMonitor.ts  # Performance profiling
+├── telemetry/                  # OpenTelemetry implementation
+│   ├── instrumentation.ts     # SDK setup
+│   ├── metrics/               # HTTP, GraphQL, Couchbase metrics
+│   ├── tracing/               # Distributed tracing
+│   ├── health/                # Telemetry health checks
+│   └── coordinator/           # Batch coordination
+├── logging/                    # Logging infrastructure (3-layer DI)
+│   ├── ports/                 # Logger interfaces
+│   ├── adapters/              # Pino + Winston adapters
+│   └── container.ts           # DI container
+├── errors/                     # Error handling
+│   ├── problem-details.ts     # RFC 7807 responses
+│   ├── error-codes.ts         # Error code constants
+│   └── result.ts              # Result<T,E> pattern
+├── models/                     # Data models and Zod schemas
+├── services/                   # Business logic
+│   └── health/                # Health service handlers
+└── utils/                      # Utility functions
 ```
-
-## Development Best Practices
-
-### Code Style
-- Follow TypeScript strict mode
-- Use Biome for consistent formatting
-- Prefer explicit return types for public APIs
-- Use descriptive variable and function names
-
-### Testing Approach
-- Write unit tests for business logic
-- Use integration tests for service interactions
-- E2E tests for complete user flows
-- Performance tests for critical paths
-
-### Error Handling
-- Use structured error responses
-- Include request IDs for tracing
-- Log errors with appropriate context
-- Handle circuit breaker states gracefully
-
-### Performance Considerations
-- Leverage Bun's native APIs (`Bun.serve()`, `crypto.subtle`)
-- Use caching for expensive operations
-- Implement circuit breakers for external dependencies
-- Monitor memory usage and response times
 
 ## Environment Configuration
 
-### Development (.env)
+Copy `.env.example` and configure these key sections:
+
+### Application
+| Variable | Default | Description |
+|----------|---------|-------------|
+| PORT | 4000 | Server port |
+| LOG_LEVEL | info | Log level (debug, info, warn, error) |
+| LOGGING_BACKEND | pino | Logger backend (pino or winston) |
+| YOGA_RESPONSE_CACHE_TTL | 900000 | GraphQL response cache TTL (ms) |
+| ALLOWED_ORIGINS | http://localhost:3000 | CORS allowed origins (comma-separated) |
+
+### Couchbase Capella
+| Variable | Default | Description |
+|----------|---------|-------------|
+| COUCHBASE_URL | couchbase://localhost | Connection string |
+| COUCHBASE_USERNAME | Administrator | Database username |
+| COUCHBASE_PASSWORD | password | Database password |
+| COUCHBASE_BUCKET | default | Bucket name |
+| COUCHBASE_SCOPE | _default | Scope name |
+| COUCHBASE_COLLECTION | _default | Collection name |
+
+### OpenTelemetry
+| Variable | Default | Description |
+|----------|---------|-------------|
+| ENABLE_OPENTELEMETRY | true | Enable/disable telemetry |
+| OTEL_EXPORTER_OTLP_TRACES_ENDPOINT | http://localhost:4318/v1/traces | Traces endpoint |
+| OTEL_EXPORTER_OTLP_METRICS_ENDPOINT | http://localhost:4318/v1/metrics | Metrics endpoint |
+| OTEL_EXPORTER_OTLP_LOGS_ENDPOINT | http://localhost:4318/v1/logs | Logs endpoint |
+
+See [Environment Variables Reference](../configuration/environment.md) for the complete list.
+
+## Path Aliases
+
+Configured in `tsconfig.json`:
+
+| Alias | Maps to |
+|-------|---------|
+| `$lib/*` | `src/lib/*` |
+| `$utils/*` | `src/utils/*` |
+| `$models/*` | `src/models/*` |
+| `$config` | `src/config` |
+| `$telemetry/*` | `src/telemetry/*` |
+| `$logging/*` | `src/logging/*` |
+| `$graphql/*` | `src/graphql/*` |
+| `$types/*` | `src/types/*` |
+| `$constants/*` | `src/constants/*` |
+
+## Docker Development
+
 ```bash
-NODE_ENV=development
-PORT=3000
-TELEMETRY_MODE=console
+# Build and run with Docker Compose
+docker compose up
 
-# Kong Configuration
-KONG_MODE=API_GATEWAY
-KONG_ADMIN_URL=http://kong-admin:8001
-KONG_ADMIN_TOKEN=your-dev-token
+# Build specific targets
+bun run docker:build           # Production build
+bun run docker:build:dev       # Development build
+bun run docker:run             # Run container with .env
 
-# JWT Configuration
-KONG_JWT_AUTHORITY=https://sts-api.dev.example.com/
-KONG_JWT_AUDIENCE=http://api.dev.example.com/
-JWT_EXPIRATION_MINUTES=15
+# Optional observability stack
+docker compose --profile observability up
 ```
 
-### Debugging Configuration
-```bash
-# Enable debug logging
-LOG_LEVEL=debug
-
-# Enable profiling (development only)
-PROFILING_ENABLED=true
-
-# Circuit breaker tuning
-CIRCUIT_BREAKER_TIMEOUT=1000
-CIRCUIT_BREAKER_ERROR_THRESHOLD=25
-```
-
-## Common Development Tasks
-
-### Adding New Endpoints
-1. Create handler in `src/handlers/`
-2. Add route to `src/routes/router.ts`
-3. Update OpenAPI spec in `src/handlers/openapi.ts`
-4. Add tests in `test/bun/` and `test/playwright/`
-
-### Modifying Configuration
-1. Update schema in `src/config/schemas.ts`
-2. Add environment variable mapping in `src/config/config.ts`
-3. Update documentation
-4. Add validation tests
-
-### Integrating External Services
-1. Create adapter in `src/adapters/`
-2. Add circuit breaker protection
-3. Implement caching if appropriate
-4. Add comprehensive error handling
-5. Write integration tests
+Docker Compose provides Jaeger (tracing), Prometheus (metrics), and Grafana (visualization) via the observability profile.
 
 ## Troubleshooting
 
-For comprehensive troubleshooting including error codes, diagnostics, and runbook procedures, see the [Troubleshooting Guide](../operations/troubleshooting.md).
-
-### Common Issues
-
-#### Port Already in Use
+### Server won't start
 ```bash
-# Kill existing processes
-bun run server:kill
-# Or manually
-lsof -ti:3000 | xargs kill -9
+# Check if port 4000 is in use
+lsof -i :4000
+
+# Kill existing process
+lsof -ti:4000 | xargs kill -9
 ```
 
-#### TypeScript Errors
+### Couchbase connection fails
+- Verify credentials in `.env` match your Capella cluster
+- Check that `COUCHBASE_URL` uses the correct connection string format
+- Ensure network access is configured in Capella (allowed IP ranges)
+- Connection manager retries with exponential backoff on startup
+
+### TypeScript errors
 ```bash
-# Check for type errors
-bun run typecheck
-# Fix auto-fixable issues
-bun run quality:fix
+bun run typecheck              # Check for type errors
 ```
 
-#### Kong Connection Issues
+### Test failures
 ```bash
-# Verify Kong is accessible
-curl http://kong-admin:8001/status
-# Check configuration
-echo $KONG_ADMIN_URL
+bun run test:bun:unit          # Run unit tests in isolation
+bun run test:bun --bail        # Stop on first failure
 ```
 
-#### Cache Issues
-```bash
-# Clear Redis cache (if using Redis)
-redis-cli FLUSHALL
-# Restart service to clear in-memory cache
-bun run dev:clean
-```
+## Related Documentation
 
-### Debug Logging
-Enable debug logging for detailed troubleshooting:
-```bash
-LOG_LEVEL=debug bun run dev
-```
-
-### Performance Issues
-Use profiling tools for performance analysis:
-```bash
-# Start with profiling enabled
-PROFILING_ENABLED=true bun run dev
-
-# In another terminal
-curl -X POST http://localhost:3000/debug/profiling/start
-# Run your operations
-curl -X POST http://localhost:3000/debug/profiling/stop
-```
+- [Testing Guide](testing.md) - Comprehensive testing strategy
+- [Architecture Overview](../architecture/overview.md) - System design
+- [Profiling Guide](profiling.md) - Performance profiling
+- [API Best Practices](api-best-practices.md) - RFC compliance

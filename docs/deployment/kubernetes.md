@@ -7,55 +7,53 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: authentication-service
+  name: capellaql
   labels:
-    app: authentication-service
+    app: capellaql
     version: v1.0.0
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: authentication-service
+      app: capellaql
   template:
     metadata:
       labels:
-        app: authentication-service
+        app: capellaql
         version: v1.0.0
     spec:
       containers:
-      - name: authentication-service
-        image: example/authentication-service:latest
+      - name: capellaql
+        image: zx8086/capellaql:latest
         ports:
-        - containerPort: 3000
+        - containerPort: 4000
           name: http
           protocol: TCP
         env:
         - name: NODE_ENV
           value: "production"
         - name: PORT
-          value: "3000"
-        - name: KONG_MODE
-          value: "KONNECT"
-        - name: KONG_ADMIN_URL
+          value: "4000"
+        - name: COUCHBASE_URL
           valueFrom:
             secretKeyRef:
-              name: kong-config
-              key: admin-url
-        - name: KONG_ADMIN_TOKEN
+              name: couchbase-config
+              key: url
+        - name: COUCHBASE_USERNAME
           valueFrom:
             secretKeyRef:
-              name: kong-config
-              key: admin-token
-        - name: KONG_JWT_AUTHORITY
+              name: couchbase-config
+              key: username
+        - name: COUCHBASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: couchbase-config
+              key: password
+        - name: COUCHBASE_BUCKET
           valueFrom:
             configMapKeyRef:
-              name: auth-config
-              key: jwt-authority
-        - name: KONG_JWT_AUDIENCE
-          valueFrom:
-            configMapKeyRef:
-              name: auth-config
-              key: jwt-audience
+              name: capellaql-config
+              key: bucket
         - name: TELEMETRY_MODE
           value: "otlp"
         - name: OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
@@ -73,7 +71,7 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 3000
+            port: 4000
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 5
@@ -81,7 +79,7 @@ spec:
         readinessProbe:
           httpGet:
             path: /health
-            port: 3000
+            port: 4000
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 5
@@ -110,16 +108,16 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: authentication-service
+  name: capellaql
   labels:
-    app: authentication-service
+    app: capellaql
 spec:
   selector:
-    app: authentication-service
+    app: capellaql
   ports:
   - name: http
     port: 80
-    targetPort: 3000
+    targetPort: 4000
     protocol: TCP
   type: ClusterIP
 ```
@@ -131,15 +129,13 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: auth-config
+  name: capellaql-config
   labels:
-    app: authentication-service
+    app: capellaql
 data:
-  jwt-authority: "https://sts-api.example.com/"
-  jwt-audience: "http://api.example.com/"
-  jwt-expiration-minutes: "15"
+  bucket: "default"
   cors-origin: "https://app.example.com"
-  api-title: "Authentication Service API"
+  api-title: "CapellaQL GraphQL API"
   api-version: "1.0.0"
 ---
 apiVersion: v1
@@ -147,12 +143,12 @@ kind: ConfigMap
 metadata:
   name: telemetry-config
   labels:
-    app: authentication-service
+    app: capellaql
 data:
   traces-endpoint: "https://otel.example.com/v1/traces"
   metrics-endpoint: "https://otel.example.com/v1/metrics"
   logs-endpoint: "https://otel.example.com/v1/logs"
-  service-name: "authentication-service"
+  service-name: "capellaql"
   service-version: "1.0.0"
 ```
 
@@ -161,34 +157,24 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: kong-config
+  name: couchbase-config
   labels:
-    app: authentication-service
+    app: capellaql
 type: Opaque
 data:
-  admin-url: aHR0cHM6Ly91cy5hcGkua29uZ2hxLmNvbS92Mi9jb250cm9sLXBsYW5lcy9hYmMxMjM=  # base64 encoded
-  admin-token: QmVhcmVyIHNlY3JldDEyMw==  # base64 encoded
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: redis-config
-  labels:
-    app: authentication-service
-type: Opaque
-data:
-  url: cmVkaXNzOi8vcmVkaXMuZXhhbXBsZS5jb206NjM4MA==  # base64 encoded
+  url: Y291Y2hiYXNlczovL2NiLmV4YW1wbGUuY29t  # base64 encoded
+  username: YWRtaW4=  # base64 encoded
   password: c2VjdXJlLXBhc3N3b3JkLTEyMw==  # base64 encoded
 ```
 
 ## High Availability Setup
 
-### Deployment with Redis
+### HA Deployment
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: authentication-service
+  name: capellaql
 spec:
   replicas: 3
   strategy:
@@ -198,11 +184,11 @@ spec:
       maxSurge: 1
   selector:
     matchLabels:
-      app: authentication-service
+      app: capellaql
   template:
     metadata:
       labels:
-        app: authentication-service
+        app: capellaql
     spec:
       affinity:
         podAntiAffinity:
@@ -214,96 +200,15 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - authentication-service
+                  - capellaql
               topologyKey: kubernetes.io/hostname
       containers:
-      - name: authentication-service
-        image: example/authentication-service:latest
+      - name: capellaql
+        image: zx8086/capellaql:latest
         env:
         - name: HIGH_AVAILABILITY
           value: "true"
-        - name: REDIS_ENABLED
-          value: "true"
-        - name: REDIS_URL
-          valueFrom:
-            secretKeyRef:
-              name: redis-config
-              key: url
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: redis-config
-              key: password
-        # ... other configuration
-```
-
-### Redis Deployment
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: redis
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: redis
-  template:
-    metadata:
-      labels:
-        app: redis
-    spec:
-      containers:
-      - name: redis
-        image: redis:7-alpine
-        ports:
-        - containerPort: 6379
-        args:
-        - redis-server
-        - --requirepass
-        - $(REDIS_PASSWORD)
-        env:
-        - name: REDIS_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: redis-config
-              key: password
-        resources:
-          requests:
-            cpu: 50m
-            memory: 64Mi
-          limits:
-            cpu: 200m
-            memory: 256Mi
-        volumeMounts:
-        - name: redis-data
-          mountPath: /data
-      volumes:
-      - name: redis-data
-        persistentVolumeClaim:
-          claimName: redis-pvc
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: redis
-spec:
-  selector:
-    app: redis
-  ports:
-  - port: 6379
-    targetPort: 6379
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: redis-pvc
-spec:
-  accessModes:
-  - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
+        # ... other configuration (Couchbase, telemetry, etc.)
 ```
 
 ## Horizontal Pod Autoscaler
@@ -312,12 +217,12 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: authentication-service-hpa
+  name: capellaql-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: authentication-service
+    name: capellaql
   minReplicas: 3
   maxReplicas: 10
   metrics:
@@ -356,13 +261,13 @@ Ensures service availability during Kubernetes node maintenance, upgrades, and v
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: authentication-service-pdb
-  namespace: authentication
+  name: capellaql-pdb
+  namespace: capellaql
 spec:
   maxUnavailable: 1
   selector:
     matchLabels:
-      app.kubernetes.io/name: authentication-service
+      app.kubernetes.io/name: capellaql
 ```
 
 With 3 replicas, at least 2 pods will always be available during voluntary disruptions (node drains, upgrades).
@@ -370,10 +275,10 @@ With 3 replicas, at least 2 pods will always be available during voluntary disru
 **Testing PDB:**
 ```bash
 # Check PDB status
-kubectl get pdb -n authentication
+kubectl get pdb -n capellaql
 
 # View PDB details
-kubectl describe pdb authentication-service-pdb -n authentication
+kubectl describe pdb capellaql-pdb -n capellaql
 
 # Simulate node drain (test node)
 kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
@@ -386,24 +291,24 @@ kubectl drain <node-name> --ignore-daemonsets --delete-emptydir-data
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: authentication-service-ingress
+  name: capellaql-ingress
 spec:
   podSelector:
     matchLabels:
-      app: authentication-service
+      app: capellaql
   policyTypes:
   - Ingress
   ingress:
   - from:
     - namespaceSelector:
         matchLabels:
-          name: kong-system
+          name: ingress-nginx
     - namespaceSelector:
         matchLabels:
           name: monitoring
     ports:
     - protocol: TCP
-      port: 3000
+      port: 4000
 ```
 
 ### Egress Network Policy
@@ -411,95 +316,59 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: authentication-service-egress
+  name: capellaql-egress
 spec:
   podSelector:
     matchLabels:
-      app: authentication-service
+      app: capellaql
   policyTypes:
   - Egress
   egress:
-  - to:
-    - namespaceSelector:
-        matchLabels:
-          name: kong-system
-    ports:
-    - protocol: TCP
-      port: 8001  # Kong Admin API
-  - to:
-    - podSelector:
-        matchLabels:
-          app: redis
-    ports:
-    - protocol: TCP
-      port: 6379
-  - to: []  # Allow all for OTLP endpoints (external)
+  - to: []  # Allow Couchbase Capella and OTLP endpoints (external)
     ports:
     - protocol: TCP
       port: 443
+    - protocol: TCP
+      port: 11210  # Couchbase SDK
+    - protocol: TCP
+      port: 11207  # Couchbase SDK (TLS)
 ```
 
 ## Ingress Configuration
 
-### Kong Ingress
+### Standard Kubernetes Ingress
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: authentication-service-ingress
+  name: capellaql-ingress
   annotations:
-    kubernetes.io/ingress.class: kong
-    konghq.com/plugins: key-auth,rate-limiting
-    konghq.com/protocols: https
-    konghq.com/https-redirect-status-code: "301"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
 spec:
+  ingressClassName: nginx
   tls:
   - hosts:
-    - auth-api.example.com
-    secretName: auth-api-tls
+    - graphql-api.example.com
+    secretName: graphql-api-tls
   rules:
-  - host: auth-api.example.com
+  - host: graphql-api.example.com
     http:
       paths:
-      - path: /tokens
+      - path: /graphql
         pathType: Exact
         backend:
           service:
-            name: authentication-service
+            name: capellaql
             port:
               number: 80
       - path: /health
-        pathType: Exact
+        pathType: Prefix
         backend:
           service:
-            name: authentication-service
+            name: capellaql
             port:
               number: 80
-```
-
-### Kong Plugins
-```yaml
-apiVersion: configuration.konghq.com/v1
-kind: KongPlugin
-metadata:
-  name: auth-key-auth
-plugin: key-auth
-config:
-  key_names:
-  - apikey
-  hide_credentials: true
----
-apiVersion: configuration.konghq.com/v1
-kind: KongPlugin
-metadata:
-  name: auth-rate-limiting
-plugin: rate-limiting
-config:
-  minute: 1000
-  hour: 10000
-  policy: redis
-  redis_host: redis.kong-system.svc.cluster.local
-  redis_port: 6379
 ```
 
 ## Monitoring and Observability
@@ -509,13 +378,13 @@ config:
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: authentication-service
+  name: capellaql
   labels:
-    app: authentication-service
+    app: capellaql
 spec:
   selector:
     matchLabels:
-      app: authentication-service
+      app: capellaql
   endpoints:
   - port: http
     path: /metrics
@@ -528,11 +397,11 @@ spec:
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: authentication-service-detailed
+  name: capellaql-detailed
 spec:
   selector:
     matchLabels:
-      app: authentication-service
+      app: capellaql
   podMetricsEndpoints:
   - port: http
     path: /metrics
@@ -619,7 +488,7 @@ See `k8s/README.md` for complete implementation details and manifests.
 apiVersion: policy/v1beta1
 kind: PodSecurityPolicy
 metadata:
-  name: authentication-service-psp
+  name: capellaql-psp
 spec:
   privileged: false
   allowPrivilegeEscalation: false
@@ -653,12 +522,12 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: authentication-service
+  name: capellaql
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: authentication-service
+  name: capellaql
 rules:
 - apiGroups: [""]
   resources: ["configmaps", "secrets"]
@@ -667,13 +536,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: authentication-service
+  name: capellaql
 subjects:
 - kind: ServiceAccount
-  name: authentication-service
+  name: capellaql
 roleRef:
   kind: Role
-  name: authentication-service
+  name: capellaql
   apiGroup: rbac.authorization.k8s.io
 ```
 
@@ -687,7 +556,7 @@ roleRef:
 
 ### Health Checks
 - **Liveness Probe**: `/health` - Detect crashed containers
-- **Readiness Probe**: `/health/ready` - Control traffic routing (checks Kong connectivity)
+- **Readiness Probe**: `/health/ready` - Control traffic routing (checks Couchbase connectivity)
 - **Startup Probe**: Handle slow startup scenarios
 
 ### Security Hardening
@@ -710,15 +579,15 @@ The project includes 22 AlertManager rules based on SLA thresholds (see `k8s/pro
 
 | Alert Group | Description |
 |-------------|-------------|
-| `auth-service-resources` | Memory usage >70%/80% of limit |
-| `auth-service-event-loop` | Event loop delay >50ms/100ms |
-| `auth-service-http-errors` | HTTP 5xx rate >2%/5% |
-| `auth-service-kong-latency` | P95 latency >200ms/500ms |
-| `auth-service-circuit-breaker` | Circuit breaker opens >1/3 per hour |
-| `auth-service-token-errors` | Token error rate >1%/5% |
-| `auth-service-response-time` | Endpoint SLA violations |
-| `auth-service-availability` | Service down, pods not ready |
-| `auth-service-cache` | Cache hit rate, Redis status |
+| `capellaql-resources` | Memory usage >70%/80% of limit |
+| `capellaql-event-loop` | Event loop delay >50ms/100ms |
+| `capellaql-http-errors` | HTTP 5xx rate >2%/5% |
+| `capellaql-couchbase-latency` | P95 latency >200ms/500ms |
+| `capellaql-circuit-breaker` | Circuit breaker opens >1/3 per hour |
+| `capellaql-graphql-errors` | GraphQL error rate >1%/5% |
+| `capellaql-response-time` | Endpoint SLA violations |
+| `capellaql-availability` | Service down, pods not ready |
+| `capellaql-cache` | Cache hit rate |
 
 **Prerequisites:** Requires kube-prometheus-stack:
 ```bash
@@ -733,7 +602,7 @@ helm install kube-prometheus prometheus-community/kube-prometheus-stack -n monit
 #### Pod Startup Issues
 ```bash
 # Check pod status
-kubectl get pods -l app=authentication-service
+kubectl get pods -l app=capellaql
 
 # View pod events
 kubectl describe pod <pod-name>
@@ -748,35 +617,35 @@ kubectl exec -it <pod-name> -- sh
 #### Configuration Issues
 ```bash
 # Verify ConfigMaps
-kubectl get configmap auth-config -o yaml
+kubectl get configmap capellaql-config -o yaml
 
 # Check Secrets
-kubectl get secret kong-config -o yaml
+kubectl get secret couchbase-config -o yaml
 
 # Test environment variables
-kubectl exec <pod-name> -- env | grep KONG
+kubectl exec <pod-name> -- env | grep COUCHBASE
 ```
 
 #### Network Connectivity
 ```bash
 # Test service connectivity
-kubectl exec <pod-name> -- curl http://authentication-service/health
+kubectl exec <pod-name> -- curl http://capellaql-service/health
 
-# Check Kong connectivity
-kubectl exec <pod-name> -- curl -v $KONG_ADMIN_URL/status
+# Check Couchbase connectivity
+kubectl exec <pod-name> -- curl http://capellaql-service/health/comprehensive | jq '.checks.database'
 
 # Verify DNS resolution
-kubectl exec <pod-name> -- nslookup authentication-service
+kubectl exec <pod-name> -- nslookup capellaql-service
 ```
 
 #### Performance Issues
 ```bash
 # Check resource usage
-kubectl top pod -l app=authentication-service
+kubectl top pod -l app=capellaql
 
 # View HPA status
-kubectl get hpa authentication-service-hpa
+kubectl get hpa capellaql-hpa
 
 # Monitor metrics
-kubectl exec <pod-name> -- curl http://localhost:3000/metrics
+kubectl exec <pod-name> -- curl http://localhost:4000/health/performance
 ```

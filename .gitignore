@@ -61,9 +61,12 @@ logs
 
 # AGENTS/
 .bun-cache/
+CLAUDE.md
 
 migrate/
 
 # StrykerJS mutation testing
 .stryker-tmp/
 reports/mutation/
+.zed
+docs/plans/

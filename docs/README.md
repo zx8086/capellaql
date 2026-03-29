@@ -58,10 +58,10 @@ High-performance GraphQL service for Couchbase Capella databases.
 | [getting-started.md](development/getting-started.md) | Development setup guide |
 | [testing.md](development/testing.md) | Testing strategy (unit, E2E, K6) |
 | [api-best-practices.md](development/api-best-practices.md) | RFC compliance and best practices |
+| [logging.md](development/logging.md) | Logging architecture and patterns |
 | [profiling.md](development/profiling.md) | Performance profiling |
 | [devcontainer.md](development/devcontainer.md) | DevContainer setup |
 | [zed-tasks.md](development/zed-tasks.md) | Zed IDE task reference |
-| [kong-test-setup.md](development/kong-test-setup.md) | Kong integration testing |
 
 ### Operations
 

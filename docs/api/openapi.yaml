@@ -23,7 +23,7 @@ info:
     or GET for simple read operations. WebSocket connections are supported for subscriptions.
 
     ## Authentication
-    Authentication is handled via Kong API Gateway with JWT tokens.
+    CapellaQL is an internal GraphQL service for querying Couchbase Capella databases.
   contact:
     name: CapellaQL Team
     email: capellaql@tommy.com
@@ -1114,14 +1114,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: JWT token issued by Kong API Gateway
-
-    KongHeaders:
-      type: apiKey
-      in: header
-      name: x-consumer-id
-      description: Kong consumer identification headers
+      description: Bearer token for authenticated access
 
 security:
   - BearerAuth: []
-  - KongHeaders: []

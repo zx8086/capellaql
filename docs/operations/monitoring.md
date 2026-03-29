@@ -1245,7 +1245,7 @@ The service exports 65 OpenTelemetry metric instruments organized by category. A
 
 ### Main Health Check - `/health`
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:4000/health
 ```
 
 Returns service health with dependency status:
@@ -1315,7 +1315,7 @@ Returns comprehensive telemetry system status with component-level diagnostics.
 **Implementation**: `src/telemetry/health/telemetryHealth.ts`
 
 ```bash
-curl http://localhost:3000/health/telemetry
+curl http://localhost:4000/health/telemetry
 ```
 
 #### Response Structure

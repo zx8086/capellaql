@@ -36,8 +36,8 @@ CapellaQL is a high-performance GraphQL service built with Bun that provides a m
 
 ### Technology Stack
 - **Runtime**: Bun (leverages Bun-specific APIs and performance optimizations)
-- **GraphQL**: GraphQL Yoga with Elysia framework
-- **Database**: Couchbase SDK v4.5.0 with comprehensive error handling, retry logic, and performance monitoring
+- **GraphQL**: GraphQL Yoga 5.18.1 with Bun.serve()
+- **Database**: Couchbase SDK v4.6.1 with comprehensive error handling, retry logic, and performance monitoring
 - **Observability**: OpenTelemetry with custom OTLP exporters
 - **Containerization**: Docker multi-architecture (linux/amd64, linux/arm64)
 
@@ -79,35 +79,60 @@ src/
 │   ├── envMapping.ts           # Environment variable mapping
 │   ├── loader.ts               # Configuration loader with validation
 │   └── schemas.ts              # Zod validation schemas
-├── index.ts                     # Main server entry point with Elysia
-├── dashboard/
-│   └── index.html              # Development dashboard (served at /dashboard)
+├── index.ts                     # Main server entry point with Bun.serve()
+├── server/                      # HTTP server layer
+│   ├── handlers/               # GraphQL and health handlers
+│   ├── middleware/             # 7-stage middleware pipeline
+│   ├── websocket/             # GraphQL subscriptions
+│   └── types.ts               # Server type definitions
 ├── graphql/
 │   ├── schema.ts               # GraphQL schema assembly
 │   ├── typeDefs.ts             # GraphQL type definitions
+│   ├── context.ts              # Request context factory
 │   ├── types.ts                # TypeScript types for resolvers
-│   └── resolvers/              # Modular resolver files
+│   ├── validation/             # Input validation
+│   └── resolvers/              # Modular resolver files (12+ domains)
 ├── lib/
 │   ├── couchbase/              # Couchbase database layer
-│   │   ├── connection-manager.ts  # Connection factory
+│   │   ├── connection-manager.ts  # Singleton connection
 │   │   ├── circuit-breaker.ts     # Resilience patterns
-│   │   ├── errors.ts              # Error handling
+│   │   ├── data-loader.ts         # Batch operations
+│   │   ├── kv-operations.ts       # Key-value operations
+│   │   ├── query-executor.ts      # N1QL queries
+│   │   ├── repository.ts          # Repository pattern
+│   │   ├── errors.ts              # Error handling (25+ types)
 │   │   ├── metrics.ts             # Performance monitoring
 │   │   └── transaction-handler.ts # Transaction management
 │   ├── graphqlResponseCache.ts # Response caching layer
 │   ├── queryCache.ts           # Query result caching
+│   ├── bunSQLiteCache.ts       # SQLite cache layer
+│   ├── memoryGuardian.ts       # Memory monitoring
+│   ├── performanceMonitor.ts   # Performance profiling
 │   └── systemHealth.ts         # System health monitoring
+├── logging/                     # Logging infrastructure (3-layer DI)
+│   ├── ports/                  # Logger interfaces
+│   ├── adapters/               # Pino + Winston adapters
+│   └── container.ts            # DI container
+├── errors/                      # Error handling
+│   ├── problem-details.ts      # RFC 7807 responses
+│   ├── error-codes.ts          # Error code constants
+│   └── result.ts               # Result<T,E> pattern
 ├── models/
 │   ├── index.ts                # Model exports
 │   ├── types.ts                # TypeScript types and Zod schemas
 │   └── errors.ts               # Structured error hierarchy
+├── services/                    # Business logic services
+│   └── health/                 # Health service handlers
 ├── telemetry/                   # OpenTelemetry implementation
 │   ├── instrumentation.ts      # OTEL setup and metrics
 │   ├── logger.ts               # Structured logging
 │   ├── export-stats-tracker.ts # Export monitoring
-│   └── metrics/                # Metrics collection
+│   ├── metrics/                # Metrics collection
+│   ├── tracing/                # Distributed tracing
+│   ├── health/                 # Telemetry health checks
+│   └── coordinator/            # Batch coordination
 ├── utils/
-│   └── logger.ts               # Winston-based structured logging
+│   └── logger.ts               # Logger utilities
 tests/                          # Centralized test directory
 ├── bun/                       # Bun runtime tests
 │   ├── unit/                  # Unit tests
@@ -126,9 +151,14 @@ tests/                          # Centralized test directory
 
 ### Path Aliases (tsconfig.json)
 - `$lib/*` → `src/lib/*`
-- `$utils/*` → `src/utils/*`  
+- `$utils/*` → `src/utils/*`
 - `$models/*` → `src/models/*`
 - `$config` → `src/config`
+- `$telemetry/*` → `src/telemetry/*`
+- `$logging/*` → `src/logging/*`
+- `$graphql/*` → `src/graphql/*`
+- `$types/*` → `src/types/*`
+- `$constants/*` → `src/constants/*`
 
 ### Database Patterns
 

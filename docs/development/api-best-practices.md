@@ -144,32 +144,26 @@ HTTP/1.1 400 Bad Request
 
 ### 5. Rate Limit Headers (RFC 6585)
 
-**Implementation:** Kong API Gateway handles rate limiting upstream.
+**Implementation:** Built-in rate limiting middleware (`src/server/middleware/rateLimit.ts`).
 
-> **Note:** Rate limiting is NOT implemented in this service. It is handled by Kong API Gateway as an external dependency. The service provides utility functions (`src/utils/response.ts`) for generating rate limit error responses if needed in future implementations.
+Rate limiting is implemented as a memory-based middleware in the server's middleware pipeline. It limits requests per client IP + path combination.
 
-**Kong Rate Limiting:** Configured via Kong's `rate-limiting` plugin at the gateway level, providing:
-- Per-consumer rate limiting
-- Per-route rate limiting
-- Response headers (`X-RateLimit-*`)
+**Features:**
+- Per-client+path rate limiting (memory-based store)
+- Automatic cleanup of expired entries
+- Configurable limits via environment variables
 
-**Service Support (Error Responses Only):**
-
-The service includes an `AUTH_006` error code for rate limit scenarios, used when Kong's rate limiting triggers:
+**Response when rate limited:**
 
 ```http
 HTTP/1.1 429 Too Many Requests
 Retry-After: 30
 
 {
-  "type": "urn:problem-type:auth-service/auth-006",
+  "type": "urn:problem-type:capellaql/rate-limit-exceeded",
   "title": "Rate Limit Exceeded",
   "status": 429,
-  "code": "AUTH_006",
-  "extensions": {
-    "limit": 100,
-    "resetAt": "2026-02-14T05:43:18.000Z"
-  }
+  "detail": "Too many requests, please try again later"
 }
 ```
 

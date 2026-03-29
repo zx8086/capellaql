@@ -1,12 +1,12 @@
 # Profiling Guide
 
-Complete guide to profiling workflows and network workarounds for the authentication service.
+Complete guide to profiling workflows for the CapellaQL GraphQL service.
 
 ## Quick Start
 
-### Profile Token Generation
+### Profile Server Under Load
 ```bash
-bun run profile:scenario:tokens
+bun run perf:profile
 ```
 
 ### Profile During K6 Tests
@@ -24,23 +24,17 @@ Enhanced analysis with actionable recommendations is automatically displayed.
 ### Available Commands
 
 ```bash
-# Token generation scenario
-bun run profile:scenario:tokens
+# CPU profiling
+bun run perf:profile
 
-# Health check endpoint
-bun run profile:scenario:health
-
-# Token validation
-bun run profile:scenario:validate
-
-# Mixed workload
-bun run profile:scenario:mixed
+# Heap snapshot
+bun run perf:heap
 
 # Profile during K6 smoke tests
-ENABLE_PROFILING=true bun run test:k6:smoke:health
+ENABLE_PROFILING=true bun run test:k6:smoke:all
 
 # Profile during K6 load tests
-ENABLE_PROFILING=true bun run test:k6:load
+ENABLE_PROFILING=true bun run test:k6:load:all
 ```
 
 ---
@@ -292,8 +286,8 @@ Bun's `Bun.serve()` is extremely fast (100k+ req/sec). Use tools that can keep u
 
 | Tool | Install | Usage |
 |------|---------|-------|
-| [bombardier](https://github.com/codesenberg/bombardier) | `brew install bombardier` | `bombardier -c 100 -n 10000 http://localhost:3000/health` |
-| [oha](https://github.com/hatoo/oha) | `brew install oha` | `oha -c 100 -n 10000 http://localhost:3000/health` |
+| [bombardier](https://github.com/codesenberg/bombardier) | `brew install bombardier` | `bombardier -c 100 -n 10000 http://localhost:4000/health` |
+| [oha](https://github.com/hatoo/oha) | `brew install oha` | `oha -c 100 -n 10000 http://localhost:4000/health` |
 | [k6](https://k6.io/) | `brew install k6` | `k6 run test/k6/smoke/health-smoke.ts` |
 
 **Avoid** Node.js-based tools like `autocannon` - they're not fast enough to properly benchmark Bun.
@@ -329,14 +323,14 @@ await run();
 bun run dev &
 
 # 2. Warm up
-curl http://localhost:3000/health
+curl http://localhost:4000/health
 
 # 3. Run load test with bombardier
-bombardier -c 100 -d 30s http://localhost:3000/health
+bombardier -c 100 -d 30s http://localhost:4000/health
 
 # 4. Run with profiling enabled
 bun --cpu-prof-md --cpu-prof-dir ./profiles src/index.ts &
-bombardier -c 100 -d 30s http://localhost:3000/health
+bombardier -c 100 -d 30s http://localhost:4000/health
 kill %1  # Stop server, profile saved
 
 # 5. Analyze profile
@@ -386,7 +380,7 @@ The following Zed tasks are available for profiling (press `Cmd+Shift+P` > "task
 
 | Task | Description |
 |------|-------------|
-| `profile: tokens` | Profile token generation scenario |
+| `profile: graphql` | Profile GraphQL query handling |
 | `profile: health` | Profile health endpoint |
 | `profile: list` | List profile files |
 | `profile: cleanup (dry run)` | Preview profile cleanup |
@@ -455,40 +449,36 @@ After profiling, you'll see an enhanced analysis report with:
 
 Example recommendation:
 ```markdown
-### HIGH: Kong Cache
-**Issue**: Kong consumer lookups consuming 23.1% CPU time (target: <15%)
-**Expected Impact**: -10-15ms P95 latency, -20% Kong API calls
+### HIGH: GraphQL Resolver Latency
+**Issue**: Couchbase query execution consuming 23.1% CPU time (target: <15%)
+**Expected Impact**: -10-15ms P95 latency, -20% database round-trips
 **Action Items**:
-1. Increase CACHING_TTL_SECONDS from 300 to 600 in .env
-2. Review cache invalidation logic in src/services/kong/consumer.service.ts
-3. Monitor metric: kong_cache_hits_total / kong_operations_total
+1. Increase YOGA_RESPONSE_CACHE_TTL from 900000 to 1800000 in .env
+2. Review DataLoader batching in src/lib/couchbase/data-loader.ts
+3. Monitor metric: couchbase_query_duration_ms
 ```
 
 ---
 
 ## Common Workflows
 
-### Workflow 1: Optimizing Token Generation
+### Workflow 1: Optimizing GraphQL Resolver Performance
 
-**Goal**: Reduce token generation latency from P95 100ms to <80ms
+**Goal**: Reduce GraphQL query latency from P95 100ms to <80ms
 
 ```bash
 # Step 1: Create baseline profile
-bun run profile:scenario:tokens
+bun run perf:profile
 
-# Step 2: Review analysis and identify bottlenecks
+# Step 2: Generate load with K6
+bun run test:k6:load:all
 
-# Step 3: Implement optimization
+# Step 3: Review analysis and identify bottlenecks
 
-# Step 4: Profile after optimization
-bun run profile:scenario:tokens
+# Step 4: Implement optimization
 
-# Step 5: Compare results
-
-# Step 6: Archive baseline
-bun scripts/profiling/archive-profile.ts \
-  --profile=profiles/current/tokens-old.cpu-prof.md \
-  --label="baseline-v1.0"
+# Step 5: Profile after optimization and compare results
+bun run perf:profile
 ```
 
 ### Workflow 2: Investigating Production Slowness
@@ -562,8 +552,8 @@ CONTINUOUS_PROFILING_OUTPUT_DIR=profiles/auto   # Output directory
 CONTINUOUS_PROFILING_MAX_CONCURRENT=1           # Max concurrent sessions
 
 # SLA Thresholds (configured in src/config/defaults.ts)
-# /tokens: P95 100ms, P99 200ms
-# /tokens/validate: P95 50ms, P99 100ms
+# /graphql (simple): P95 200ms, P99 500ms
+# /graphql (complex): P95 500ms, P99 1000ms
 # /health: P95 400ms, P99 500ms
 ```
 
@@ -604,7 +594,7 @@ Add a bind mount volume in your ECS Task Definition:
 ```json
 {
   "containerDefinitions": [{
-    "name": "authentication-service",
+    "name": "capellaql-service",
     "mountPoints": [{
       "sourceVolume": "tmp-storage",
       "containerPath": "/tmp",
@@ -644,18 +634,18 @@ data:
 
 | Endpoint | P95 Target | P99 Target |
 |----------|-----------|------------|
-| GET /tokens | <100ms | <200ms |
-| GET /tokens/validate | <50ms | <100ms |
+| POST /graphql (simple) | <200ms | <500ms |
+| POST /graphql (complex) | <500ms | <1000ms |
 | GET /health | <400ms | <500ms |
 
 ### CPU Budget
 
 | Operation | Target |
 |-----------|--------|
-| JWT signing | <40% CPU time |
-| Kong operations | <15% CPU time |
+| GraphQL resolver execution | <40% CPU time |
+| Couchbase query execution | <15% CPU time |
 | JSON serialization | <8% CPU time |
-| HTTP overhead | <12% CPU time |
+| HTTP/middleware overhead | <12% CPU time |
 
 ### Memory Budget
 
@@ -750,7 +740,7 @@ Bun v1.3.x has known networking bugs that cause `fetch()` to fail when connectin
 - `fetch()` throws `FailedToOpenSocket: Was there a typo in the url or port?` errors
 - `fetch()` throws `ConnectionRefused` errors
 - Same URL works perfectly with `curl` command
-- Affects Kong Admin API and OTEL collector connections on private IPs
+- Affects OTEL collector connections on private IPs
 - Error occurs almost immediately (~12ms) rather than timing out
 
 **Known Bun Issues:**
@@ -769,7 +759,7 @@ We've implemented automatic curl fallback when Bun's native fetch fails.
 import { fetchWithFallback } from './utils/bun-fetch-fallback';
 
 // Use exactly like native fetch
-const response = await fetchWithFallback('http://192.168.178.3:30001/status');
+const response = await fetchWithFallback('http://localhost:4318/v1/traces');
 const data = await response.json();
 ```
 
@@ -845,7 +835,7 @@ if (method === "HEAD") {
 ### When to Use
 
 **Use `fetchWithFallback()` for:**
-- Kong Admin API requests (already integrated)
+- OTEL collector connections on private IPs
 - External service calls to local IPs
 - Integration tests connecting to remote services
 
@@ -860,10 +850,10 @@ if (method === "HEAD") {
 # Test curl fallback is working
 LOG_LEVEL=debug bun run dev
 
-# Make request to Kong on local IP
-curl -X POST http://localhost:3000/tokens \
-  -H "X-Consumer-ID: test-consumer" \
-  -H "X-Consumer-Username: test-consumer"
+# Make a GraphQL request
+curl -X POST http://localhost:4000/graphql \
+  -H "Content-Type: application/json" \
+  -d '{"query": "{ looksSummary(brand: \"TH\") { totalLooks } }"}'
 
 # Look for logs showing:
 # - "Fetch failed, trying curl fallback"
@@ -879,7 +869,7 @@ curl -X POST http://localhost:3000/tokens \
 **Symptom**: No .md files in profiles/ after running profile command
 
 **Solutions**:
-1. Check server started successfully: `curl http://localhost:3000/health`
+1. Check server started successfully: `curl http://localhost:4000/health`
 2. Verify Bun version: `bun --version` (requires 1.3+)
 3. Check for permission errors: `ls -la profiles/`
 4. Increase profile duration: `bun run profile:scenario:tokens --duration=60`
@@ -941,7 +931,7 @@ CONTINUOUS_PROFILING_MAX_STORAGE_GB=2
 
 ### SLA Monitor Not Triggering
 
-1. Verify configuration: `curl http://localhost:3000/health | jq .slaMonitor`
+1. Verify configuration: `curl http://localhost:4000/health/comprehensive | jq .slaMonitor`
 2. Check latency actually exceeds thresholds
 3. Verify throttling hasn't blocked trigger
 
@@ -953,10 +943,10 @@ CONTINUOUS_PROFILING_MAX_STORAGE_GB=2
 which curl
 
 # Test curl directly
-curl -I http://192.168.178.3:30001/status
+curl -I http://localhost:4318/v1/traces
 
-# Check .env has correct Kong URL
-grep KONG_ADMIN_URL .env
+# Check .env has correct OTEL endpoint
+grep OTEL_EXPORTER .env
 ```
 
 **Fallback seems slow:**

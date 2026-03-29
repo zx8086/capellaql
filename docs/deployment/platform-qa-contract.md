@@ -275,14 +275,14 @@ mv tests/k6/stress/soak-test.ts tests/k6/soak/
 **Before (hardcoded):**
 ```typescript
 export default defineConfig({
-  baseURL: 'http://localhost:3000',  // Won't work in CI
+  baseURL: 'http://localhost:4000',  // Won't work in CI
 });
 ```
 
 **After (environment-aware):**
 ```typescript
 export default defineConfig({
-  baseURL: process.env.BASE_URL || 'http://localhost:3000',
+  baseURL: process.env.BASE_URL || 'http://localhost:4000',
 });
 ```
 
@@ -375,7 +375,7 @@ include:
 |----------|---------|
 | `IMAGE_TAG` | Full image reference for the service container |
 | `PORT` | Port your app should bind to |
-| `BASE_URL` | Full URL to reach the app (`http://app:3000`) |
+| `BASE_URL` | Full URL to reach the app (`http://app:4000`) |
 | `TARGET_URL` | Alias for `BASE_URL` in K6 |
 | `PEAK_VUS` | Peak virtual users for stress/spike |
 | `RAMP_UP` | Ramp-up duration |
@@ -426,7 +426,7 @@ include:
 | Bind to `localhost` | Docker networking requires `0.0.0.0` | Bind to `0.0.0.0` |
 | Skip the health endpoint | Test runners wait 120s then fail | Implement `GET /health → 200` |
 | Define K6 thresholds via CLI | K6 doesn't support `--threshold` | Define in `options.thresholds` |
-| Hardcode `localhost:3000` in tests | In CI, app is at `http://app:3000` | Use `process.env.BASE_URL` |
+| Hardcode `localhost:4000` in tests | In CI, app is at `http://app:4000` | Use `process.env.BASE_URL` |
 | Configure Playwright reporters | Platform adds `--reporter=html,junit` | Remove reporter config |
 | Use `@latest` in production | Platform updates could break you | Pin to `@1.0.0` |
 

@@ -2,6 +2,8 @@
 
 This document describes the Zed IDE tasks available in `.zed/tasks.json` for managing infrastructure, development, and deployment workflows.
 
+> **Note:** Some tasks below (Kong, Redis, Valkey, Postgres) are from a previous project configuration and are not used by CapellaQL. They remain documented here because they may still exist in `.zed/tasks.json`. The core CapellaQL tasks are in the Development, Testing, and Quality sections.
+
 ## Overview
 
 The project includes **144 pre-configured Zed tasks** organized by category. Tasks can be run from Zed's command palette (`Cmd+Shift+P` > "task: spawn").
@@ -44,7 +46,7 @@ The project includes **144 pre-configured Zed tasks** organized by category. Tas
 | `service: openapi spec` | OpenAPI spec (first 60 lines) |
 | `server: health check` | Full health endpoint response |
 | `server: health check (Valkey)` | Cache-specific health |
-| `server: kill (port 3000)` | Kill process on port 3000 |
+| `server: kill (port 4000)` | Kill process on port 4000 |
 
 ---
 
@@ -55,7 +57,7 @@ The project includes **144 pre-configured Zed tasks** organized by category. Tas
 | `dev: start (watch mode)` | Start with hot reload |
 | `dev: start (devcontainer env)` | Start with devcontainer config |
 | `dev: start with Valkey` | Start using Valkey cache |
-| `dev: clean restart` | Kill port 3000 and restart |
+| `dev: clean restart` | Kill port 4000 and restart |
 | `dev: quickstart` | Generate OpenAPI, then start |
 
 ---

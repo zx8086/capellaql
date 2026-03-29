@@ -15,7 +15,7 @@
 - [5. Bun Unit Tests — Domain Organization](#5-bun-unit-tests--domain-organization)
 - [6. Bun Unit Tests — Best Practices](#6-bun-unit-tests--best-practices)
 - [7. Integration Tests — Real Dependencies](#7-integration-tests--real-dependencies)
-- [8. Playwright E2E Tests — Dual-Mode Pattern](#8-playwright-e2e-tests--dual-mode-pattern)
+- [8. Playwright E2E Tests](#8-playwright-e2e-tests)
 - [9. Playwright E2E Tests — Configuration](#9-playwright-e2e-tests--configuration)
 - [10. K6 Performance Tests — Structure](#10-k6-performance-tests--structure)
 - [11. K6 Performance Tests — Configuration](#11-k6-performance-tests--configuration)
@@ -74,15 +74,13 @@ The testing strategy follows a **three-tier approach** with emphasis on live bac
 ### Philosophy
 
 ```typescript
-// ❌ AVOID: Traditional mocking approach
-const mockKongAdapter = {
-  getConsumer: vi.fn().mockResolvedValue({ id: "123" })
-};
+// AVOID: Traditional mocking approach
+const mockCollection = { get: mock(() => ({ content: { id: "123" } })) };
 
-// ✅ PREFER: Live backend testing
-const kongAdapter = new KongAdapter(process.env.KONG_ADMIN_URL);
-const consumer = await kongAdapter.getConsumer("test-consumer-001");
-expect(consumer.id).toBeDefined();
+// PREFER: Live backend testing
+const { collection } = await getCouchbaseConnection();
+const result = await collection.get("doc-id");
+expect(result.content).toBeDefined();
 ```
 
 ### Benefits
@@ -121,9 +119,9 @@ export async function fetchWithFallback(
 ```typescript
 import { fetchWithFallback } from "../utils/bun-fetch-fallback";
 
-test("Kong adapter with remote IP", async () => {
+test("Couchbase health endpoint reachable", async () => {
   const response = await fetchWithFallback(
-    "http://192.168.178.3:30001/consumers/test-consumer-001"
+    `${process.env.COUCHBASE_URL}/pools/default`
   );
   expect(response.ok).toBe(true);
 });
@@ -138,8 +136,8 @@ export async function skipIfServiceUnavailable(
   url: string
 ) {
   try {
-    const response = await fetchWithFallback(url, { 
-      signal: AbortSignal.timeout(5000) 
+    const response = await fetchWithFallback(url, {
+      signal: AbortSignal.timeout(5000)
     });
     if (!response.ok) {
       test.skip(`${serviceName} unavailable at ${url}`);
@@ -154,13 +152,13 @@ export async function skipIfServiceUnavailable(
 ```typescript
 import { skipIfServiceUnavailable } from "../shared/test-skip-conditions";
 
-describe("Kong integration", () => {
+describe("Couchbase integration", () => {
   beforeAll(async () => {
-    await skipIfServiceUnavailable("Kong", process.env.KONG_ADMIN_URL!);
+    await skipIfServiceUnavailable("Couchbase", process.env.COUCHBASE_URL!);
   });
 
-  test("get consumer", async () => {
-    // Test runs only if Kong is available
+  test("get document", async () => {
+    // Test runs only if Couchbase is available
   });
 });
 ```
@@ -173,29 +171,29 @@ describe("Kong integration", () => {
 
 ```
 test/
-├── bun/                    # Unit tests (114 files)
-│   ├── adapters/           # External service adapters (5 files)
+├── bun/                    # Unit tests
 │   ├── cache/              # Caching functionality (15 files)
 │   ├── circuit-breaker/    # Circuit breaker patterns (5 files)
 │   ├── config/             # Configuration management (9 files)
+│   ├── couchbase/          # Couchbase database layer tests
+│   ├── errors/             # Error handling tests (RFC 7807)
 │   ├── handlers/           # HTTP request handlers (6 files)
 │   ├── health/             # Health check endpoints (6 files)
-│   ├── kong/               # Kong API Gateway integration (4 files)
 │   ├── logging/            # Logging functionality (4 files)
-│   ├── middleware/         # Request middleware (1 file)
+│   ├── middleware/         # Request middleware
 │   ├── mutation/           # Mutation-resistant tests (2 files)
 │   ├── services/           # Service layer (8 files)
 │   ├── shared/             # Shared utilities (2 files)
 │   ├── telemetry/          # Observability (18 files)
 │   ├── types/              # Type definitions (1 file)
 │   └── utils/              # Utility functions (19 files)
-├── chaos/                  # Chaos engineering (4 files, 57 tests)
-│   ├── kong-failure.test.ts
+├── chaos/                  # Chaos engineering (4 files)
+│   ├── couchbase-failure.test.ts
 │   ├── redis-failure.test.ts
 │   ├── network-partition.test.ts
 │   └── resource-exhaustion.test.ts
-├── integration/            # Integration tests (6 files)
-│   ├── kong-adapter.integration.test.ts
+├── integration/            # Integration tests
+│   ├── connection.test.ts
 │   ├── circuit-breaker.integration.test.ts
 │   └── redis-cache.integration.test.ts
 ├── playwright/             # E2E scenarios (4 files)
@@ -365,11 +363,10 @@ bun test --watch test/bun/cache/                # Watch mode
 test/bun/services/
 ├── jwt.service.test.ts                 # JWT generation/validation
 ├── jwt-error-path.test.ts              # JWT error scenarios
-├── api-gateway.service.test.ts         # Live Kong integration
 ├── cache-health.service.test.ts        # Cache health service
-├── kong-service-integration.test.ts    # Kong integration
 ├── circuit-breaker-service.test.ts     # Circuit breaker patterns
-└── token-service-integration.test.ts   # Token service integration
+├── connection.test.ts                  # Couchbase connection management
+└── resolvers.test.ts                   # GraphQL resolver integration
 ```
 
 ### Naming Conventions
@@ -377,7 +374,7 @@ test/bun/services/
 | Suffix | Purpose | Example |
 |--------|---------|---------|
 | `.test.ts` | Standard unit test | `jwt.service.test.ts` |
-| `.integration.test.ts` | Integration with live deps | `kong-service.integration.test.ts` |
+| `.integration.test.ts` | Integration with live deps | `connection.integration.test.ts` |
 | `.mutation.test.ts` | Mutation-resistant tests | `jwt.mutation.test.ts` |
 | `-errors.test.ts` | Error path coverage | `cache-factory-errors.test.ts` |
 | `-edge-cases.test.ts` | Edge case scenarios | `cache-health-edge-cases.test.ts` |
@@ -502,88 +499,73 @@ afterAll(async () => {
 ### Timeout Configuration
 
 ```typescript
-// For tests with external API calls
-test("Kong adapter fetches consumer", async () => {
-  const adapter = new KongAdapter(process.env.KONG_ADMIN_URL!);
-  
-  const consumer = await adapter.getConsumer("test-consumer-001", {
-    signal: AbortSignal.timeout(5000) // 5-second timeout
+// For tests with external service calls
+test("Couchbase fetches document", async () => {
+  const { collection } = await getCouchbaseConnection();
+
+  const result = await collection.get("test-doc-001", {
+    timeout: 5000 // 5-second timeout
   });
 
-  expect(consumer.id).toBeDefined();
-}, { timeout: 6000 }); // Test timeout slightly higher than fetch timeout
+  expect(result.content).toBeDefined();
+}, { timeout: 6000 }); // Test timeout slightly higher than operation timeout
 ```
 
 ---
 
 ## 7. Integration Tests — Real Dependencies
 
-### Kong Integration Test
+### Couchbase Integration Test
 
 ```typescript
-// test/integration/kong-adapter.integration.test.ts
+// test/integration/connection.test.ts
 import { describe, test, expect, beforeAll } from "bun:test";
-import { KongAdapter } from "../../src/adapters/kong.adapter";
+import { getCouchbaseConnection } from "../../src/lib/couchbase/connection-manager";
 import { skipIfServiceUnavailable } from "../shared/test-skip-conditions";
 
-describe("Kong Adapter Integration", () => {
-  let adapter: KongAdapter;
-
+describe("Couchbase Connection Integration", () => {
   beforeAll(async () => {
-    const kongUrl = process.env.KONG_ADMIN_URL;
-    if (!kongUrl) {
-      throw new Error("KONG_ADMIN_URL not configured");
+    const couchbaseUrl = process.env.COUCHBASE_URL;
+    if (!couchbaseUrl) {
+      throw new Error("COUCHBASE_URL not configured");
     }
 
-    await skipIfServiceUnavailable("Kong Admin API", kongUrl);
-    adapter = new KongAdapter(kongUrl);
+    await skipIfServiceUnavailable("Couchbase", couchbaseUrl);
   });
 
-  describe("Consumer Operations", () => {
-    test("fetches existing consumer", async () => {
-      const consumer = await adapter.getConsumer("test-consumer-001");
+  describe("Document Operations", () => {
+    test("fetches existing document", async () => {
+      const { collection } = await getCouchbaseConnection();
+      const result = await collection.get("test-doc-001");
 
-      expect(consumer).toBeDefined();
-      expect(consumer.id).toBeString();
-      expect(consumer.username).toBe("test-consumer-001");
+      expect(result).toBeDefined();
+      expect(result.content).toBeDefined();
+      expect(result.cas).toBeDefined();
     });
 
-    test("returns null for non-existent consumer", async () => {
-      const consumer = await adapter.getConsumer("non-existent-consumer");
-      expect(consumer).toBeNull();
-    });
+    test("returns DocumentNotFoundError for missing document", async () => {
+      const { collection } = await getCouchbaseConnection();
 
-    test("handles network errors gracefully", async () => {
-      const badAdapter = new KongAdapter("http://invalid-url:9999");
-      
-      await expect(badAdapter.getConsumer("test"))
+      await expect(collection.get("non-existent-doc"))
         .rejects.toThrow();
     });
+
+    test("handles connection errors gracefully", async () => {
+      // Attempting to connect with invalid credentials should throw
+      await expect(getCouchbaseConnection({
+        connectionString: "couchbase://invalid-host:9999"
+      })).rejects.toThrow();
+    });
   });
 
-  describe("Circuit Breaker Integration", () => {
-    test("circuit opens after threshold errors", async () => {
-      const circuitBreakerAdapter = new KongAdapter(
-        "http://invalid-url:9999",
-        { circuitBreaker: { threshold: 0.5, windowSize: 10 } }
-      );
+  describe("Query Operations", () => {
+    test("executes N1QL query", async () => {
+      const { cluster } = await getCouchbaseConnection();
+      const result = await cluster.query("SELECT 1 AS num");
 
-      // Force errors to open circuit
-      for (let i = 0; i < 6; i++) {
-        try {
-          await circuitBreakerAdapter.getConsumer("test");
-        } catch {}
-      }
-
-      // Circuit should be open now - fast rejection
-      const start = Date.now();
-      try {
-        await circuitBreakerAdapter.getConsumer("test");
-      } catch (error) {
-        const duration = Date.now() - start;
-        expect(duration).toBeLessThan(50); // Fast rejection
-        expect(error.message).toContain("Circuit breaker is OPEN");
-      }
+      expect(result.rows).toBeDefined();
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0].num).toBe(1);
     });
   });
 });
@@ -655,122 +637,56 @@ describe("Redis Cache Integration", () => {
 
 ---
 
-## 8. Playwright E2E Tests — Dual-Mode Pattern
+## 8. Playwright E2E Tests
 
-### Dual-Mode Testing Architecture
+### Testing Architecture
 
-Tests support two execution modes for flexibility:
+Playwright E2E tests run directly against `localhost:4000` where the CapellaQL GraphQL service is running. There is no gateway proxy layer -- tests hit the server directly.
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│  Dual-Mode E2E Testing                                       │
-│                                                              │
-│  Mode 1: Direct (CI-Safe)          Mode 2: Via Kong         │
-│  ┌────────────────────┐            ┌────────────────────┐  │
-│  │  Playwright Test   │            │  Playwright Test   │  │
-│  └─────────┬──────────┘            └─────────┬──────────┘  │
-│            │                                  │             │
-│            │ X-Consumer-* headers             │ API Key     │
-│            ▼                                  ▼             │
-│  ┌────────────────────┐            ┌────────────────────┐  │
-│  │  localhost:3000    │            │  localhost:8000    │  │
-│  │  (Direct)          │            │  (Kong Proxy)      │  │
-│  └────────────────────┘            └─────────┬──────────┘  │
-│                                               │             │
-│                                               ▼             │
-│                                     ┌────────────────────┐  │
-│                                     │  localhost:3000    │  │
-│                                     │  (Backend)         │  │
-│                                     └────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────────────────────────┐
+│  Playwright E2E Testing                    │
+│                                            │
+│  ┌────────────────────┐                   │
+│  │  Playwright Test   │                   │
+│  └─────────┬──────────┘                   │
+│            │                               │
+│            │ GraphQL queries               │
+│            ▼                               │
+│  ┌────────────────────┐                   │
+│  │  localhost:4000    │                   │
+│  │  (CapellaQL)       │                   │
+│  └────────────────────┘                   │
+└──────────────────────────────────────────┘
 ```
 
-### Mode Detection Implementation
+### E2E Test Example
 
 ```typescript
-// test/playwright/shared/test-mode.ts
-export type TestMode = "direct" | "via-kong";
-
-export function detectTestMode(): TestMode {
-  return process.env.TEST_MODE === "via-kong" ? "via-kong" : "direct";
-}
-
-export function getBaseUrl(mode: TestMode): string {
-  if (mode === "via-kong") {
-    return process.env.KONG_PROXY_URL || "http://localhost:8000";
-  }
-  return process.env.API_BASE_URL || "http://localhost:3000";
-}
-
-export function getAuthHeaders(mode: TestMode, consumerId: string) {
-  if (mode === "via-kong") {
-    // Kong mode: Use API key authentication
-    return {
-      "apikey": process.env[`TEST_CONSUMER_${consumerId}_API_KEY`]!
-    };
-  }
-  
-  // Direct mode: Use X-Consumer-* headers
-  return {
-    "X-Consumer-Id": `test-consumer-${consumerId}`,
-    "X-Consumer-Username": `loadtest-user-${consumerId}`,
-    "X-Anonymous-Consumer": "false"
-  };
-}
-```
-
-### Dual-Mode Test Example
-
-```typescript
-// test/playwright/consolidated-business.e2e.ts
+// tests/playwright/graphql/health.spec.ts
 import { test, expect } from "@playwright/test";
-import { detectTestMode, getBaseUrl, getAuthHeaders } from "./shared/test-mode";
 
-const testMode = detectTestMode();
-const baseUrl = getBaseUrl(testMode);
+const baseUrl = process.env.API_BASE_URL || "http://localhost:4000";
 
-test.describe(`JWT Token Generation (${testMode})`, () => {
-  test("generates valid JWT token", async ({ request }) => {
-    const headers = getAuthHeaders(testMode, "001");
-
-    const response = await request.post(`${baseUrl}/tokens`, { headers });
+test.describe("CapellaQL Health Checks", () => {
+  test("health endpoint returns ok", async ({ request }) => {
+    const response = await request.get(`${baseUrl}/health`);
 
     expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    
-    expect(body.access_token).toBeDefined();
-    expect(body.access_token.split(".")).toHaveLength(3); // JWT format
-    expect(body.expires_in).toBe(900); // 15 minutes
+    expect(body.status).toBe("ok");
   });
 
-  test("rejects anonymous consumers", async ({ request }) => {
-    const headers = testMode === "via-kong" 
-      ? {} // No auth header
-      : {
-          "X-Consumer-Id": "anonymous",
-          "X-Anonymous-Consumer": "true"
-        };
+  test("GraphQL introspection works", async ({ request }) => {
+    const response = await request.post(`${baseUrl}/graphql`, {
+      data: {
+        query: "{ __typename }"
+      }
+    });
 
-    const response = await request.post(`${baseUrl}/tokens`, { headers });
-
-    expect(response.status()).toBe(401);
+    expect(response.ok()).toBeTruthy();
     const body = await response.json();
-    expect(body.error).toBe("Anonymous consumers are not allowed");
-  });
-
-  test("multiple users get unique tokens", async ({ request }) => {
-    const headers1 = getAuthHeaders(testMode, "001");
-    const headers2 = getAuthHeaders(testMode, "002");
-
-    const [response1, response2] = await Promise.all([
-      request.post(`${baseUrl}/tokens`, { headers: headers1 }),
-      request.post(`${baseUrl}/tokens`, { headers: headers2 })
-    ]);
-
-    const token1 = (await response1.json()).access_token;
-    const token2 = (await response2.json()).access_token;
-
-    expect(token1).not.toBe(token2); // Unique tokens
+    expect(body.data.__typename).toBeDefined();
   });
 });
 ```
@@ -799,7 +715,7 @@ export default defineConfig({
   ],
 
   use: {
-    baseURL: process.env.API_BASE_URL || "http://localhost:3000",
+    baseURL: process.env.API_BASE_URL || "http://localhost:4000",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure"
@@ -811,7 +727,7 @@ export default defineConfig({
       testMatch: /ci-safe\.e2e\.ts/,
       use: { 
         ...devices["Desktop Chrome"],
-        baseURL: "http://localhost:3000" // Always direct mode
+        baseURL: "http://localhost:4000" // Always direct mode
       }
     },
     {
@@ -838,7 +754,7 @@ export default defineConfig({
 
   webServer: {
     command: "bun run start",
-    url: "http://localhost:3000/health",
+    url: "http://localhost:4000/health",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000
   }
@@ -851,7 +767,7 @@ export default defineConfig({
 // test/playwright/ci-safe.e2e.ts
 import { test, expect } from "@playwright/test";
 
-// Tests that run WITHOUT Kong dependencies
+// Tests that run against localhost:4000 directly
 test.describe("CI-Safe API Tests", () => {
   test("health endpoint responds", async ({ request }) => {
     const response = await request.get("/health");
@@ -1177,7 +1093,7 @@ export const stressOptions = {
 # Target Configuration
 TARGET_PROTOCOL=http
 TARGET_HOST=localhost
-TARGET_PORT=3000
+TARGET_PORT=4000
 K6_TIMEOUT=30s
 
 # Smoke Test Configuration
@@ -1365,90 +1281,60 @@ tests/bun/chaos/
 
 Run with: `bun test tests/bun/chaos/`
 
-### Legacy Chaos Test Categories
-
-```
-test/chaos/
-├── kong-failure.test.ts           # Kong Admin API failures (19 tests)
-├── redis-failure.test.ts          # Redis cache failures (14 tests)
-├── network-partition.test.ts      # Network issues (10 tests)
-└── resource-exhaustion.test.ts    # Memory/CPU pressure (14 tests)
-```
-
-### Kong Failure Scenarios
+### Couchbase Failure Scenarios
 
 ```typescript
-// test/chaos/kong-failure.test.ts
-import { describe, test, expect, beforeEach, afterEach } from "bun:test";
-import { KongAdapter } from "../../src/adapters/kong.adapter";
-import { MockKongServer } from "../shared/mock-kong-server";
+// tests/bun/chaos/couchbase-failure.test.ts
+import { describe, test, expect, beforeEach } from "bun:test";
+import { getCouchbaseConnection } from "../../../src/lib/couchbase/connection-manager";
+import { CouchbaseErrorHandler } from "../../../src/lib/couchbase/errors";
 
-describe("Chaos: Kong Failures", () => {
-  let mockServer: MockKongServer;
-  let adapter: KongAdapter;
-
-  beforeEach(() => {
-    mockServer = new MockKongServer({ failureMode: "timeout" });
-    adapter = new KongAdapter(mockServer.url, {
-      circuitBreaker: { 
-        threshold: 0.5, 
-        windowSize: 10,
-        timeout: 100 // Fast timeout for chaos testing
-      }
-    });
+describe("Chaos: Couchbase Failures", () => {
+  test("handles connection timeout gracefully", async () => {
+    await expect(
+      getCouchbaseConnection({
+        connectionString: "couchbase://unreachable-host:8091",
+        timeout: 1000
+      })
+    ).rejects.toThrow();
   });
 
-  afterEach(async () => {
-    await mockServer.close();
+  test("handles bucket not found error", async () => {
+    const { cluster } = await getCouchbaseConnection();
+
+    await expect(
+      cluster.bucket("nonexistent-bucket").defaultCollection().get("doc")
+    ).rejects.toThrow();
   });
 
-  test("circuit opens after 50% error rate", async () => {
-    // Force 6 failures out of 10 requests
+  test("classifies errors correctly via CouchbaseErrorHandler", async () => {
+    const handler = new CouchbaseErrorHandler();
+    const timeoutError = new Error("timeout");
+    timeoutError.name = "TimeoutError";
+
+    const classified = handler.classify(timeoutError);
+    expect(classified.retryable).toBe(true);
+    expect(classified.severity).toBe("warning");
+  });
+
+  test("circuit breaker opens after repeated failures", async () => {
+    // Force repeated connection failures to trigger circuit breaker
+    const attempts: boolean[] = [];
+
     for (let i = 0; i < 6; i++) {
       try {
-        await adapter.getConsumer("test");
-      } catch {}
+        await getCouchbaseConnection({
+          connectionString: "couchbase://invalid:9999",
+          timeout: 100
+        });
+        attempts.push(true);
+      } catch {
+        attempts.push(false);
+      }
     }
 
-    // Circuit should be OPEN now
-    const start = Date.now();
-    try {
-      await adapter.getConsumer("test");
-    } catch (error) {
-      const duration = Date.now() - start;
-      
-      expect(duration).toBeLessThan(50); // Fast rejection
-      expect(error.message).toContain("Circuit breaker is OPEN");
-    }
-  });
-
-  test("falls back to stale cache during Kong outage", async () => {
-    // Pre-populate cache
-    mockServer.setMode("success");
-    const consumer = await adapter.getConsumer("test-consumer-001");
-    
-    // Simulate Kong outage
-    mockServer.setMode("failure");
-    
-    // Should return stale cached data
-    const staleConsumer = await adapter.getConsumer("test-consumer-001");
-    expect(staleConsumer).toEqual(consumer);
-    expect(staleConsumer._stale).toBe(true);
-  });
-
-  test("circuit half-opens after timeout", async () => {
-    // Open circuit
-    for (let i = 0; i < 6; i++) {
-      try { await adapter.getConsumer("test"); } catch {}
-    }
-
-    // Wait for half-open timeout (60 seconds in config)
-    await new Promise(resolve => setTimeout(resolve, 60_100));
-
-    // Circuit should attempt recovery
-    mockServer.setMode("success");
-    const consumer = await adapter.getConsumer("test-consumer-001");
-    expect(consumer).toBeDefined();
+    // All attempts should have failed
+    expect(attempts.every((a) => a === false)).toBe(true);
   });
 });
 ```
@@ -1517,61 +1403,60 @@ describe("Chaos: Redis Failures", () => {
 ```typescript
 // test/chaos/network-partition.test.ts
 import { describe, test, expect, beforeEach } from "bun:test";
-import { ApiGatewayService } from "../../src/services/api-gateway.service";
+import { getCouchbaseConnection } from "../../src/lib/couchbase/connection-manager";
 import { FlakeyNetworkSimulator } from "../shared/flakey-network";
 
 describe("Chaos: Network Partitions", () => {
-  let service: ApiGatewayService;
   let network: FlakeyNetworkSimulator;
 
   beforeEach(() => {
-    network = new FlakeyNetworkSimulator({ 
+    network = new FlakeyNetworkSimulator({
       failureRate: 0.3, // 30% packet loss
       latency: { min: 50, max: 200 }
-    });
-    
-    service = new ApiGatewayService({
-      baseUrl: network.url,
-      retry: { maxAttempts: 3, backoff: "exponential" }
     });
   });
 
   test("retries succeed despite intermittent failures", async () => {
     network.setFailureRate(0.3); // 30% failure rate
 
-    const consumer = await service.getConsumer("test-consumer-001");
-    expect(consumer).toBeDefined(); // Eventually succeeds
+    const { collection } = await getCouchbaseConnection();
+    const result = await collection.get("test-doc-001");
+    expect(result.content).toBeDefined(); // Eventually succeeds with retry
   });
 
   test("circuit stays closed for occasional failures", async () => {
     network.setFailureRate(0.2); // 20% failure rate (below threshold)
 
+    const { collection } = await getCouchbaseConnection();
+
     // Make 50 requests
     for (let i = 0; i < 50; i++) {
       try {
-        await service.getConsumer("test-consumer-001");
+        await collection.get("test-doc-001");
       } catch {}
     }
 
     // Circuit should still be CLOSED
-    const consumer = await service.getConsumer("test-consumer-001");
-    expect(consumer).toBeDefined(); // No fast rejection
+    const result = await collection.get("test-doc-001");
+    expect(result.content).toBeDefined(); // No fast rejection
   });
 
   test("circuit opens for frequent failures", async () => {
     network.setFailureRate(0.8); // 80% failure rate
 
+    const { collection } = await getCouchbaseConnection();
+
     // Force circuit to open
     for (let i = 0; i < 10; i++) {
       try {
-        await service.getConsumer("test");
+        await collection.get("test-doc");
       } catch {}
     }
 
     // Circuit should be OPEN
     const start = Date.now();
     try {
-      await service.getConsumer("test");
+      await collection.get("test-doc");
     } catch (error) {
       expect(Date.now() - start).toBeLessThan(50);
       expect(error.message).toContain("Circuit breaker is OPEN");
@@ -1611,7 +1496,7 @@ describe("Chaos: Resource Exhaustion", () => {
 
   test("handles high concurrent connections", async () => {
     const requests = Array.from({ length: 100 }, () =>
-      fetch("http://localhost:3000/health")
+      fetch("http://localhost:4000/health")
     );
 
     const responses = await Promise.all(requests);
@@ -1979,12 +1864,12 @@ jobs:
         run: |
           bun run start &
           sleep 5
-          curl --retry 10 --retry-delay 1 http://localhost:3000/health
+          curl --retry 10 --retry-delay 1 http://localhost:4000/health
 
       - name: Run E2E tests
         run: bun run test:e2e
         env:
-          API_BASE_URL: http://localhost:3000
+          API_BASE_URL: http://localhost:4000
 
       - name: Upload test results
         if: always()
@@ -2102,12 +1987,12 @@ export async function skipIfRedisUnavailable() {
   await skipIfServiceUnavailable("Redis", redisUrl);
 }
 
-export async function skipIfKongUnavailable() {
-  const kongUrl = process.env.KONG_ADMIN_URL;
-  if (!kongUrl) {
-    test.skip("KONG_ADMIN_URL not configured");
+export async function skipIfCouchbaseUnavailable() {
+  const couchbaseUrl = process.env.COUCHBASE_URL;
+  if (!couchbaseUrl) {
+    test.skip("COUCHBASE_URL not configured");
   }
-  await skipIfServiceUnavailable("Kong Admin API", kongUrl);
+  await skipIfServiceUnavailable("Couchbase", couchbaseUrl);
 }
 ```
 
@@ -2168,10 +2053,10 @@ export function enableFetchPolyfill() {
 ### Mock Servers
 
 ```typescript
-// test/shared/mock-kong-server.ts
+// test/shared/mock-couchbase-server.ts
 import { serve, Server } from "bun";
 
-export class MockKongServer {
+export class MockCouchbaseServer {
   private server: Server;
   private failureMode: "none" | "timeout" | "error" | "500";
 
@@ -2198,21 +2083,19 @@ export class MockKongServer {
     }
 
     if (this.failureMode === "error") {
-      throw new Error("Simulated network error");
+      throw new Error("Simulated connection error");
     }
 
     if (this.failureMode === "500") {
       return new Response("Internal Server Error", { status: 500 });
     }
 
-    // Success mode
+    // Success mode - simulate Couchbase REST API
     const url = new URL(req.url);
-    if (url.pathname.includes("/consumers/")) {
-      const consumerId = url.pathname.split("/").pop();
+    if (url.pathname.includes("/pools/default")) {
       return Response.json({
-        id: consumerId,
-        username: consumerId,
-        custom_id: `custom-${consumerId}`
+        name: "default",
+        nodes: [{ status: "healthy" }]
       });
     }
 
@@ -2237,7 +2120,7 @@ NODE_ENV=test
 LOG_LEVEL=silent
 
 # Application
-PORT=3000
+PORT=4000
 HOST=localhost
 
 # JWT
@@ -2246,8 +2129,11 @@ JWT_ISSUER=https://sts.example.com/
 JWT_AUDIENCE=http://api.example.com/
 JWT_EXPIRATION=900
 
-# Kong Admin API (live integration)
-KONG_ADMIN_URL=http://192.168.178.3:30001
+# Couchbase (live integration)
+COUCHBASE_URL=couchbase://localhost
+COUCHBASE_USERNAME=Administrator
+COUCHBASE_PASSWORD=password
+COUCHBASE_BUCKET=test-bucket
 
 # Redis (test database)
 REDIS_URL=redis://localhost:6379
@@ -2255,7 +2141,7 @@ REDIS_DB=10
 
 # Telemetry (console mode for testing)
 TELEMETRY_MODE=console
-OTEL_SERVICE_NAME=authentication-service-test
+OTEL_SERVICE_NAME=capellaql-test
 
 # Test Consumers
 TEST_CONSUMER_ID_1=test-consumer-001
@@ -2329,7 +2215,7 @@ services:
 | Tests timeout | External service unavailable | Check service URL in `.env`, verify network connectivity |
 | Parallel test failures | Instance equality checks | Use functional equivalence (compare properties, not instances) |
 | Redis connection errors | Wrong database | Verify `REDIS_DB=10` in test environment |
-| Kong integration fails | Bun fetch networking bug | `fetchWithFallback()` handles automatically via curl |
+| Couchbase connection fails | Wrong URL or credentials | Verify `COUCHBASE_URL`, `COUCHBASE_USERNAME`, `COUCHBASE_PASSWORD` in `.env` |
 | Mutation testing ENOEXEC | Missing bundled Bun | Run `bun run build:bun-bundle` |
 | StrykerJS parse errors | Wrong test reporter | Use `--reporter=dots` for mutation testing |
 | High memory usage in tests | No cleanup | Add `afterEach` to clear caches and close connections |
@@ -2344,12 +2230,12 @@ bun test --verbose test/bun/specific.test.ts
 bun --inspect test test/bun/specific.test.ts
 
 # Check service connectivity
-curl http://192.168.178.3:30001/status  # Kong
-redis-cli -h localhost -p 6379 ping     # Redis
+curl http://localhost:8091/pools/default  # Couchbase
+redis-cli -h localhost -p 6379 ping       # Redis
 
-# Test curl fallback
-LOG_LEVEL=debug bun test test/bun/kong/
-# Look for: "Fetch failed, trying curl fallback"
+# Test Couchbase connection
+LOG_LEVEL=debug bun test tests/bun/couchbase/
+# Look for: connection status and error classification output
 
 # Verify mutation testing setup
 BUN_BE_BUN=1 ./scripts/bundled-runtimes/bun-cli --version

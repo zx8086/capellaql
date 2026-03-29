@@ -145,9 +145,9 @@ The build workflow includes explicit DHI attestation verification before every b
 
 ```bash
 docker run -d \
-  --name auth-service \
+  --name capellaql \
   --env-file .env \
-  -p 3000:3000 \
+  -p 4000:4000 \
   --user 65532:65532 \
   --read-only \
   --tmpfs /tmp:noexec,nosuid,size=100m \
@@ -217,7 +217,7 @@ spec:
     "name": "authentication-service",
     "image": "authentication-service:latest",
     "portMappings": [{
-      "containerPort": 3000,
+      "containerPort": 4000,
       "protocol": "tcp"
     }],
     "user": "65532:65532",
@@ -238,7 +238,7 @@ spec:
       "readOnly": false
     }],
     "healthCheck": {
-      "command": ["CMD-SHELL", "wget -q --spider http://localhost:3000/health || exit 1"],
+      "command": ["CMD-SHELL", "wget -q --spider http://localhost:4000/health || exit 1"],
       "interval": 30,
       "timeout": 5,
       "retries": 3,
@@ -413,19 +413,19 @@ docker rm auth-service
 
 # Restore baseline
 docker run -d \
-  --name auth-service \
+  --name capellaql \
   --env-file .env \
-  -p 3000:3000 \
+  -p 4000:4000 \
   --user 65532:65532 \
   --read-only \
   --tmpfs /tmp:noexec,nosuid,size=100m \
   --tmpfs /app/profiles:noexec,nosuid,size=50m \
   --cap-drop=ALL \
   --security-opt=no-new-privileges:true \
-  authentication-service:baseline
+  capellaql-service:baseline
 
 # Verify health
-curl -s http://localhost:3000/health | jq '.status'
+curl -s http://localhost:4000/health | jq '.status'
 ```
 
 ### Kubernetes Rollback (< 60 seconds)
