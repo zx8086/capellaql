@@ -11,10 +11,6 @@ import { applicationConfig, telemetryConfig } from "$config";
 import { serializeError } from "$utils/errorUtils";
 import { telemetryHealthMonitor } from "./health/telemetryHealth";
 
-// ============================================================================
-// Types and Interfaces
-// ============================================================================
-
 export enum LogLevel {
   DEBUG = "debug",
   INFO = "info",
@@ -44,26 +40,9 @@ export interface StructuredLogData {
   };
 }
 
-// ============================================================================
-// ECS Field Mapping Configuration
-// Implementation: lines 108-135 per monitoring-updated.md
-// ============================================================================
-
-/**
- * ECS (Elastic Common Schema) field mapping for observability platform integration.
- * Maps custom application fields to ECS-standard field names.
- *
- * Per monitoring-updated.md lines 108-135:
- * - Top-level fields in Elasticsearch (not nested under labels.*)
- * - Kibana auto-complete recognition
- * - Direct field access (consumer.id instead of labels.consumerId)
- * - Standard compliance with Elastic Common Schema
- *
- * IMPORTANT: The service uses `consumer.*` namespace, NOT `user.*`.
- * This is intentional per documentation lines 218-224:
- * - `consumer.*` - API consumer entities (API clients)
- * - `user.*` - Reserved for end-user identification (not currently used)
- */
+// ECS (Elastic Common Schema) field mapping for observability platform integration.
+// Uses `consumer.*` namespace (not `user.*`) because these are API client entities,
+// not end-user identification.
 const ECS_FIELD_MAPPING: Record<string, string> = {
   // Consumer fields (API client identification)
   consumerId: "consumer.id",
@@ -72,10 +51,6 @@ const ECS_FIELD_MAPPING: Record<string, string> = {
   requestId: "event.id",
   totalDuration: "event.duration",
 };
-
-// ============================================================================
-// Trace Context Extraction
-// ============================================================================
 
 function getCurrentTraceContext(): LogContext {
   try {
@@ -96,15 +71,7 @@ function getCurrentTraceContext(): LogContext {
   }
 }
 
-// ============================================================================
-// ECS Field Transformation (Custom Transform for Field Mapping)
-// Per monitoring-updated.md: Step 3 in format pipeline
-// ============================================================================
-
-/**
- * Custom Winston transform to rename fields per ECS mapping.
- * Applied BEFORE ecsFormat() to ensure correct field names in ECS output.
- */
+// Applied BEFORE ecsFormat() to ensure correct field names in ECS output
 const fieldMappingTransform = winston.format((info) => {
   // Apply ECS field mapping to info object
   for (const [customField, ecsField] of Object.entries(ECS_FIELD_MAPPING)) {
@@ -126,29 +93,12 @@ const fieldMappingTransform = winston.format((info) => {
   return info;
 });
 
-// ============================================================================
-// Winston Logger Configuration
-// Per monitoring-updated.md format pipeline:
-// 1. winston.format.timestamp()      -> Adds timestamp
-// 2. winston.format.errors()         -> Stack trace handling
-// 3. Custom transform                -> Renames fields (consumerId -> consumer.id)
-// 4. ecsFormat()                     -> ECS JSON structure
-//
-// Console transport format:
-// Custom clean format for development readability
-// ============================================================================
-
 // Service configuration for ECS format
 const localConfig = {
   serviceName: telemetryConfig.SERVICE_NAME || "capellaql",
   serviceVersion: telemetryConfig.SERVICE_VERSION || "2.0.0",
   environment: process.env.NODE_ENV || process.env.BUN_ENV || "development",
 };
-
-// ============================================================================
-// Clean Console Format for Development
-// Shows: timestamp level: message {relevant-fields-only}
-// ============================================================================
 
 const cleanConsoleFormat = winston.format.printf((info) => {
   const { level, message, timestamp, ...meta } = info;
@@ -167,10 +117,6 @@ const cleanConsoleFormat = winston.format.printf((info) => {
   const metaStr = Object.keys(relevant).length > 0 ? ` ${JSON.stringify(relevant)}` : "";
   return `${ts} ${level}: ${message}${metaStr}`;
 });
-
-// ============================================================================
-// Winston Telemetry Logger Class
-// ============================================================================
 
 class WinstonTelemetryLogger {
   private logger: winston.Logger;
@@ -248,10 +194,6 @@ class WinstonTelemetryLogger {
     }
   }
 
-  /**
-   * Legacy initialize method for backward compatibility.
-   * Calls reinitialize() internally.
-   */
   public initialize(): void {
     this.reinitialize();
   }
@@ -414,35 +356,20 @@ class WinstonTelemetryLogger {
     }
   }
 
-  /**
-   * Get the underlying Winston logger instance.
-   * Use for advanced scenarios requiring direct Winston access.
-   */
   public getLogger(): winston.Logger {
     return this.logger;
   }
 
-  /**
-   * Check if OTLP transport is active.
-   */
   public isOTLPEnabled(): boolean {
     return this.isInitialized;
   }
 }
-
-// ============================================================================
-// Singleton Export
-// ============================================================================
 
 // Singleton logger instance (matches documentation: winstonTelemetryLogger)
 export const winstonTelemetryLogger = new WinstonTelemetryLogger();
 
 // Legacy alias for compatibility
 export const telemetryLogger = winstonTelemetryLogger;
-
-// ============================================================================
-// Convenience Functions (matching existing logger interface)
-// ============================================================================
 
 export function log(message: string, meta?: Record<string, unknown>): void {
   winstonTelemetryLogger.info(message, meta);

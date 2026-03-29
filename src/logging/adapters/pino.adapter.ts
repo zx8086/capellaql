@@ -6,11 +6,6 @@ import type { ITelemetryLogger, LogContext } from "../ports/logger.port";
 
 const MS_TO_NS = 1_000_000;
 
-/**
- * Resolve service identity from environment / config for ECS fields.
- * These are injected into ecsFormat() so every log line includes
- * service.name, service.version, service.environment per ECS spec.
- */
 function resolveServiceMeta() {
   return {
     serviceName: process.env.OTEL_SERVICE_NAME || "capellaql-service",
@@ -19,9 +14,7 @@ function resolveServiceMeta() {
   };
 }
 
-/**
- * ECS boilerplate keys to strip from dev output — keep only domain-relevant fields.
- */
+// ECS boilerplate keys to strip from dev output -- keep only domain-relevant fields
 const ECS_STRIP_KEYS = new Set([
   "@timestamp",
   "ecs.version",
@@ -34,10 +27,6 @@ const ECS_STRIP_KEYS = new Set([
   "service.environment",
 ]);
 
-/**
- * ANSI color codes for level-colored dev output.
- * trace=gray, debug=cyan, info=green, warn=yellow, error=red, fatal=magenta
- */
 const LEVEL_COLORS: Record<string, string> = {
   trace: "\x1b[90m",
   debug: "\x1b[36m",
@@ -82,10 +71,6 @@ function goldenPathWrite(logObj: Record<string, unknown>): string {
   return `${ts} ${color}${levelName}${RESET}: ${text}${metaStr}\n`;
 }
 
-/**
- * Build the dev-mode destination that produces clean single-line output.
- * In production, returns undefined to use raw JSON stdout.
- */
 function buildDevDestination(): pino.DestinationStream | undefined {
   const env = process.env.NODE_ENV;
   if (env === "production" || env === "staging") {
@@ -105,16 +90,8 @@ function buildDevDestination(): pino.DestinationStream | undefined {
   } as pino.DestinationStream;
 }
 
-/**
- * Create a root pino instance with ECS formatting and OTEL trace injection.
- *
- * ECS compliance (per https://www.elastic.co/docs/reference/ecs/logging/nodejs/pino):
- * - ecsFormat() produces: @timestamp, log.level, message, ecs.version, process.pid, host.hostname
- * - Service identity: service.name, service.version, service.environment, event.dataset
- * - Trace correlation via mixin: trace.id, span.id, transaction.id (from OTEL active span)
- * - Error serialization: convertErr=true maps err → ECS error.type/error.message/error.stack_trace
- * - apmIntegration: false — we inject trace fields ourselves via OTEL API (not Elastic APM agent)
- */
+// ECS compliance: ecsFormat() produces @timestamp, log.level, message, ecs.version, process.pid, host.hostname.
+// apmIntegration: false because we inject trace fields ourselves via OTEL API (not Elastic APM agent).
 function createPinoLogger(level?: string): PinoLogger {
   const svc = resolveServiceMeta();
 
@@ -151,22 +128,12 @@ function createPinoLogger(level?: string): PinoLogger {
   return devDest ? pino(opts, devDest) : pino(opts);
 }
 
-/**
- * Pino-backed telemetry logger implementing ITelemetryLogger.
- *
- * This is the default Layer 1 backend adapter for the CapellaQL
- * logging DI architecture.
- */
 export class PinoAdapter implements ITelemetryLogger {
   private readonly logger: PinoLogger;
 
   constructor(logger?: PinoLogger) {
     this.logger = logger ?? createPinoLogger();
   }
-
-  /* ------------------------------------------------------------------ */
-  /*  ILogger core methods                                               */
-  /* ------------------------------------------------------------------ */
 
   debug(message: string, context?: LogContext): void {
     this.logger.debug(context ?? {}, message);
@@ -203,10 +170,6 @@ export class PinoAdapter implements ITelemetryLogger {
   reinitialize(): void {
     // No-op — Pino uses a global LoggerProvider; no re-init required.
   }
-
-  /* ------------------------------------------------------------------ */
-  /*  ITelemetryLogger domain methods                                    */
-  /* ------------------------------------------------------------------ */
 
   logHttpRequest(method: string, path: string, statusCode: number, duration: number, context?: LogContext): void {
     this.logger.info(

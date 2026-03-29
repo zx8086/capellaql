@@ -1,11 +1,5 @@
 /* src/lib/couchbase/errors.ts */
 
-/**
- * SDK Error Types Module
- * Imports ALL official SDK error types and provides error classification
- * PRESERVES existing 25+ error classifications with severity levels and categories
- */
-
 import {
   AmbiguousTimeoutError,
   // Authentication & Authorization
@@ -56,14 +50,7 @@ import {
 
 import type { CouchbaseErrorContext, ErrorClassification } from "./types";
 
-/**
- * Error classifier using SDK types with instanceof checks
- * Preserves existing 25+ error classifications with severity, category, and alert flags
- */
 export class CouchbaseErrorClassifier {
-  /**
-   * Complete error classification map (preserved from existing implementation)
-   */
   private static readonly ERROR_CLASSIFICATIONS = new Map<string, ErrorClassification>([
     // Document/Key Errors - Not retryable, expected in normal operations
     [
@@ -231,9 +218,6 @@ export class CouchbaseErrorClassifier {
     ],
   ]);
 
-  /**
-   * Check if error is retryable using SDK instanceof checks
-   */
   static isRetryable(error: unknown): boolean {
     if (!error) return false;
 
@@ -252,9 +236,6 @@ export class CouchbaseErrorClassifier {
     );
   }
 
-  /**
-   * Check if error is a network/connectivity issue
-   */
   static isNetworkError(error: unknown): boolean {
     if (!error) return false;
 
@@ -272,9 +253,6 @@ export class CouchbaseErrorClassifier {
     );
   }
 
-  /**
-   * Check if error is authentication/authorization
-   */
   static isAuthError(error: unknown): boolean {
     return (
       error instanceof AuthenticationFailureError ||
@@ -284,9 +262,6 @@ export class CouchbaseErrorClassifier {
     );
   }
 
-  /**
-   * Check if error is a permanent failure (don't retry)
-   */
   static isPermanentFailure(error: unknown): boolean {
     return (
       CouchbaseErrorClassifier.isAuthError(error) ||
@@ -302,18 +277,12 @@ export class CouchbaseErrorClassifier {
     );
   }
 
-  /**
-   * Check if error is a document conflict (CAS mismatch)
-   */
   static isConflictError(error: unknown): boolean {
     return (
       error instanceof CasMismatchError || error instanceof DocumentExistsError || error instanceof DocumentLockedError
     );
   }
 
-  /**
-   * Check if error is resource not found
-   */
   static isNotFoundError(error: unknown): boolean {
     return (
       error instanceof DocumentNotFoundError ||
@@ -322,16 +291,10 @@ export class CouchbaseErrorClassifier {
     );
   }
 
-  /**
-   * Check if error is an ambiguous timeout (requires manual investigation)
-   */
   static isAmbiguousError(error: unknown): boolean {
     return error instanceof AmbiguousTimeoutError || error instanceof DurabilityAmbiguousError;
   }
 
-  /**
-   * Classify error using the classification map (preserves existing pattern)
-   */
   static classifyError(error: any): ErrorClassification {
     const errorType = error.constructor.name;
     const classification = CouchbaseErrorClassifier.ERROR_CLASSIFICATIONS.get(errorType);
@@ -361,9 +324,6 @@ export class CouchbaseErrorClassifier {
     };
   }
 
-  /**
-   * Extract error context from SDK error
-   */
   static extractContext(error: unknown, operation?: string): CouchbaseErrorContext {
     const baseContext: CouchbaseErrorContext = {
       message: error instanceof Error ? error.message : String(error),
@@ -388,9 +348,6 @@ export class CouchbaseErrorClassifier {
     return baseContext;
   }
 
-  /**
-   * Get retry strategy based on error type
-   */
   static getRetryStrategy(error: unknown): {
     shouldRetry: boolean;
     maxAttempts: number;
@@ -429,17 +386,11 @@ export class CouchbaseErrorClassifier {
     return { shouldRetry: false, maxAttempts: 0, baseDelayMs: 0 };
   }
 
-  /**
-   * Get the error classifications map (for inspection/testing)
-   */
   static getErrorClassifications(): Map<string, ErrorClassification> {
     return new Map(CouchbaseErrorClassifier.ERROR_CLASSIFICATIONS);
   }
 }
 
-/**
- * Export all SDK error types for application use
- */
 export {
   // Core
   CouchbaseError,
@@ -487,16 +438,7 @@ export {
   UnsupportedOperationError,
 };
 
-// ============================================================================
-// Custom Connection Error
-// ============================================================================
-
-/**
- * Connection-specific error that preserves SDK error context.
- * Used for connection failures, initialization errors, and circuit breaker states.
- *
- * @see SIO-442 - Comprehensive Error Handling Improvements
- */
+// @see SIO-442 - Comprehensive Error Handling Improvements
 export class ConnectionError extends Error {
   public readonly code = "CONNECTION_ERROR";
   public override readonly cause?: Error;
@@ -516,9 +458,7 @@ export class ConnectionError extends Error {
     }
   }
 
-  /**
-   * Serialize for logging - ensures proper JSON output (never [object Object])
-   */
+  // Ensures proper JSON output (never [object Object])
   toJSON(): Record<string, unknown> {
     return {
       name: this.name,

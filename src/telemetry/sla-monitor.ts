@@ -5,22 +5,12 @@ import { type Counter, type Histogram, metrics } from "@opentelemetry/api";
 import { getLogger } from "../logging/container";
 import { triggerSLAViolationProfiling } from "./profiling-metrics";
 
-// ============================================================================
-// Types
-// ============================================================================
-
-/**
- * SLA threshold definition for an endpoint.
- */
 export interface SlaThreshold {
   endpoint: string; // Endpoint path to monitor
   p95: number; // P95 latency threshold (ms)
   p99: number; // P99 latency threshold (ms)
 }
 
-/**
- * Configuration for SLA monitoring.
- */
 export interface SlaMonitorConfig {
   enabled: boolean;
   autoTriggerOnSlaViolation: boolean;
@@ -30,9 +20,6 @@ export interface SlaMonitorConfig {
   outputDir: string;
 }
 
-/**
- * Percentile calculation results.
- */
 export interface PercentileMetrics {
   p95: number;
   p99: number;
@@ -42,9 +29,6 @@ export interface PercentileMetrics {
   mean: number;
 }
 
-/**
- * SLA violation event.
- */
 export interface SlaViolation {
   endpoint: string;
   timestamp: number;
@@ -56,9 +40,6 @@ export interface SlaViolation {
   reason?: string;
 }
 
-/**
- * SLA monitor statistics.
- */
 export interface SlaMonitorStats {
   enabled: boolean;
   activeEndpoints: string[];
@@ -71,10 +52,6 @@ export interface SlaMonitorStats {
   };
 }
 
-// ============================================================================
-// Default Configuration
-// ============================================================================
-
 const DEFAULT_CONFIG: SlaMonitorConfig = {
   enabled: false,
   autoTriggerOnSlaViolation: true,
@@ -84,14 +61,6 @@ const DEFAULT_CONFIG: SlaMonitorConfig = {
   outputDir: "/tmp/profiles",
 };
 
-// ============================================================================
-// Rolling Buffer Implementation
-// ============================================================================
-
-/**
- * High-performance rolling buffer using Float64Array.
- * Maintains last N samples for efficient percentile calculation.
- */
 class RollingBuffer {
   private buffer: Float64Array;
   private index: number = 0;
@@ -103,9 +72,6 @@ class RollingBuffer {
     this.buffer = new Float64Array(size);
   }
 
-  /**
-   * Add a value to the buffer.
-   */
   push(value: number): void {
     this.buffer[this.index] = value;
     this.index = (this.index + 1) % this.size;
@@ -114,16 +80,10 @@ class RollingBuffer {
     }
   }
 
-  /**
-   * Get the number of samples in the buffer.
-   */
   getCount(): number {
     return this.count;
   }
 
-  /**
-   * Get sorted copy of buffer values.
-   */
   getSortedValues(): Float64Array {
     const values = new Float64Array(this.count);
 
@@ -140,11 +100,7 @@ class RollingBuffer {
     return values;
   }
 
-  /**
-   * Calculate percentile from buffer.
-   *
-   * @param percentile - Percentile to calculate (0-100)
-   */
+  // @param percentile - Percentile to calculate (0-100)
   calculatePercentile(percentile: number): number {
     if (this.count === 0) {
       return 0;
@@ -155,9 +111,6 @@ class RollingBuffer {
     return sorted[Math.max(0, Math.min(index, this.count - 1))];
   }
 
-  /**
-   * Calculate multiple percentiles efficiently.
-   */
   calculatePercentiles(): PercentileMetrics {
     if (this.count === 0) {
       return { p95: 0, p99: 0, count: 0, min: 0, max: 0, mean: 0 };
@@ -183,9 +136,6 @@ class RollingBuffer {
     };
   }
 
-  /**
-   * Clear the buffer.
-   */
   clear(): void {
     this.buffer.fill(0);
     this.index = 0;
@@ -193,13 +143,6 @@ class RollingBuffer {
   }
 }
 
-// ============================================================================
-// SLA Monitor Class
-// ============================================================================
-
-/**
- * SLA monitor for automatic performance violation detection.
- */
 class SlaMonitor {
   private config: SlaMonitorConfig;
   private buffers: Map<string, RollingBuffer> = new Map();
@@ -219,9 +162,6 @@ class SlaMonitor {
     this.initializeMetrics();
   }
 
-  /**
-   * Initialize threshold map from config.
-   */
   private initializeThresholds(): void {
     for (const threshold of this.config.slaThresholds) {
       this.thresholdMap.set(threshold.endpoint, threshold);
@@ -229,9 +169,6 @@ class SlaMonitor {
     }
   }
 
-  /**
-   * Initialize OpenTelemetry metrics.
-   */
   private initializeMetrics(): void {
     if (!this.config.enabled) {
       return;
@@ -285,9 +222,6 @@ class SlaMonitor {
     }
   }
 
-  /**
-   * Check for SLA violations.
-   */
   private async checkSlaViolation(endpoint: string, buffer: RollingBuffer, threshold: SlaThreshold): Promise<void> {
     const percentileMetrics = buffer.calculatePercentiles();
 
@@ -354,9 +288,6 @@ class SlaMonitor {
     }
   }
 
-  /**
-   * Check if profiling can be triggered for an endpoint.
-   */
   private canTriggerProfiling(endpoint: string): boolean {
     const lastTrigger = this.lastTriggers.get(endpoint);
     if (!lastTrigger) {
@@ -367,9 +298,6 @@ class SlaMonitor {
     return minutesSinceLastTrigger >= this.config.slaViolationThrottleMinutes;
   }
 
-  /**
-   * Get minutes since last trigger.
-   */
   private getMinutesSinceLastTrigger(endpoint: string): number {
     const lastTrigger = this.lastTriggers.get(endpoint);
     if (!lastTrigger) {
@@ -378,9 +306,6 @@ class SlaMonitor {
     return (Date.now() - lastTrigger) / 60000;
   }
 
-  /**
-   * Record a violation event.
-   */
   private recordViolation(
     endpoint: string,
     percentileMetrics: PercentileMetrics,
@@ -407,9 +332,6 @@ class SlaMonitor {
     }
   }
 
-  /**
-   * Get current SLA monitor statistics.
-   */
   public getStats(): SlaMonitorStats {
     const bufferSizes: Record<string, number> = {};
     for (const [endpoint, buffer] of this.buffers) {
@@ -434,9 +356,6 @@ class SlaMonitor {
     };
   }
 
-  /**
-   * Get percentile metrics for an endpoint.
-   */
   public getPercentiles(endpoint: string): PercentileMetrics | null {
     const buffer = this.buffers.get(endpoint);
     if (!buffer || buffer.getCount() === 0) {
@@ -445,16 +364,10 @@ class SlaMonitor {
     return buffer.calculatePercentiles();
   }
 
-  /**
-   * Get recent violations.
-   */
   public getRecentViolations(limit = 10): SlaViolation[] {
     return this.violations.slice(-limit);
   }
 
-  /**
-   * Update configuration.
-   */
   public updateConfig(config: Partial<SlaMonitorConfig>): void {
     this.config = { ...this.config, ...config };
 
@@ -465,9 +378,6 @@ class SlaMonitor {
     }
   }
 
-  /**
-   * Clear all data (for testing).
-   */
   public reset(): void {
     for (const buffer of this.buffers.values()) {
       buffer.clear();
@@ -479,15 +389,8 @@ class SlaMonitor {
   }
 }
 
-// ============================================================================
-// Singleton
-// ============================================================================
-
 let slaMonitorInstance: SlaMonitor | null = null;
 
-/**
- * Get or create the SLA monitor singleton.
- */
 export function getSlaMonitor(config?: Partial<SlaMonitorConfig>): SlaMonitor {
   if (!slaMonitorInstance) {
     slaMonitorInstance = new SlaMonitor(config);
@@ -495,9 +398,6 @@ export function getSlaMonitor(config?: Partial<SlaMonitorConfig>): SlaMonitor {
   return slaMonitorInstance;
 }
 
-/**
- * Initialize SLA monitor with configuration.
- */
 export function initializeSlaMonitor(config: Partial<SlaMonitorConfig>): SlaMonitor {
   if (slaMonitorInstance) {
     slaMonitorInstance.updateConfig(config);
@@ -507,9 +407,6 @@ export function initializeSlaMonitor(config: Partial<SlaMonitorConfig>): SlaMoni
   return slaMonitorInstance;
 }
 
-/**
- * Shutdown SLA monitor.
- */
 export function shutdownSlaMonitor(): void {
   if (slaMonitorInstance) {
     const stats = slaMonitorInstance.getStats();
@@ -523,9 +420,5 @@ export function shutdownSlaMonitor(): void {
     slaMonitorInstance = null;
   }
 }
-
-// ============================================================================
-// Convenience Exports
-// ============================================================================
 
 export { SlaMonitor, RollingBuffer };

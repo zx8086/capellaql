@@ -48,10 +48,6 @@ import { markTelemetryInitialized } from "./health/telemetryHealth";
 import { initializeTelemetryCircuitBreakers, shutdownTelemetryCircuitBreakers } from "./telemetry-circuit-breaker";
 import { winstonTelemetryLogger } from "./winston-logger";
 
-// ============================================================================
-// Module-level state (per migrate/telemetry/instrumentation.ts)
-// ============================================================================
-
 interface MetricReaderLike {
   forceFlush(): Promise<void>;
   shutdown(): Promise<void>;

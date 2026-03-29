@@ -4,10 +4,6 @@
 import { type Counter, type Histogram, metrics, type ObservableGauge } from "@opentelemetry/api";
 import { getLogger } from "../logging/container";
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type ProfilingTriggerReason = "sla_violation" | "manual" | "scheduled" | "memory_pressure" | "error_spike";
 
 export interface ProfilingSession {
@@ -29,10 +25,6 @@ export interface ProfilingMetricsState {
   lastSessionId: string | null;
 }
 
-// ============================================================================
-// State
-// ============================================================================
-
 let isInitialized = false;
 const activeSessions: Map<string, ProfilingSession> = new Map();
 const metricsState: ProfilingMetricsState = {
@@ -50,22 +42,11 @@ const metricsState: ProfilingMetricsState = {
   lastSessionId: null,
 };
 
-// ============================================================================
-// OTel Instruments
-// ============================================================================
-
 let profilingTriggersCounter: Counter | null = null;
 let profilingDurationHistogram: Histogram | null = null;
 let activeSessionsGauge: ObservableGauge | null = null;
 let slaViolationTriggersCounter: Counter | null = null;
 
-// ============================================================================
-// Initialization
-// ============================================================================
-
-/**
- * Initialize profiling metrics instruments.
- */
 export function initializeProfilingMetrics(): void {
   if (isInitialized) {
     return;
@@ -111,24 +92,10 @@ export function initializeProfilingMetrics(): void {
   });
 }
 
-// ============================================================================
-// Session Management
-// ============================================================================
-
-/**
- * Generate a unique session ID.
- */
 function generateSessionId(): string {
   return `prof_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
-/**
- * Start a new profiling session.
- *
- * @param reason - Why profiling was triggered
- * @param endpoint - Optional endpoint that triggered profiling
- * @returns Session ID
- */
 export function startProfilingSession(reason: ProfilingTriggerReason, endpoint?: string): string {
   if (!isInitialized) {
     initializeProfilingMetrics();
@@ -172,12 +139,6 @@ export function startProfilingSession(reason: ProfilingTriggerReason, endpoint?:
   return sessionId;
 }
 
-/**
- * Complete a profiling session.
- *
- * @param sessionId - Session to complete
- * @param outputPath - Optional path to profiling output
- */
 export function completeProfilingSession(sessionId: string, outputPath?: string): void {
   const session = activeSessions.get(sessionId);
   if (!session) {
@@ -216,12 +177,6 @@ export function completeProfilingSession(sessionId: string, outputPath?: string)
   });
 }
 
-/**
- * Mark a profiling session as failed.
- *
- * @param sessionId - Session that failed
- * @param error - Error that caused the failure
- */
 export function failProfilingSession(sessionId: string, error?: Error): void {
   const session = activeSessions.get(sessionId);
   if (!session) {
@@ -255,19 +210,7 @@ export function failProfilingSession(sessionId: string, error?: Error): void {
   });
 }
 
-// ============================================================================
-// SLA Violation Integration
-// ============================================================================
-
-/**
- * Trigger profiling due to SLA violation.
- * Includes throttling checks and overhead validation.
- *
- * @param endpoint - Endpoint that violated SLA
- * @param p95Latency - Current p95 latency
- * @param threshold - SLA threshold that was violated
- * @returns Session ID if profiling was started, null if throttled
- */
+// @returns Session ID if profiling was started, null if throttled
 export function triggerSLAViolationProfiling(endpoint: string, p95Latency: number, threshold: number): string | null {
   // Check if we have too many active sessions (overhead limit)
   if (activeSessions.size >= 3) {
@@ -295,13 +238,6 @@ export function triggerSLAViolationProfiling(endpoint: string, p95Latency: numbe
   return sessionId;
 }
 
-// ============================================================================
-// Status and Diagnostics
-// ============================================================================
-
-/**
- * Get current profiling metrics state.
- */
 export function getProfilingMetricsState(): ProfilingMetricsState {
   return {
     ...metricsState,
@@ -309,24 +245,14 @@ export function getProfilingMetricsState(): ProfilingMetricsState {
   };
 }
 
-/**
- * Get active profiling sessions.
- */
 export function getActiveSessions(): ProfilingSession[] {
   return Array.from(activeSessions.values());
 }
 
-/**
- * Check if profiling is currently active.
- */
 export function isProfilingActive(): boolean {
   return activeSessions.size > 0;
 }
 
-/**
- * Shutdown profiling metrics.
- * Fails all active sessions.
- */
 export function shutdownProfilingMetrics(): void {
   // Fail all active sessions
   for (const sessionId of activeSessions.keys()) {

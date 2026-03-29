@@ -8,14 +8,7 @@ import { deriveOtlpEndpoint, generateConfigHealthReport, toBool, validateConfigH
 import type { Config } from "./schemas";
 import { ConfigSchema, ConfigurationError } from "./schemas";
 
-// =============================================================================
-// TYPE COERCION (per 4-pillar pattern)
-// =============================================================================
-
-/**
- * Coerce a raw string env var value to the target type.
- * Per 4-pillar pattern: Simple type conversion, validation happens once on merged config.
- */
+// Per 4-pillar pattern: Simple type conversion, validation happens once on merged config.
 function coerceValue(
   raw: string | undefined,
   type: EnvVarType,
@@ -47,10 +40,7 @@ function coerceValue(
   }
 }
 
-/**
- * Get environment variable value.
- * Bun-first approach with Node.js fallback.
- */
+// Bun-first approach with Node.js fallback.
 function getEnvVar(key: string): string | undefined {
   if (typeof Bun !== "undefined") {
     const value = Bun.env[key];
@@ -71,14 +61,7 @@ function getEnvVar(key: string): string | undefined {
   return undefined;
 }
 
-// =============================================================================
-// DEEP FREEZE (per 4-pillar pattern)
-// =============================================================================
-
-/**
- * Deep freeze an object recursively.
- * Per 4-pillar pattern: Config is immutable after validation.
- */
+// Config is immutable after validation.
 function deepFreeze<T extends object>(obj: T): Readonly<T> {
   for (const value of Object.values(obj)) {
     if (value && typeof value === "object" && !Object.isFrozen(value)) {
@@ -88,17 +71,7 @@ function deepFreeze<T extends object>(obj: T): Readonly<T> {
   return Object.freeze(obj);
 }
 
-// =============================================================================
-// ENVIRONMENT VALUE READER (walks the mapping)
-// =============================================================================
-
-/**
- * Walk the envVarMapping and read values from the environment.
- * Returns a partial config object with only the values that were set.
- *
- * Per 4-pillar pattern principle #5:
- * "The env mapping drives the loader"
- */
+// The env mapping drives the loader.
 function readEnvValues(env: (key: string) => string | undefined): Record<string, Record<string, unknown>> {
   const result: Record<string, Record<string, unknown>> = {};
 
@@ -128,14 +101,6 @@ function readEnvValues(env: (key: string) => string | undefined): Record<string,
   return result;
 }
 
-// =============================================================================
-// SPECIAL HANDLING FOR DERIVED VALUES
-// =============================================================================
-
-/**
- * Handle OTLP endpoint derivation (telemetry-specific logic).
- * If specific endpoints aren't set, derive from base endpoint.
- */
 function deriveOtlpEndpoints(envValues: Record<string, Record<string, unknown>>): void {
   const telemetry = envValues.telemetry || {};
 
@@ -161,14 +126,7 @@ function deriveOtlpEndpoints(envValues: Record<string, Record<string, unknown>>)
   }
 }
 
-// =============================================================================
-// MERGE HELPER
-// =============================================================================
-
-/**
- * Deep merge environment values over defaults.
- * Per 4-pillar pattern: defaults <- environment overrides
- */
+// defaults <- environment overrides
 function mergeWithDefaults<T extends object>(defaults: T, env: Partial<T>): T {
   const result = { ...defaults };
   for (const [key, value] of Object.entries(env)) {
@@ -178,10 +136,6 @@ function mergeWithDefaults<T extends object>(defaults: T, env: Partial<T>): T {
   }
   return result;
 }
-
-// =============================================================================
-// ENHANCED ERROR TYPE
-// =============================================================================
 
 class ModularConfigurationError extends ConfigurationError {
   override toDetailedString(): string {
@@ -197,26 +151,8 @@ class ModularConfigurationError extends ConfigurationError {
   }
 }
 
-// =============================================================================
-// MAIN CONFIGURATION INITIALIZER
-// =============================================================================
-
-/**
- * Initialize and validate configuration (Pillar 3 - Loader).
- *
- * Per 4-pillar pattern:
- * 1. Walk the mapping to read env values (no hardcoded env var names)
- * 2. Merge env values over defaults
- * 3. Validate once on the final merged config
- * 4. Deep freeze the result
- *
- * @returns Readonly, validated, frozen configuration object
- */
 export function initializeConfig(): Readonly<Config> {
-  // Walk the mapping to read env values (principle #5)
   const envValues = readEnvValues(getEnvVar);
-
-  // Handle derived values (telemetry endpoints)
   deriveOtlpEndpoints(envValues);
 
   // Merge: defaults <- environment overrides
@@ -230,7 +166,6 @@ export function initializeConfig(): Readonly<Config> {
     );
   }
 
-  // Single validation boundary (principle #4)
   const result = ConfigSchema.safeParse(merged);
 
   if (!result.success) {
@@ -260,9 +195,6 @@ export function initializeConfig(): Readonly<Config> {
 
   const validatedConfig = result.data;
 
-  // =========================================================================
-  // FAIL-FAST HEALTH VALIDATION (per 4-pillar pattern enhancement)
-  // =========================================================================
   // After schema validation passes, run additional health checks.
   // Critical issues block startup; warnings are logged but allowed.
   const health = validateConfigHealth(validatedConfig);
@@ -316,6 +248,6 @@ export function initializeConfig(): Readonly<Config> {
     process.stderr.write("=== CONFIGURATION INITIALIZATION COMPLETE ===\n\n");
   }
 
-  // Deep freeze the config to prevent runtime mutation (4-pillar requirement)
+  // Prevents runtime mutation
   return deepFreeze(validatedConfig);
 }

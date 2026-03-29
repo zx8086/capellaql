@@ -3,23 +3,11 @@
 
 import { getLogger } from "../logging/container";
 
-// ============================================================================
-// Types
-// ============================================================================
-
-/**
- * GC event types based on freed memory ratio.
- * Per monitoring-updated.md specification:
- * - major: >30% of heap freed (full GC)
- * - minor: 5-30% of heap freed (young generation)
- * - incremental: <5% or 0 bytes freed (background GC)
- * - unknown: Negative freed bytes (measurement artifact)
- */
+// GC type classification by freed memory ratio:
+// major: >30% freed (full GC), minor: 5-30% (young gen),
+// incremental: <5% (background GC), unknown: negative freed bytes
 export type GCType = "minor" | "major" | "incremental" | "unknown";
 
-/**
- * Represents a garbage collection event.
- */
 export interface GCEvent {
   type: GCType;
   durationMs: number;
@@ -29,9 +17,6 @@ export interface GCEvent {
   timestamp: number;
 }
 
-/**
- * Current heap statistics from bun:jsc or process.memoryUsage().
- */
 export interface HeapStats {
   used_heap_size: number;
   total_heap_size: number;
@@ -39,9 +24,6 @@ export interface HeapStats {
   array_buffers: number;
 }
 
-/**
- * Aggregated GC metrics state.
- */
 export interface GCMetricsState {
   gcCount: number;
   totalGCDuration: number;
@@ -51,10 +33,6 @@ export interface GCMetricsState {
 }
 
 export type GCEventCallback = (event: GCEvent) => void;
-
-// ============================================================================
-// State
-// ============================================================================
 
 let gcMetricsState: GCMetricsState = {
   gcCount: 0,
@@ -73,10 +51,6 @@ let collectionInterval: ReturnType<typeof setInterval> | null = null;
 let lastHeapUsed = 0;
 let eventCallback: GCEventCallback | null = null;
 
-// ============================================================================
-// bun:jsc API Types (when available)
-// ============================================================================
-
 interface BunJSC {
   heapStats(): {
     heapSize: number;
@@ -93,13 +67,6 @@ interface BunJSC {
   stopRemoteDebugger(): void;
 }
 
-// ============================================================================
-// Helper Functions
-// ============================================================================
-
-/**
- * Try to get bun:jsc module if available.
- */
 function getBunJSC(): BunJSC | null {
   try {
     if (typeof Bun !== "undefined") {
@@ -113,9 +80,6 @@ function getBunJSC(): BunJSC | null {
   }
 }
 
-/**
- * Get current heap statistics from bun:jsc or Node.js.
- */
 export function getCurrentHeapStats(): HeapStats {
   const jsc = getBunJSC();
 
@@ -171,9 +135,6 @@ function classifyGCType(heapBefore: number, freedBytes: number): GCType {
   }
 }
 
-/**
- * Record a GC event.
- */
 function recordGCEvent(heapBefore: number, heapAfter: number, durationMs: number): GCEvent {
   const freedBytes = heapBefore - heapAfter;
   const type = classifyGCType(heapBefore, freedBytes);
@@ -205,16 +166,6 @@ function recordGCEvent(heapBefore: number, heapAfter: number, durationMs: number
   return event;
 }
 
-// ============================================================================
-// Public API
-// ============================================================================
-
-/**
- * Initialize GC metrics collection.
- *
- * @param callback - Optional callback invoked for each GC event
- * @param intervalMs - Collection interval in milliseconds (default: 30000)
- */
 export function initializeGCMetrics(callback?: GCEventCallback, intervalMs = 30000): void {
   if (collectionInterval) {
     getLogger().warn("GC metrics already initialized");
@@ -258,11 +209,6 @@ export function initializeGCMetrics(callback?: GCEventCallback, intervalMs = 300
   });
 }
 
-/**
- * Force immediate garbage collection.
- *
- * @returns The GC event from the forced collection
- */
 export function forceGC(): GCEvent {
   const startTime = performance.now();
   const heapBefore = getCurrentHeapStats().used_heap_size;
@@ -289,16 +235,10 @@ export function forceGC(): GCEvent {
   return event;
 }
 
-/**
- * Get current GC metrics state.
- */
 export function getGCMetricsState(): GCMetricsState {
   return { ...gcMetricsState };
 }
 
-/**
- * Reset GC metrics state.
- */
 export function resetGCMetrics(): void {
   gcMetricsState = {
     gcCount: 0,
@@ -314,9 +254,6 @@ export function resetGCMetrics(): void {
   };
 }
 
-/**
- * Shutdown GC metrics collection.
- */
 export function shutdownGCMetrics(): void {
   if (collectionInterval) {
     clearInterval(collectionInterval);
@@ -338,16 +275,10 @@ export function shutdownGCMetrics(): void {
   eventCallback = null;
 }
 
-/**
- * Check if GC metrics are currently running.
- */
 export function isGCMetricsRunning(): boolean {
   return collectionInterval !== null;
 }
 
-/**
- * Get average GC duration.
- */
 export function getAverageGCDuration(): number {
   if (gcMetricsState.gcCount === 0) {
     return 0;
@@ -355,9 +286,6 @@ export function getAverageGCDuration(): number {
   return gcMetricsState.totalGCDuration / gcMetricsState.gcCount;
 }
 
-/**
- * Get GC frequency (events per minute) based on runtime.
- */
 export function getGCFrequency(): number {
   const uptimeMs = process.uptime() * 1000;
   if (uptimeMs === 0) {

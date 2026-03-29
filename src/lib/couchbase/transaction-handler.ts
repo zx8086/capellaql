@@ -1,16 +1,5 @@
 /* src/lib/couchbase/transaction-handler.ts */
 
-/**
- * Transaction Handler Module
- *
- * Migrated from couchbaseTransactionHandler.ts with integration to new error classifier.
- * Features:
- * - Comprehensive transaction error handling
- * - Ambiguous commit tracking for manual investigation
- * - Safe operation wrappers (get, insert, replace)
- * - Utility methods for common transaction patterns
- */
-
 import {
   CasMismatchError,
   DocumentExistsError,
@@ -25,10 +14,6 @@ import { CouchbaseErrorClassifier } from "./errors";
 import { recordQuery } from "./metrics";
 import type { OperationContext } from "./types";
 
-// =============================================================================
-// TYPES
-// =============================================================================
-
 export interface TransactionOperationContext extends OperationContext {
   transactionId?: string;
   attemptNumber?: number;
@@ -42,19 +27,6 @@ export interface TransactionConfig {
   cleanupClientAttempts?: boolean;
 }
 
-// =============================================================================
-// TRANSACTION HANDLER CLASS
-// =============================================================================
-
-/**
- * Handles Couchbase transactions with comprehensive error handling.
- *
- * Features:
- * - Automatic retry for transient failures
- * - Ambiguous commit tracking and investigation
- * - Safe operation wrappers with proper error classification
- * - Utility methods for common patterns (atomic update, batch operations)
- */
 export class CouchbaseTransactionHandler {
   private static readonly DEFAULT_CONFIG: TransactionConfig = {
     durabilityLevel: "majority",
@@ -63,9 +35,6 @@ export class CouchbaseTransactionHandler {
     cleanupClientAttempts: true,
   };
 
-  /**
-   * Execute a transaction with comprehensive error handling.
-   */
   static async executeTransaction<T>(
     transactionLogic: (ctx: TransactionAttemptContext) => Promise<T>,
     context: TransactionOperationContext,
@@ -200,9 +169,6 @@ export class CouchbaseTransactionHandler {
     }
   }
 
-  /**
-   * Safe get operation within a transaction.
-   */
   static async safeGet(
     ctx: TransactionAttemptContext,
     collection: any,
@@ -229,9 +195,6 @@ export class CouchbaseTransactionHandler {
     }
   }
 
-  /**
-   * Safe insert operation within a transaction.
-   */
   static async safeInsert(
     ctx: TransactionAttemptContext,
     collection: any,
@@ -253,9 +216,6 @@ export class CouchbaseTransactionHandler {
     }
   }
 
-  /**
-   * Safe replace operation within a transaction.
-   */
   static async safeReplace(
     ctx: TransactionAttemptContext,
     doc: TransactionGetResult,
@@ -276,9 +236,6 @@ export class CouchbaseTransactionHandler {
     }
   }
 
-  /**
-   * Classify transaction-specific errors.
-   */
   private static classifyTransactionError(error: any): {
     retryable: boolean;
     severity: "info" | "warning" | "critical";
@@ -344,9 +301,6 @@ export class CouchbaseTransactionHandler {
     );
   }
 
-  /**
-   * Handle errors that occur within a transaction.
-   */
   private static handleInTransactionError(error: any, context: TransactionOperationContext): void {
     const classification = CouchbaseTransactionHandler.classifyTransactionError(error);
 
@@ -368,9 +322,6 @@ export class CouchbaseTransactionHandler {
     }
   }
 
-  /**
-   * Handle ambiguous transaction commits.
-   */
   private static async handleAmbiguousTransaction(
     error: TransactionCommitAmbiguousError,
     context: TransactionOperationContext & { transactionId: string }
@@ -410,9 +361,6 @@ export class CouchbaseTransactionHandler {
     }
   }
 
-  /**
-   * Create a transaction operation context.
-   */
   static createTransactionContext(
     operationType: string,
     requestId?: string,
@@ -429,9 +377,6 @@ export class CouchbaseTransactionHandler {
     };
   }
 
-  /**
-   * Utility method for atomic updates.
-   */
   static async atomicUpdate<T>(
     collection: any,
     key: string,
@@ -462,9 +407,6 @@ export class CouchbaseTransactionHandler {
     );
   }
 
-  /**
-   * Utility method for batch operations within a transaction.
-   */
   static async batchOperation<T>(
     operations: Array<(ctx: TransactionAttemptContext) => Promise<T>>,
     context: TransactionOperationContext,

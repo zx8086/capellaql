@@ -1,14 +1,9 @@
-/* src/services/health/cacheHealth.ts */
-// Cache health check service - matches reference format exactly
+// src/services/health/cacheHealth.ts
 
 import { bunSQLiteCache } from "$lib/bunSQLiteCache";
 import { defaultQueryCache } from "$lib/queryCache";
 import { err } from "../../telemetry";
 import { type CacheDependency, formatPercentage, formatResponseTime, type HealthStatus } from "./types";
-
-// ============================================================================
-// Cache Health Monitor State
-// ============================================================================
 
 interface HealthMonitorState {
   consecutiveSuccesses: number;
@@ -30,10 +25,6 @@ let monitorState: HealthMonitorState = {
   isMonitoring: true,
 };
 
-// ============================================================================
-// Cache Health Service
-// ============================================================================
-
 export class CacheHealthService {
   private static instance: CacheHealthService;
   private lastHealthCheck?: CacheDependency;
@@ -49,16 +40,6 @@ export class CacheHealthService {
     return CacheHealthService.instance;
   }
 
-  /**
-   * Get cache health details matching reference format exactly:
-   * {
-   *   type: "sqlite",
-   *   connection: { connected: true, responseTime: "0.4ms" },
-   *   entries: { primary: 0, primaryActive: 0, stale: 0, staleCacheAvailable: true },
-   *   performance: { hitRate: "0.00%", avgLatencyMs: 0 },
-   *   healthMonitor: { ... }
-   * }
-   */
   async getHealth(): Promise<CacheDependency> {
     const now = Date.now();
 
@@ -93,9 +74,6 @@ export class CacheHealthService {
     }
   }
 
-  /**
-   * Check SQLite cache health (Bun-native)
-   */
   private async checkSQLiteHealth(startTime: number): Promise<CacheDependency> {
     const stats = bunSQLiteCache.getStats();
     const analytics = bunSQLiteCache.getAnalytics();
@@ -134,9 +112,6 @@ export class CacheHealthService {
     };
   }
 
-  /**
-   * Check Map-based cache health (fallback for non-Bun environments)
-   */
   private checkMapCacheHealth(startTime: number): CacheDependency {
     const stats = defaultQueryCache.getStats();
     const responseTime = performance.now() - startTime;
@@ -171,9 +146,6 @@ export class CacheHealthService {
     };
   }
 
-  /**
-   * Get current monitor status matching reference format
-   */
   private getMonitorStatus(currentStatus: HealthStatus): CacheDependency["healthMonitor"] {
     return {
       status: currentStatus,
@@ -191,9 +163,6 @@ export class CacheHealthService {
     };
   }
 
-  /**
-   * Record successful health check
-   */
   private recordSuccess(responseTimeMs: number): void {
     const wasFailure = monitorState.consecutiveFailures > 0;
     monitorState.consecutiveSuccesses++;
@@ -208,9 +177,6 @@ export class CacheHealthService {
     };
   }
 
-  /**
-   * Record failed health check
-   */
   private recordFailure(responseTimeMs: number): void {
     const wasSuccess = monitorState.consecutiveSuccesses > 0;
     monitorState.consecutiveFailures++;
@@ -225,9 +191,6 @@ export class CacheHealthService {
     };
   }
 
-  /**
-   * Create error response when health check fails
-   */
   private createErrorResponse(responseTimeMs: number): CacheDependency {
     return {
       type: typeof Bun !== "undefined" ? "sqlite" : "map",
@@ -264,9 +227,6 @@ export class CacheHealthService {
     };
   }
 
-  /**
-   * Check if cache is ready (for readiness probes)
-   */
   async isReady(): Promise<boolean> {
     try {
       if (typeof Bun !== "undefined") {
@@ -282,17 +242,11 @@ export class CacheHealthService {
     }
   }
 
-  /**
-   * Clear health check cache (for testing)
-   */
   clearCache(): void {
     this.lastHealthCheck = undefined;
     this.lastCheckTime = 0;
   }
 
-  /**
-   * Reset monitor state (for testing)
-   */
   resetMonitorState(): void {
     monitorState = {
       consecutiveSuccesses: 0,

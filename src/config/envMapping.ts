@@ -3,14 +3,6 @@
 // Per 4-pillar pattern: Single source of truth for env var names and types
 // The loader walks this mapping — env var names are never hardcoded elsewhere
 
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
-
-/**
- * Type coercion hint for environment variable values.
- * All env vars are strings at runtime; this tells the loader how to convert them.
- */
 export type EnvVarType = "string" | "number" | "boolean" | "array";
 
 export interface EnvVarEntry {
@@ -18,19 +10,6 @@ export interface EnvVarEntry {
   type: EnvVarType;
 }
 
-// =============================================================================
-// ENVIRONMENT VARIABLE MAPPING
-// =============================================================================
-
-/**
- * Environment variable mapping.
- *
- * This is the SINGLE SOURCE OF TRUTH for which env vars map to which config keys.
- * The loader walks this structure — env var names are never hardcoded elsewhere.
- *
- * Per 4-pillar pattern principle #2:
- * "Every env var is explicitly mapped"
- */
 export const envVarMapping = {
   application: {
     LOG_LEVEL: { envVar: "LOG_LEVEL", type: "string" },
@@ -112,14 +91,7 @@ export const envVarMapping = {
 
 export type EnvVarMapping = typeof envVarMapping;
 
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Get the environment variable name for a given config path.
- * Used for error reporting to show which env var caused the issue.
- */
+// Used for error reporting to show which env var caused the issue.
 export function getEnvVarForPath(configPath: string): string | undefined {
   const [section, key] = configPath.split(".");
   if (!section || !key) return undefined;

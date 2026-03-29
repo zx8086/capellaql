@@ -3,10 +3,6 @@
 
 import { type CircuitBreakerConfig, CircuitBreakerState, TelemetryCircuitBreaker } from "./health/CircuitBreaker";
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type TelemetrySignal = "traces" | "metrics" | "logs";
 
 export interface SignalCircuitBreakerStats {
@@ -34,10 +30,6 @@ export interface TelemetryCircuitBreakersStatus {
   signals: Record<TelemetrySignal, SignalCircuitBreakerStats>;
 }
 
-// ============================================================================
-// Default Configuration
-// ============================================================================
-
 const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
   failureThreshold: 5, // 5 failures to open
   recoveryTimeoutMs: 60000, // 1 minute recovery
@@ -45,28 +37,12 @@ const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
   timeWindowMs: 60000, // 1 minute window
 };
 
-// ============================================================================
-// Per-Signal Circuit Breakers
-// ============================================================================
-
-/**
- * Individual circuit breakers for each telemetry signal type.
- * This allows fine-grained control over failure handling per signal.
- *
- * Per monitoring-updated.md specification:
- * - traces: Controls trace export circuit breaking
- * - metrics: Controls metric export circuit breaking
- * - logs: Controls log export circuit breaking
- */
+// Per-signal circuit breakers allow independent failure handling for traces, metrics, and logs
 const signalCircuitBreakers: Record<TelemetrySignal, TelemetryCircuitBreaker> = {
   traces: new TelemetryCircuitBreaker(DEFAULT_CIRCUIT_BREAKER_CONFIG),
   metrics: new TelemetryCircuitBreaker(DEFAULT_CIRCUIT_BREAKER_CONFIG),
   logs: new TelemetryCircuitBreaker(DEFAULT_CIRCUIT_BREAKER_CONFIG),
 };
-
-// ============================================================================
-// State Transition Logging Interval
-// ============================================================================
 
 let stateCheckInterval: ReturnType<typeof setInterval> | null = null;
 let previousStates: Record<TelemetrySignal, CircuitBreakerState> = {
@@ -75,10 +51,6 @@ let previousStates: Record<TelemetrySignal, CircuitBreakerState> = {
   logs: CircuitBreakerState.CLOSED,
 };
 
-/**
- * Start monitoring for circuit breaker state transitions.
- * Logs state changes for observability.
- */
 function startStateMonitoring(intervalMs = 5000): void {
   if (stateCheckInterval) {
     return; // Already running
@@ -104,41 +76,22 @@ function startStateMonitoring(intervalMs = 5000): void {
   }, intervalMs);
 }
 
-// ============================================================================
-// Public API
-// ============================================================================
-
-/**
- * Get the circuit breaker for a specific signal type.
- */
 export function getSignalCircuitBreaker(signal: TelemetrySignal): TelemetryCircuitBreaker {
   return signalCircuitBreakers[signal];
 }
 
-/**
- * Check if a specific signal can execute (circuit breaker allows).
- */
 export function canExecuteSignal(signal: TelemetrySignal): boolean {
   return signalCircuitBreakers[signal].canExecute();
 }
 
-/**
- * Record a successful operation for a signal.
- */
 export function recordSignalSuccess(signal: TelemetrySignal): void {
   signalCircuitBreakers[signal].recordSuccess();
 }
 
-/**
- * Record a failed operation for a signal.
- */
 export function recordSignalFailure(signal: TelemetrySignal): void {
   signalCircuitBreakers[signal].recordFailure();
 }
 
-/**
- * Get stats for a specific signal circuit breaker.
- */
 export function getSignalStats(signal: TelemetrySignal): SignalCircuitBreakerStats {
   const breaker = signalCircuitBreakers[signal];
   const stats = breaker.getStats();
@@ -159,9 +112,6 @@ export function getSignalStats(signal: TelemetrySignal): SignalCircuitBreakerSta
   };
 }
 
-/**
- * Get comprehensive status of all telemetry circuit breakers.
- */
 export function getTelemetryCircuitBreakersStatus(): TelemetryCircuitBreakersStatus {
   const signals: TelemetrySignal[] = ["traces", "metrics", "logs"];
   const signalStats: Record<TelemetrySignal, SignalCircuitBreakerStats> = {} as Record<
@@ -216,9 +166,6 @@ export function getTelemetryCircuitBreakersStatus(): TelemetryCircuitBreakersSta
   };
 }
 
-/**
- * Reset all circuit breakers to closed state.
- */
 export function resetAllCircuitBreakers(): void {
   for (const signal of Object.keys(signalCircuitBreakers) as TelemetrySignal[]) {
     signalCircuitBreakers[signal].reset();
@@ -226,9 +173,6 @@ export function resetAllCircuitBreakers(): void {
   }
 }
 
-/**
- * Initialize telemetry circuit breakers with optional custom config.
- */
 export function initializeTelemetryCircuitBreakers(config?: Partial<CircuitBreakerConfig>): void {
   const finalConfig = { ...DEFAULT_CIRCUIT_BREAKER_CONFIG, ...config };
 
@@ -248,10 +192,6 @@ export function initializeTelemetryCircuitBreakers(config?: Partial<CircuitBreak
   startStateMonitoring();
 }
 
-/**
- * Shutdown telemetry circuit breakers.
- * Cleans up intervals and resets state.
- */
 export function shutdownTelemetryCircuitBreakers(): void {
   if (stateCheckInterval) {
     clearInterval(stateCheckInterval);
@@ -267,10 +207,6 @@ export function shutdownTelemetryCircuitBreakers(): void {
     summary: status.summary,
   });
 }
-
-// ============================================================================
-// Convenience Exports
-// ============================================================================
 
 export type { CircuitBreakerConfig, CircuitBreakerStats } from "./health/CircuitBreaker";
 // Re-export types and enums from CircuitBreaker

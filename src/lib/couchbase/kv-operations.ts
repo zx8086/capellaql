@@ -1,16 +1,5 @@
 /* src/lib/couchbase/kv-operations.ts */
 
-/**
- * Key-Value Operations Module
- *
- * MEDIUM PRIORITY FIXES INTEGRATED:
- * - Subdocument operations (mutateIn) for partial updates
- * - CAS (Compare-And-Swap) for optimistic locking
- * - Durability levels for write guarantees
- * - Field projection for efficient reads
- * - Batch operations with parallel execution
- */
-
 import {
   type Collection,
   DurabilityLevel,
@@ -33,35 +22,9 @@ const DURABILITY_MAP: Record<string, DurabilityLevel> = {
   persistToMajority: DurabilityLevel.PersistToMajority,
 };
 
-// Re-export types
 export type { KVGetOptions, KVUpsertOptions, SubdocOperation };
 
-// =============================================================================
-// KV OPERATIONS CLASS
-// =============================================================================
-
-/**
- * Enhanced KV operations with SDK best practices.
- *
- * Features:
- * - Field projection for efficient reads
- * - Subdocument operations for partial updates
- * - CAS support for optimistic locking
- * - Durability levels for write guarantees
- * - Batch operations with parallel execution
- */
 export class KVOperations {
-  /**
-   * MEDIUM PRIORITY FIX: Get document with field projection.
-   *
-   * Usage:
-   * ```typescript
-   * // Get only specific fields (more efficient than full document)
-   * const result = await KVOperations.get(collection, "user::123", {
-   *   project: ["name", "email", "status"]
-   * });
-   * ```
-   */
   static async get<T = any>(
     collection: Collection,
     id: string,
@@ -69,14 +32,8 @@ export class KVOperations {
   ): Promise<(GetResult & { value: T }) | null> {
     try {
       const getOptions: GetOptions = {
-        // SDK BEST PRACTICE: Retrieve expiry if needed
         withExpiry: options.withExpiry,
-
-        // MEDIUM PRIORITY FIX: Project specific fields for performance
-        // Example: { project: ["name", "email", "status"] }
-        // Fetches only these fields instead of entire document
         project: options.project,
-
         timeout: options.timeout || 7500,
       };
 
@@ -91,18 +48,6 @@ export class KVOperations {
     }
   }
 
-  /**
-   * MEDIUM PRIORITY FIX: Upsert with durability and CAS.
-   *
-   * Usage:
-   * ```typescript
-   * // Upsert with durability (waits for replication)
-   * await KVOperations.upsert(collection, "user::123", userData, {
-   *   durability: "majority",
-   *   expiry: 3600 // 1 hour TTL
-   * });
-   * ```
-   */
   static async upsert<T = any>(
     collection: Collection,
     id: string,
@@ -110,22 +55,14 @@ export class KVOperations {
     options: KVUpsertOptions = {}
   ): Promise<MutationResult> {
     const upsertOptions: UpsertOptions = {
-      // SDK BEST PRACTICE: Use durability for critical writes
-      // Options: "none", "majority", "majorityAndPersistToActive", "persistToMajority"
       durabilityLevel: options.durability ? DURABILITY_MAP[options.durability] : undefined,
-
-      // Set expiry (TTL) if provided
       expiry: options.expiry,
-
       timeout: options.timeout || 7500,
     };
 
     return await collection.upsert(id, document, upsertOptions);
   }
 
-  /**
-   * Insert a new document (fails if exists).
-   */
   static async insert<T = any>(
     collection: Collection,
     id: string,
@@ -139,9 +76,6 @@ export class KVOperations {
     });
   }
 
-  /**
-   * Replace an existing document (fails if not exists).
-   */
   static async replace<T = any>(
     collection: Collection,
     id: string,
@@ -156,9 +90,6 @@ export class KVOperations {
     });
   }
 
-  /**
-   * Remove a document.
-   */
   static async remove(
     collection: Collection,
     id: string,
@@ -170,17 +101,11 @@ export class KVOperations {
     });
   }
 
-  /**
-   * Check if a document exists without retrieving it.
-   */
   static async exists(collection: Collection, id: string): Promise<boolean> {
     const result = await collection.exists(id);
     return result.exists;
   }
 
-  /**
-   * Get document and lock it for modification.
-   */
   static async getAndLock<T = any>(
     collection: Collection,
     id: string,
@@ -197,37 +122,14 @@ export class KVOperations {
     }
   }
 
-  /**
-   * Unlock a locked document.
-   */
   static async unlock(collection: Collection, id: string, cas: any): Promise<void> {
     await collection.unlock(id, cas);
   }
 
-  /**
-   * Touch a document to update its expiry.
-   */
   static async touch(collection: Collection, id: string, expiry: number): Promise<MutationResult> {
     return await collection.touch(id, expiry);
   }
 
-  // =============================================================================
-  // SUBDOCUMENT OPERATIONS
-  // =============================================================================
-
-  /**
-   * MEDIUM PRIORITY FIX: Subdocument operations for partial updates.
-   *
-   * Usage:
-   * ```typescript
-   * // Update only specific fields (more efficient than full document update)
-   * await KVOperations.mutateIn(collection, "user::123", [
-   *   { type: "upsert", path: "lastLogin", value: new Date().toISOString() },
-   *   { type: "replace", path: "loginCount", value: 42 },
-   *   { type: "arrayAppend", path: "tags", value: "premium" }
-   * ]);
-   * ```
-   */
   static async mutateIn(
     collection: Collection,
     id: string,
@@ -270,9 +172,6 @@ export class KVOperations {
     })) as unknown as MutationResult;
   }
 
-  /**
-   * Lookup specific paths in a document without retrieving entire document.
-   */
   static async lookupIn<T extends Record<string, any> = Record<string, any>>(
     collection: Collection,
     id: string,
@@ -300,19 +199,6 @@ export class KVOperations {
     }
   }
 
-  // =============================================================================
-  // BATCH OPERATIONS
-  // =============================================================================
-
-  /**
-   * Get multiple documents in parallel (batch operation).
-   *
-   * Usage:
-   * ```typescript
-   * const users = await KVOperations.getMulti(collection, ["user::1", "user::2", "user::3"]);
-   * // Returns Map<string, User>
-   * ```
-   */
   static async getMulti<T = any>(
     collection: Collection,
     ids: string[],
@@ -354,9 +240,6 @@ export class KVOperations {
     return results;
   }
 
-  /**
-   * Upsert multiple documents in parallel (batch operation).
-   */
   static async upsertMulti<T = any>(
     collection: Collection,
     documents: Array<{ id: string; document: T }>,

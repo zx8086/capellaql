@@ -4,10 +4,6 @@
 
 import type { Counter, Histogram, ObservableGauge, UpDownCounter } from "@opentelemetry/api";
 
-// ============================================================================
-// Instrument Registry Types
-// ============================================================================
-
 export interface MetricInstruments {
   // HTTP Metrics
   httpRequestsTotal: Counter;
@@ -62,10 +58,6 @@ export interface MetricInstruments {
   // Security Metrics (placeholder)
   securityEventsTotal: Counter;
 }
-
-// ============================================================================
-// Instrument Definitions
-// ============================================================================
 
 export const INSTRUMENT_DEFINITIONS = {
   // HTTP Instruments

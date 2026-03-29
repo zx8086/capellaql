@@ -12,10 +12,6 @@ import {
 import { getAvailableMetricNames, INSTRUMENT_COUNT } from "../metrics/instruments";
 import { CircuitBreakerState, TelemetryCircuitBreaker } from "./CircuitBreaker";
 
-// ============================================================================
-// Types per monitoring-updated.md lines 1363-1420
-// ============================================================================
-
 export interface CircuitBreakerStats {
   state: "closed" | "open" | "half-open";
   failureCount: number;
@@ -136,10 +132,6 @@ export interface ExporterHealth {
   successRate: string;
 }
 
-// ============================================================================
-// Telemetry Health Monitor
-// ============================================================================
-
 // Track initialization time
 let initializationTime: string | null = null;
 
@@ -196,9 +188,6 @@ class TelemetryHealthMonitor {
     this.circuitBreakers.get(exporterName)?.recordFailure();
   }
 
-  /**
-   * Get health status per monitoring-updated.md lines 1363-1518
-   */
   public getTelemetryHealthStatus(): TelemetryHealthStatus {
     const cfg = loadConfig();
     const telemetryCfg = cfg.telemetry;
@@ -359,9 +348,6 @@ class TelemetryHealthMonitor {
     };
   }
 
-  /**
-   * Legacy method for backward compatibility
-   */
   public getHealthData(): TelemetryHealthData {
     const circuitBreakerStats = this.mainCircuitBreaker.getHealthStatus();
     const memoryUsage = process.memoryUsage();
@@ -473,23 +459,14 @@ class TelemetryHealthMonitor {
 // Singleton instance
 export const telemetryHealthMonitor = new TelemetryHealthMonitor();
 
-/**
- * Get telemetry health status per monitoring-updated.md structure
- */
 export function getTelemetryHealthStatus(): TelemetryHealthStatus {
   return telemetryHealthMonitor.getTelemetryHealthStatus();
 }
 
-/**
- * Legacy function for backward compatibility
- */
 export function getTelemetryHealth(): TelemetryHealthData {
   return telemetryHealthMonitor.getHealthData();
 }
 
-/**
- * Mark telemetry as initialized (called from instrumentation.ts)
- */
 export function markTelemetryInitialized(): void {
   telemetryHealthMonitor.markInitialized();
 }

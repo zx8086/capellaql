@@ -1,16 +1,7 @@
-/* src/services/health/types.ts */
-// Health check types matching reference pattern EXACTLY
-
-// ============================================================================
-// Core Health Status Types
-// ============================================================================
+// src/services/health/types.ts
 
 export type HealthStatus = "healthy" | "degraded" | "unhealthy";
 export type CircuitBreakerState = "closed" | "open" | "half-open";
-
-// ============================================================================
-// Couchbase Dependency (replaces Kong in reference)
-// ============================================================================
 
 export interface CouchbaseDependency {
   status: HealthStatus;
@@ -25,10 +16,6 @@ export interface CouchbaseDependency {
     };
   };
 }
-
-// ============================================================================
-// Cache Dependency (aligned with actual cache implementation)
-// ============================================================================
 
 export interface CacheDependency {
   type: "sqlite" | "map";
@@ -62,10 +49,6 @@ export interface CacheDependency {
   };
 }
 
-// ============================================================================
-// Telemetry Dependency (matches reference exactly)
-// ============================================================================
-
 export interface TelemetrySignalHealth {
   status: HealthStatus;
   endpoint: string;
@@ -86,10 +69,6 @@ export interface TelemetryHealthDetails {
   logs: TelemetrySignalHealth;
 }
 
-// ============================================================================
-// Health Check Response (matches reference exactly)
-// ============================================================================
-
 export interface HealthCheckResponse {
   status: HealthStatus;
   timestamp: string;
@@ -106,10 +85,6 @@ export interface HealthCheckResponse {
   requestId: string;
 }
 
-// ============================================================================
-// Readiness Check Response (for Kubernetes probes)
-// ============================================================================
-
 export interface ReadinessCheckResponse {
   ready: boolean;
   timestamp: string;
@@ -120,10 +95,6 @@ export interface ReadinessCheckResponse {
   };
   requestId: string;
 }
-
-// ============================================================================
-// Liveness Check Response (for Kubernetes probes)
-// ============================================================================
 
 export interface LivenessCheckResponse {
   alive: boolean;
@@ -136,10 +107,6 @@ export interface LivenessCheckResponse {
   };
   requestId: string;
 }
-
-// ============================================================================
-// Utility Functions
-// ============================================================================
 
 export function formatResponseTime(ms: number): string {
   return `${ms.toFixed(2)}ms`;

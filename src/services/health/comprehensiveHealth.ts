@@ -1,5 +1,4 @@
-/* src/services/health/comprehensiveHealth.ts */
-// Comprehensive health check orchestrator - matches reference format exactly
+// src/services/health/comprehensiveHealth.ts
 
 import config from "$config";
 import { err } from "../../telemetry";
@@ -15,15 +14,7 @@ import {
   type ReadinessCheckResponse,
 } from "./types";
 
-// ============================================================================
-// Server Start Time (for uptime calculation)
-// ============================================================================
-
 const serverStartTime = Date.now();
-
-// ============================================================================
-// Comprehensive Health Service
-// ============================================================================
 
 export class ComprehensiveHealthService {
   private static instance: ComprehensiveHealthService;
@@ -37,24 +28,6 @@ export class ComprehensiveHealthService {
     return ComprehensiveHealthService.instance;
   }
 
-  /**
-   * Get comprehensive health check response matching reference format exactly:
-   * {
-   *   status: "healthy",
-   *   timestamp: "2026-02-22T21:32:46.675Z",
-   *   version: "2.6.4",
-   *   environment: "local",
-   *   uptime: "10s",
-   *   highAvailability: true,
-   *   circuitBreakerState: "closed",
-   *   dependencies: {
-   *     couchbase: { status, responseTime, details },
-   *     cache: { type, connection, entries, performance, healthMonitor },
-   *     telemetry: { traces, metrics, logs }
-   *   },
-   *   requestId: "..."
-   * }
-   */
   async getHealth(requestId: string): Promise<HealthCheckResponse> {
     try {
       // Fetch all dependency health in parallel
@@ -105,10 +78,6 @@ export class ComprehensiveHealthService {
     }
   }
 
-  /**
-   * Get readiness check response
-   * Used by Kubernetes/container orchestrators
-   */
   async getReadiness(requestId: string): Promise<ReadinessCheckResponse> {
     const checks: ReadinessCheckResponse["checks"] = {
       couchbase: { ready: false },
@@ -164,10 +133,6 @@ export class ComprehensiveHealthService {
     };
   }
 
-  /**
-   * Get liveness check response
-   * Simple check that the process is alive
-   */
   getLiveness(requestId: string): LivenessCheckResponse {
     const memoryUsage = process.memoryUsage();
     const uptimeSeconds = (Date.now() - serverStartTime) / 1000;
@@ -189,9 +154,6 @@ export class ComprehensiveHealthService {
     };
   }
 
-  /**
-   * Determine overall health status from component statuses
-   */
   private determineOverallStatus(...statuses: HealthStatus[]): HealthStatus {
     // If any unhealthy, overall is unhealthy
     if (statuses.includes("unhealthy")) {
@@ -207,9 +169,6 @@ export class ComprehensiveHealthService {
     return "healthy";
   }
 
-  /**
-   * Create error response when health check fails completely
-   */
   private createErrorResponse(requestId: string, _error: unknown): HealthCheckResponse {
     const uptimeSeconds = (Date.now() - serverStartTime) / 1000;
 
@@ -308,9 +267,6 @@ export class ComprehensiveHealthService {
     };
   }
 
-  /**
-   * Get server uptime in seconds
-   */
   getUptimeSeconds(): number {
     return (Date.now() - serverStartTime) / 1000;
   }

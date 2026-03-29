@@ -5,10 +5,6 @@ import { type Counter, type Histogram, metrics, type UpDownCounter } from "@open
 import { getLogger } from "../../logging/container";
 import { INSTRUMENT_DEFINITIONS } from "./instruments";
 
-// ============================================================================
-// Module State
-// ============================================================================
-
 let isInitialized = false;
 
 // Instrument instances
@@ -21,10 +17,6 @@ const instruments: {
   histograms: new Map(),
   upDownCounters: new Map(),
 };
-
-// ============================================================================
-// Meter Names (per documented convention)
-// ============================================================================
 
 export const METER_NAMES = {
   http: "capellaql-http-metrics",
@@ -39,14 +31,6 @@ export const METER_NAMES = {
   security: "capellaql-security-metrics",
 } as const;
 
-// ============================================================================
-// Initialization
-// ============================================================================
-
-/**
- * Initialize all metric instruments per documented structure.
- * Called once during telemetry initialization.
- */
 export function initializeMetrics(): void {
   if (isInitialized) {
     getLogger().warn("Metrics system already initialized");
@@ -117,10 +101,6 @@ export function initializeMetrics(): void {
   }
 }
 
-// ============================================================================
-// Instrument Creators
-// ============================================================================
-
 function createCounter(
   meter: ReturnType<typeof metrics.getMeter>,
   definition: { name: string; description: string; unit: string }
@@ -154,10 +134,6 @@ function createUpDownCounter(
   instruments.upDownCounters.set(definition.name, upDownCounter);
 }
 
-// ============================================================================
-// Instrument Accessors
-// ============================================================================
-
 export function getCounter(name: string): Counter | undefined {
   return instruments.counters.get(name);
 }
@@ -169,10 +145,6 @@ export function getHistogram(name: string): Histogram | undefined {
 export function getUpDownCounter(name: string): UpDownCounter | undefined {
   return instruments.upDownCounters.get(name);
 }
-
-// ============================================================================
-// Status
-// ============================================================================
 
 export function isMetricsInitialized(): boolean {
   return isInitialized;
@@ -194,9 +166,6 @@ export function getMetricsInitializationStatus(): {
   };
 }
 
-/**
- * Reset metrics (for testing)
- */
 export function resetMetrics(): void {
   instruments.counters.clear();
   instruments.histograms.clear();

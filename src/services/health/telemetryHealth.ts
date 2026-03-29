@@ -1,5 +1,4 @@
-/* src/services/health/telemetryHealth.ts */
-// Telemetry health check service - matches reference format exactly
+// src/services/health/telemetryHealth.ts
 
 import { loadConfig } from "$config";
 import { err } from "../../telemetry";
@@ -16,10 +15,6 @@ import {
   type TelemetrySignalHealth,
 } from "./types";
 
-// ============================================================================
-// Telemetry Health Service
-// ============================================================================
-
 export class TelemetryHealthService {
   private static instance: TelemetryHealthService;
   private lastHealthCheck?: TelemetryHealthDetails;
@@ -35,14 +30,6 @@ export class TelemetryHealthService {
     return TelemetryHealthService.instance;
   }
 
-  /**
-   * Get telemetry health details matching reference format exactly:
-   * {
-   *   traces: { status: "healthy", endpoint: "...", responseTime: "...", exports: {...} },
-   *   metrics: { ... },
-   *   logs: { ... }
-   * }
-   */
   async getHealth(): Promise<TelemetryHealthDetails> {
     const now = Date.now();
 
@@ -88,9 +75,6 @@ export class TelemetryHealthService {
     }
   }
 
-  /**
-   * Check health of a specific telemetry signal
-   */
   private async checkSignalHealth(
     _signal: string,
     endpoint: string,
@@ -154,9 +138,6 @@ export class TelemetryHealthService {
     }
   }
 
-  /**
-   * Create error response when health check fails completely
-   */
   private createErrorResponse(): TelemetryHealthDetails {
     const cfg = loadConfig();
     const telemetryCfg = cfg.telemetry;
@@ -182,9 +163,6 @@ export class TelemetryHealthService {
     };
   }
 
-  /**
-   * Mask sensitive parts of endpoint URL
-   */
   private maskEndpoint(url: string): string {
     try {
       const parsedUrl = new URL(url);
@@ -198,16 +176,10 @@ export class TelemetryHealthService {
     }
   }
 
-  /**
-   * Check if telemetry is ready (for readiness probes)
-   */
   isReady(): boolean {
     return isTelemetryInitialized();
   }
 
-  /**
-   * Clear health check cache (for testing)
-   */
   clearCache(): void {
     this.lastHealthCheck = undefined;
     this.lastCheckTime = 0;

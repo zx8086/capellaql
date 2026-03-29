@@ -2,11 +2,6 @@
 // 4-Pillar Configuration Pattern - Public API
 // Keep exports explicit. Internal implementation details stay internal.
 
-// =============================================================================
-// CORE EXPORTS (per 4-pillar pattern)
-// =============================================================================
-
-// Config access
 export {
   applicationConfig,
   capellaConfig,
@@ -26,12 +21,9 @@ export {
   resetConfigCache,
   telemetryConfig,
 } from "./config";
-// Defaults (for reference/testing)
 export { defaultConfig } from "./defaults";
 export type { EnvVarEntry, EnvVarMapping, EnvVarType } from "./envMapping";
-// Env mapping (for documentation/tooling)
 export { envVarMapping, getEnvVarForPath, getEnvVarPath } from "./envMapping";
-// Helpers
 export {
   describeConfig,
   generateConfigHealthReport,
@@ -40,7 +32,6 @@ export {
   validateConfigHealth,
   validateCrossConfiguration,
 } from "./helpers";
-// Loader (for advanced usage)
 export { initializeConfig } from "./loader";
 export type {
   ApplicationConfig,
@@ -50,7 +41,6 @@ export type {
   RuntimeConfig,
   TelemetryConfig,
 } from "./schemas";
-// Schemas and types
 export {
   ApplicationConfigSchema,
   CapellaConfigSchema,
@@ -61,10 +51,6 @@ export {
   SchemaRegistry,
   TelemetryConfigSchema,
 } from "./schemas";
-
-// =============================================================================
-// DEFAULT EXPORT
-// =============================================================================
 
 import { config } from "./config";
 export default config;

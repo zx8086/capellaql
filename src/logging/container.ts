@@ -1,18 +1,4 @@
-/* src/logging/container.ts
- *
- * Dependency Injection container for the logging subsystem.
- *
- * Selects between Pino (default) and Winston backends based on
- * the LOGGING_BACKEND environment variable. Falls back gracefully
- * when the primary backend fails to load — and ultimately drops
- * to a structured-JSON console fallback so the application never
- * crashes due to a missing logger.
- *
- * Usage:
- *   import { getLogger, getChildLogger } from "$logging/container";
- *   const log = getLogger();
- *   const reqLog = getChildLogger({ requestId: "abc-123" });
- */
+// src/logging/container.ts
 
 import type { ILogger, LogContext } from "./ports/logger.port";
 
@@ -22,7 +8,6 @@ export class LoggerContainer {
   private logger: ILogger | null = null;
   private backend: LoggingBackend | null = null;
 
-  /** Return the current logger, creating one lazily if needed. */
   getLogger(): ILogger {
     if (!this.logger) {
       this.logger = this.createLogger();
@@ -30,31 +15,23 @@ export class LoggerContainer {
     return this.logger;
   }
 
-  /** Convenience: create a child logger with pre-bound context. */
   getChildLogger(bindings: LogContext): ILogger {
     return this.getLogger().child(bindings);
   }
 
-  /** Inject a custom logger (useful for testing). */
   setLogger(logger: ILogger): void {
     this.logger = logger;
   }
 
-  /** Switch the backend and discard the cached logger. */
   setBackend(backend: LoggingBackend): void {
     this.backend = backend;
     this.logger = null;
   }
 
-  /** Clear all state — next `getLogger()` will re-resolve from env. */
   reset(): void {
     this.logger = null;
     this.backend = null;
   }
-
-  /* ------------------------------------------------------------------ */
-  /*  Private helpers                                                     */
-  /* ------------------------------------------------------------------ */
 
   private resolveBackend(): LoggingBackend {
     if (this.backend) return this.backend;
@@ -138,15 +115,12 @@ export class LoggerContainer {
   }
 }
 
-/** Singleton container instance. */
 export const loggerContainer = new LoggerContainer();
 
-/** Get the active logger (lazy-initialised). */
 export function getLogger(): ILogger {
   return loggerContainer.getLogger();
 }
 
-/** Get a child logger with pre-bound context fields. */
 export function getChildLogger(bindings: LogContext): ILogger {
   return loggerContainer.getChildLogger(bindings);
 }

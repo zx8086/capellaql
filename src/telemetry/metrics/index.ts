@@ -1,10 +1,6 @@
 /* src/telemetry/metrics/index.ts */
 // Public API exports per monitoring-updated.md line 36
 
-// ============================================================================
-// Initialization
-// ============================================================================
-
 export {
   getCounter,
   getHistogram,
@@ -16,20 +12,12 @@ export {
   resetMetrics,
 } from "./initialization";
 
-// ============================================================================
-// Instrument Definitions
-// ============================================================================
-
 export {
   getAvailableMetricNames,
   INSTRUMENT_COUNT,
   INSTRUMENT_DEFINITIONS,
   type MetricInstruments,
 } from "./instruments";
-
-// ============================================================================
-// Type Definitions
-// ============================================================================
 
 export type {
   BaseMetricAttributes,
@@ -49,10 +37,6 @@ export type {
   TelemetryExportAttributes,
 } from "./types";
 
-// ============================================================================
-// HTTP Metrics
-// ============================================================================
-
 export {
   getMetricsStatus,
   initializeHttpMetrics,
@@ -62,10 +46,6 @@ export {
   recordHttpResponseTime,
 } from "./httpMetrics";
 
-// ============================================================================
-// Database Metrics
-// ============================================================================
-
 export {
   type DatabaseMetricsLabels,
   getDatabaseMetricsStatus,
@@ -74,10 +54,6 @@ export {
   recordDatabaseOperation,
   recordSLIMetric,
 } from "./databaseMetrics";
-
-// ============================================================================
-// Process Metrics
-// ============================================================================
 
 export {
   getMemoryPressureState,

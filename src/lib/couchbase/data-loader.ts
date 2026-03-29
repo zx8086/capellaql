@@ -1,16 +1,5 @@
 /* src/lib/couchbase/data-loader.ts */
 
-/**
- * DataLoader Module
- *
- * Migrated from dataLoader.ts with integration to new connection manager.
- * Features:
- * - Efficient batching of document fetches
- * - Collection grouping for parallel execution
- * - Comprehensive error handling with SDK error types
- * - Integration with new error classifier
- */
-
 import DataLoader from "dataloader";
 import { debug, error as err, log } from "../../telemetry/logger";
 import { connectionManager } from "./connection-manager";
@@ -26,13 +15,6 @@ import {
   TemporaryFailureError,
 } from "./errors";
 
-// =============================================================================
-// TYPES
-// =============================================================================
-
-/**
- * Key type for identifying documents.
- */
 export interface CollectionKey {
   bucket: string;
   scope: string;
@@ -40,9 +22,6 @@ export interface CollectionKey {
   key: string;
 }
 
-/**
- * Result type for batched document fetching.
- */
 export interface DocumentResult {
   bucket: string;
   scope: string;
@@ -52,13 +31,6 @@ export interface DocumentResult {
   error?: string;
 }
 
-// =============================================================================
-// BATCH FUNCTION
-// =============================================================================
-
-/**
- * Batch function for DataLoader - fetches multiple documents efficiently.
- */
 async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<DocumentResult[]> {
   const startTime = Date.now();
 
@@ -290,13 +262,6 @@ async function batchGetDocuments(keys: readonly CollectionKey[]): Promise<Docume
   }
 }
 
-// =============================================================================
-// FACTORY FUNCTIONS
-// =============================================================================
-
-/**
- * Create a DataLoader instance for document fetching.
- */
 export function createDocumentDataLoader(): DataLoader<CollectionKey, DocumentResult> {
   return new DataLoader(batchGetDocuments, {
     // Cache results per request
@@ -308,9 +273,6 @@ export function createDocumentDataLoader(): DataLoader<CollectionKey, DocumentRe
   });
 }
 
-/**
- * Helper function to batch load documents using DataLoader.
- */
 export async function batchLoadDocuments(
   collections: Array<{ bucket: string; scope: string; collection: string }>,
   keys: string[],

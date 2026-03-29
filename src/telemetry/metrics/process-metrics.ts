@@ -5,10 +5,6 @@ import { type Counter, type Histogram, metrics, type ObservableGauge } from "@op
 import { getLogger } from "../../logging/container";
 import type { GCEvent, GCType } from "../gc-metrics";
 
-// ============================================================================
-// Types
-// ============================================================================
-
 export type MemoryPressureLevel = "normal" | "medium" | "high" | "critical";
 
 export interface MemoryPressureState {
@@ -21,19 +17,11 @@ export interface MemoryPressureState {
   lastCheck: number;
 }
 
-// ============================================================================
-// Memory Pressure Thresholds (per monitoring-updated.md)
-// ============================================================================
-
 const MEMORY_PRESSURE_THRESHOLDS = {
   medium: 0.7, // 70% heap usage
   high: 0.85, // 85% heap usage
   critical: 0.95, // 95% heap usage
 };
-
-// ============================================================================
-// State
-// ============================================================================
 
 let memoryPressureInterval: ReturnType<typeof setInterval> | null = null;
 let currentMemoryPressure: MemoryPressureState = {
@@ -45,10 +33,6 @@ let currentMemoryPressure: MemoryPressureState = {
   heapUsagePercent: 0,
   lastCheck: 0,
 };
-
-// ============================================================================
-// OTel Instruments
-// ============================================================================
 
 let isMetricsInitialized = false;
 
@@ -68,13 +52,6 @@ let externalMemoryGauge: ObservableGauge | null = null;
 let lastGCHeapBefore = 0;
 let lastGCHeapAfter = 0;
 
-// ============================================================================
-// Initialization
-// ============================================================================
-
-/**
- * Initialize process metrics instruments.
- */
 export function initializeProcessMetrics(): void {
   if (isMetricsInitialized) {
     return;
@@ -157,13 +134,6 @@ export function initializeProcessMetrics(): void {
   });
 }
 
-// ============================================================================
-// GC Metrics Recording
-// ============================================================================
-
-/**
- * Record a GC collection event.
- */
 export function recordGCCollection(type: GCType): void {
   if (!gcCollectionsCounter) {
     initializeProcessMetrics();
@@ -171,12 +141,6 @@ export function recordGCCollection(type: GCType): void {
   gcCollectionsCounter?.add(1, { gc_type: type });
 }
 
-/**
- * Record GC duration.
- *
- * @param durationSeconds - Duration in seconds
- * @param type - GC type
- */
 export function recordGCDuration(durationSeconds: number, type: GCType): void {
   if (!gcDurationHistogram) {
     initializeProcessMetrics();
@@ -184,9 +148,6 @@ export function recordGCDuration(durationSeconds: number, type: GCType): void {
   gcDurationHistogram?.record(durationSeconds, { gc_type: type });
 }
 
-/**
- * Record heap sizes before and after GC.
- */
 export function recordGCHeapSizes(
   oldGenBefore: number,
   oldGenAfter: number,
@@ -197,23 +158,12 @@ export function recordGCHeapSizes(
   lastGCHeapAfter = oldGenAfter;
 }
 
-/**
- * Handle a GC event from gc-metrics module.
- * This integrates GC events with OTel metrics.
- */
 export function handleGCEvent(event: GCEvent): void {
   recordGCCollection(event.type);
   recordGCDuration(event.durationMs / 1000, event.type);
   recordGCHeapSizes(event.heapBefore, event.heapAfter, 0, 0);
 }
 
-// ============================================================================
-// Memory Pressure Monitoring
-// ============================================================================
-
-/**
- * Calculate current memory pressure level.
- */
 function calculateMemoryPressure(): MemoryPressureState {
   const mem = process.memoryUsage();
   const heapUsagePercent = mem.heapTotal > 0 ? mem.heapUsed / mem.heapTotal : 0;
@@ -240,10 +190,7 @@ function calculateMemoryPressure(): MemoryPressureState {
   };
 }
 
-/**
- * Start automatic memory pressure monitoring.
- * Records metrics every 5 seconds.
- */
+// Records metrics every 5 seconds by default
 export function startMemoryPressureMonitoring(intervalMs = 5000): void {
   if (memoryPressureInterval) {
     getLogger().warn("Memory pressure monitoring already running");
@@ -284,9 +231,6 @@ export function startMemoryPressureMonitoring(intervalMs = 5000): void {
   });
 }
 
-/**
- * Stop memory pressure monitoring.
- */
 export function stopMemoryPressureMonitoring(): void {
   if (memoryPressureInterval) {
     clearInterval(memoryPressureInterval);
@@ -301,37 +245,21 @@ export function stopMemoryPressureMonitoring(): void {
   });
 }
 
-/**
- * Get current memory pressure state.
- */
 export function getMemoryPressureState(): MemoryPressureState {
   return { ...currentMemoryPressure };
 }
 
-/**
- * Check if memory pressure is elevated (medium, high, or critical).
- */
 export function isMemoryPressureElevated(): boolean {
   return currentMemoryPressure.level !== "normal";
 }
 
-/**
- * Check if memory pressure is critical.
- */
 export function isMemoryPressureCritical(): boolean {
   return currentMemoryPressure.level === "critical";
 }
 
-/**
- * Get memory pressure thresholds.
- */
 export function getMemoryPressureThresholds(): typeof MEMORY_PRESSURE_THRESHOLDS {
   return { ...MEMORY_PRESSURE_THRESHOLDS };
 }
-
-// ============================================================================
-// Process Metrics Status
-// ============================================================================
 
 export interface ProcessMetricsStatus {
   initialized: boolean;
@@ -341,9 +269,6 @@ export interface ProcessMetricsStatus {
   availableMetrics: string[];
 }
 
-/**
- * Get status of process metrics.
- */
 export function getProcessMetricsStatus(): ProcessMetricsStatus {
   return {
     initialized: isMetricsInitialized,

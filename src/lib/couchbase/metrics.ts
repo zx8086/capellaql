@@ -1,22 +1,6 @@
 /* src/lib/couchbase/metrics.ts */
 
-/**
- * Couchbase Performance Metrics Module
- *
- * Migrated from couchbaseMetrics.ts with integration to new connection manager.
- * Features:
- * - Circular buffer for memory-efficient metrics storage
- * - Slow query detection and logging
- * - Error breakdown analysis
- * - Query type performance analysis
- * - Peak QPS calculation
- */
-
 import { debug, log as info, warn } from "../../telemetry/logger";
-
-// =============================================================================
-// TYPES
-// =============================================================================
 
 export interface QueryMetric {
   operationType: string;
@@ -44,14 +28,6 @@ export interface PerformanceStats {
   lastResetTime: number;
 }
 
-// =============================================================================
-// METRICS COLLECTOR CLASS
-// =============================================================================
-
-/**
- * Collects and analyzes Couchbase operation metrics.
- * Uses a circular buffer to maintain memory efficiency.
- */
 class CouchbaseMetricsCollector {
   private queryMetrics: QueryMetric[] = [];
   private readonly maxMetricsHistory = 10000; // Keep last 10k operations
@@ -60,9 +36,6 @@ class CouchbaseMetricsCollector {
   private lastStatsCalculation = 0;
   private cachedStats: PerformanceStats | null = null;
 
-  /**
-   * Record a query/operation metric.
-   */
   recordQueryMetric(metric: QueryMetric): void {
     try {
       // Add hash for query identification without storing full query text
@@ -98,9 +71,6 @@ class CouchbaseMetricsCollector {
     }
   }
 
-  /**
-   * Get performance statistics for the recent time window.
-   */
   getPerformanceStats(forceRecalculate = false): PerformanceStats {
     const now = Date.now();
 
@@ -153,9 +123,6 @@ class CouchbaseMetricsCollector {
     return this.cachedStats;
   }
 
-  /**
-   * Get the slowest queries.
-   */
   getSlowQueries(limit = 10): QueryMetric[] {
     return this.queryMetrics
       .filter((m) => m.duration > this.slowQueryThreshold)
@@ -167,9 +134,6 @@ class CouchbaseMetricsCollector {
       }));
   }
 
-  /**
-   * Get error counts by type.
-   */
   getErrorBreakdown(): Record<string, number> {
     const errorCounts: Record<string, number> = {};
     const recentErrors = this.queryMetrics
@@ -185,9 +149,6 @@ class CouchbaseMetricsCollector {
     return errorCounts;
   }
 
-  /**
-   * Get performance breakdown by query type.
-   */
   getQueryTypeBreakdown(): Record<string, { count: number; avgDuration: number }> {
     const breakdown: Record<string, { total: number; totalDuration: number; count: number }> = {};
     const recentMetrics = this.queryMetrics.filter((m) => Date.now() - m.timestamp < 5 * 60 * 1000);
@@ -212,9 +173,6 @@ class CouchbaseMetricsCollector {
     return result;
   }
 
-  /**
-   * Reset all metrics.
-   */
   reset(): void {
     this.queryMetrics = [];
     this.startTime = Date.now();
@@ -222,9 +180,6 @@ class CouchbaseMetricsCollector {
     info("Couchbase metrics reset", { timestamp: this.startTime });
   }
 
-  /**
-   * Get diagnostic information about metrics collection.
-   */
   getDiagnosticInfo(): {
     metricsCount: number;
     oldestMetric: number;
@@ -287,22 +242,8 @@ class CouchbaseMetricsCollector {
   }
 }
 
-// =============================================================================
-// SINGLETON INSTANCE
-// =============================================================================
-
-/**
- * Singleton metrics collector instance.
- */
 export const couchbaseMetrics = new CouchbaseMetricsCollector();
 
-// =============================================================================
-// HELPER FUNCTIONS
-// =============================================================================
-
-/**
- * Record a query/operation metric.
- */
 export function recordQuery(
   operationType: string,
   duration: number,
@@ -326,44 +267,26 @@ export function recordQuery(
   });
 }
 
-/**
- * Get performance statistics.
- */
 export function getPerformanceStats(forceRecalculate = false): PerformanceStats {
   return couchbaseMetrics.getPerformanceStats(forceRecalculate);
 }
 
-/**
- * Get the slowest queries.
- */
 export function getSlowQueries(limit = 10): QueryMetric[] {
   return couchbaseMetrics.getSlowQueries(limit);
 }
 
-/**
- * Get error counts by type.
- */
 export function getErrorBreakdown(): Record<string, number> {
   return couchbaseMetrics.getErrorBreakdown();
 }
 
-/**
- * Get performance breakdown by query type.
- */
 export function getQueryTypeBreakdown(): Record<string, { count: number; avgDuration: number }> {
   return couchbaseMetrics.getQueryTypeBreakdown();
 }
 
-/**
- * Reset all metrics.
- */
 export function resetMetrics(): void {
   couchbaseMetrics.reset();
 }
 
-/**
- * Get diagnostic information.
- */
 export function getDiagnosticInfo(): {
   metricsCount: number;
   oldestMetric: number;

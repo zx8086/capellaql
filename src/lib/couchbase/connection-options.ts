@@ -1,31 +1,11 @@
 /* src/lib/couchbase/connection-options.ts */
 
-/**
- * Connection Options Builder
- * Constructs production-grade Couchbase ConnectOptions with ALL SDK best practices.
- *
- * LOW PRIORITY FIXES INTEGRATED:
- * - Compression (saves bandwidth)
- * - Threshold logging (slow operation detection)
- * - Orphan response logging (diagnostics)
- * - WAN development profile (Capella Cloud)
- * - DNS SRV support detection
- */
-
 import { type ConnectOptions, DurabilityLevel } from "couchbase";
 import { parseConnectionString } from "./config";
 import type { ConnectionStringMeta, CouchbaseConfig } from "./types";
 
-// Re-export parseConnectionString for convenience
 export { parseConnectionString };
 
-/**
- * Build production-grade connection options with ALL SDK optimizations.
- *
- * @param config - Validated Couchbase configuration
- * @param meta - Connection string metadata (from parseConnectionString)
- * @returns ConnectOptions optimized for the connection type
- */
 export function buildConnectionOptions(config: CouchbaseConfig, meta: ConnectionStringMeta): ConnectOptions {
   const options: ConnectOptions = {
     // Authentication
@@ -57,7 +37,7 @@ export function buildConnectionOptions(config: CouchbaseConfig, meta: Connection
     },
   };
 
-  // LOW PRIORITY FIX: For Capella Cloud - WAN development mode optimizes for latency
+  // WAN development mode optimizes for Capella Cloud latency
   if (meta.isCapella) {
     (options as any).configProfile = "wanDevelopment";
   }
@@ -72,10 +52,6 @@ export function buildConnectionOptions(config: CouchbaseConfig, meta: Connection
   return options;
 }
 
-/**
- * Get optimized timeouts based on connection type.
- * Capella Cloud connections may need longer timeouts due to WAN latency.
- */
 export function getOptimizedTimeouts(meta: ConnectionStringMeta): {
   connectTimeout: number;
   bootstrapTimeout: number;
@@ -101,9 +77,6 @@ export function getOptimizedTimeouts(meta: ConnectionStringMeta): {
   };
 }
 
-/**
- * Validate that connection options are suitable for production.
- */
 export function validateConnectionOptions(_options: ConnectOptions, meta: ConnectionStringMeta): string[] {
   const warnings: string[] = [];
 

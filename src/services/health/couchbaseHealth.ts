@@ -1,14 +1,9 @@
-/* src/services/health/couchbaseHealth.ts */
-// Couchbase health check service - matches reference format exactly
+// src/services/health/couchbaseHealth.ts
 
 import config from "$config";
 import { connectionManager } from "$lib/couchbase";
 import { err } from "../../telemetry";
 import { type CouchbaseDependency, formatResponseTime, type HealthStatus } from "./types";
-
-// ============================================================================
-// Health Check Cache (prevent overwhelming the cluster with health checks)
-// ============================================================================
 
 interface CachedHealthResult {
   result: CouchbaseDependency;
@@ -17,10 +12,6 @@ interface CachedHealthResult {
 
 let cachedHealth: CachedHealthResult | null = null;
 const CACHE_TTL_MS = 2000; // 2 seconds cache
-
-// ============================================================================
-// Couchbase Health Service
-// ============================================================================
 
 export class CouchbaseHealthService {
   private static instance: CouchbaseHealthService;
@@ -34,18 +25,6 @@ export class CouchbaseHealthService {
     return CouchbaseHealthService.instance;
   }
 
-  /**
-   * Get Couchbase health details matching reference format exactly:
-   * {
-   *   status: "healthy",
-   *   responseTime: "13.14ms",
-   *   details: {
-   *     connectionString: "couchbases://...",
-   *     bucket: "bucket-name",
-   *     services: { kv: true, query: true, search: true }
-   *   }
-   * }
-   */
   async getHealth(): Promise<CouchbaseDependency> {
     const now = Date.now();
 
@@ -110,9 +89,6 @@ export class CouchbaseHealthService {
     }
   }
 
-  /**
-   * Quick ping check for readiness probes
-   */
   async ping(): Promise<{ success: boolean; latencyMs: number; error?: string }> {
     try {
       const result = await connectionManager.ping();
@@ -130,9 +106,6 @@ export class CouchbaseHealthService {
     }
   }
 
-  /**
-   * Test connection without full health check
-   */
   async testConnection(): Promise<boolean> {
     try {
       await connectionManager.getConnection();
@@ -142,9 +115,6 @@ export class CouchbaseHealthService {
     }
   }
 
-  /**
-   * Create error response when health check fails
-   */
   private createErrorResponse(responseTimeMs: number): CouchbaseDependency {
     return {
       status: "unhealthy",
@@ -161,9 +131,6 @@ export class CouchbaseHealthService {
     };
   }
 
-  /**
-   * Mask sensitive parts of connection string for display
-   */
   private maskConnectionString(url: string): string {
     try {
       // Mask password if present in URL
@@ -178,9 +145,6 @@ export class CouchbaseHealthService {
     }
   }
 
-  /**
-   * Clear health cache (useful for testing)
-   */
   clearCache(): void {
     cachedHealth = null;
   }

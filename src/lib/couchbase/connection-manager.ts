@@ -1,32 +1,5 @@
 /* src/lib/couchbase/connection-manager.ts */
 
-/**
- * Production-Grade Couchbase Connection Manager
- *
- * ALL PRIORITY FIXES INTEGRATED:
- * HIGH PRIORITY:
- *   - SDK error types with instanceof checks
- *   - Bucket readiness verification via getAllScopes()
- *   - diagnostics() for health checks
- *   - ping() with ServiceType.KeyValue, ServiceType.Query
- *   - Error classification (retryable vs permanent)
- *
- * MEDIUM PRIORITY:
- *   - Prepared statements
- *   - Query context
- *   - Subdocument operations
- *   - CAS conflict handling
- *   - Durability levels
- *   - Field projection
- *
- * LOW PRIORITY:
- *   - Compression enabled
- *   - Threshold logging
- *   - Collection caching
- *   - Orphan response logging
- *   - DNS SRV support
- */
-
 import { type Bucket, type Cluster, type Collection, connect, type Scope, ServiceType } from "couchbase";
 import { err, log, warn } from "../../telemetry/logger";
 import { type CircuitBreaker, createCouchbaseCircuitBreaker } from "./circuit-breaker";
@@ -44,14 +17,6 @@ import {
 } from "./errors";
 import type { ConnectionMetrics, CouchbaseConfig, CouchbaseConnection, HealthStatus, RetryContext } from "./types";
 
-// =============================================================================
-// CONNECTION MANAGER CLASS
-// =============================================================================
-
-/**
- * Production-ready Couchbase connection manager with SDK best practices.
- * Singleton pattern ensures single connection across the application.
- */
 export class CouchbaseConnectionManager {
   private static instance: CouchbaseConnectionManager | null = null;
 
@@ -60,7 +25,6 @@ export class CouchbaseConnectionManager {
   private connectionPromise: Promise<Cluster> | null = null;
   private config: CouchbaseConfig | null = null;
 
-  // LOW PRIORITY FIX: Collection caching
   private collections: Map<string, Collection> = new Map();
 
   private isHealthy = false;
@@ -86,9 +50,6 @@ export class CouchbaseConnectionManager {
     this.circuitBreaker = createCouchbaseCircuitBreaker();
   }
 
-  /**
-   * Get singleton instance.
-   */
   public static getInstance(): CouchbaseConnectionManager {
     if (!CouchbaseConnectionManager.instance) {
       CouchbaseConnectionManager.instance = new CouchbaseConnectionManager();
@@ -96,13 +57,6 @@ export class CouchbaseConnectionManager {
     return CouchbaseConnectionManager.instance;
   }
 
-  // =============================================================================
-  // INITIALIZATION
-  // =============================================================================
-
-  /**
-   * Initialize connection with bucket readiness verification.
-   */
   public async initialize(config?: CouchbaseConfig): Promise<void> {
     // Load config if not provided
     const effectiveConfig = config || loadCouchbaseConfig();
@@ -164,9 +118,6 @@ export class CouchbaseConnectionManager {
     }
   }
 
-  /**
-   * Create cluster connection with retry logic.
-   */
   private async createConnection(config: CouchbaseConfig): Promise<Cluster> {
     const maxAttempts = 3;
     let lastError: Error | null = null;
@@ -182,7 +133,6 @@ export class CouchbaseConnectionManager {
         // Parse connection string
         const connectionMeta = parseConnectionString(config.connectionString);
 
-        // LOW PRIORITY FIX: Build options with all SDK features
         const options = buildConnectionOptions(config, connectionMeta);
 
         // Connect to cluster
@@ -228,15 +178,11 @@ export class CouchbaseConnectionManager {
     );
   }
 
-  /**
-   * HIGH PRIORITY FIX: Wait for bucket ready using collections API.
-   */
   private async waitForBucketReady(bucket: Bucket, timeoutMs: number): Promise<void> {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeoutMs) {
       try {
-        // SDK BEST PRACTICE: Use collections API to verify bucket readiness
         await bucket.collections().getAllScopes();
         log("Couchbase bucket is ready", { component: "couchbase", operation: "bucket_ready" });
         return;
@@ -254,13 +200,6 @@ export class CouchbaseConnectionManager {
     });
   }
 
-  // =============================================================================
-  // HEALTH MONITORING
-  // =============================================================================
-
-  /**
-   * HIGH PRIORITY FIX: Start health monitoring with diagnostics().
-   */
   private startHealthMonitoring(): void {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
@@ -291,9 +230,6 @@ export class CouchbaseConnectionManager {
     }, intervalMs);
   }
 
-  /**
-   * HIGH PRIORITY FIX: Ping with specific service types.
-   */
   public async ping(): Promise<HealthStatus> {
     if (!this.cluster) {
       return {
@@ -306,7 +242,6 @@ export class CouchbaseConnectionManager {
     try {
       const startTime = typeof Bun !== "undefined" ? Bun.nanoseconds() : performance.now() * 1_000_000;
 
-      // SDK BEST PRACTICE: Ping specific services
       const pingResult = await this.cluster.ping({
         serviceTypes: [ServiceType.KeyValue, ServiceType.Query],
         timeout: 5000,
@@ -350,18 +285,10 @@ export class CouchbaseConnectionManager {
     }
   }
 
-  /**
-   * HIGH PRIORITY FIX: Use bucket-level ping() for comprehensive health.
-   *
-   * SDK Best Practice (from Couchbase docs):
-   * - ping() is ACTIVE polling - gives real-time status
-   * - diagnostics() is PASSIVE - may return stale/empty data
-   * - "If you want to make sure the key-value service is included,
-   *    perform ping at the bucket level."
-   *
-   * For Capella cloud clusters, bucket.ping() is preferred over cluster.diagnostics()
-   * because diagnostics() may return empty services for cloud deployments.
-   */
+  // ping() is ACTIVE polling - gives real-time status
+  // diagnostics() is PASSIVE - may return stale/empty data
+  // For Capella cloud clusters, bucket.ping() is preferred over cluster.diagnostics()
+  // because diagnostics() may return empty services for cloud deployments.
   public async getHealthWithDiagnostics(): Promise<HealthStatus> {
     if (!this.cluster || !this.bucket) {
       return {
@@ -372,8 +299,6 @@ export class CouchbaseConnectionManager {
     }
 
     try {
-      // SDK BEST PRACTICE: Use bucket-level ping for Capella
-      // This ensures KV service is included and gives real-time status
       const pingResult = await this.bucket.ping({
         serviceTypes: [ServiceType.KeyValue, ServiceType.Query],
         timeout: 5000,
@@ -447,13 +372,6 @@ export class CouchbaseConnectionManager {
     }
   }
 
-  // =============================================================================
-  // CONNECTION ACCESS
-  // =============================================================================
-
-  /**
-   * LOW PRIORITY FIX: Get or create cached collection.
-   */
   public getCollection(bucketName?: string, scopeName?: string, collectionName?: string): Collection {
     if (!this.bucket || !this.cluster) {
       throw new ConnectionError("Cannot access collection - Couchbase not initialized", undefined, {
@@ -482,9 +400,6 @@ export class CouchbaseConnectionManager {
     return collectionRef;
   }
 
-  /**
-   * Get scope reference.
-   */
   public getScope(bucketName?: string, scopeName?: string): Scope {
     if (!this.cluster) {
       throw new ConnectionError("Cannot access scope - Couchbase not initialized", undefined, {
@@ -512,9 +427,6 @@ export class CouchbaseConnectionManager {
     return this.cluster.bucket(bucket).scope(scope);
   }
 
-  /**
-   * Get connection with all features.
-   */
   public async getConnection(): Promise<CouchbaseConnection> {
     if (!this.cluster || !this.bucket || !this.config) {
       throw new ConnectionError("Couchbase not initialized", undefined, {
@@ -554,7 +466,6 @@ export class CouchbaseConnectionManager {
       getHealth: () => this.getHealthWithDiagnostics(),
       executeWithRetry: this.executeWithRetry.bind(this),
 
-      // HIGH PRIORITY FIX: Expose SDK error classes
       errors: {
         DocumentNotFoundError,
         CouchbaseError,
@@ -566,13 +477,6 @@ export class CouchbaseConnectionManager {
     };
   }
 
-  // =============================================================================
-  // RETRY LOGIC
-  // =============================================================================
-
-  /**
-   * Execute operation with retry logic and circuit breaker.
-   */
   public async executeWithRetry<T>(operation: () => Promise<T>, context?: RetryContext): Promise<T> {
     const retryStrategy = context || { maxAttempts: 3, baseDelayMs: 1000 };
     const fallback = retryStrategy.fallback;
@@ -598,7 +502,6 @@ export class CouchbaseConnectionManager {
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error));
 
-          // HIGH PRIORITY FIX: Use SDK error classifier
           const errorContext = CouchbaseErrorClassifier.extractContext(error);
           const strategy = CouchbaseErrorClassifier.getRetryStrategy(error);
 
@@ -630,13 +533,6 @@ export class CouchbaseConnectionManager {
     }, fallback);
   }
 
-  // =============================================================================
-  // METRICS & STATE
-  // =============================================================================
-
-  /**
-   * Get connection metrics.
-   */
   public getMetrics(): ConnectionMetrics {
     return {
       ...this.metrics,
@@ -644,35 +540,18 @@ export class CouchbaseConnectionManager {
     };
   }
 
-  /**
-   * Check if connected and healthy.
-   */
   public isConnected(): boolean {
     return this.isHealthy && this.cluster !== null;
   }
 
-  /**
-   * Get circuit breaker state.
-   */
   public getCircuitBreakerState(): "closed" | "open" | "half-open" {
     return this.circuitBreaker.getState();
   }
 
-  /**
-   * Reset circuit breaker (administrative action).
-   */
   public resetCircuitBreaker(): void {
     this.circuitBreaker.reset();
   }
 
-  // =============================================================================
-  // CLEANUP
-  // =============================================================================
-
-  /**
-   * Close connection.
-   * Idempotent - safe to call multiple times.
-   */
   public async close(): Promise<void> {
     // Idempotency guard - prevent multiple close calls
     if (this.isClosing) {
@@ -711,10 +590,6 @@ export class CouchbaseConnectionManager {
     // Note: Don't reset isClosing - connection is permanently closed
   }
 
-  // =============================================================================
-  // UTILITIES
-  // =============================================================================
-
   private calculateBackoff(attempt: number): number {
     const baseDelay = 1000;
     const maxDelay = 8000;
@@ -737,14 +612,6 @@ export class CouchbaseConnectionManager {
   }
 }
 
-// =============================================================================
-// SINGLETON EXPORT
-// =============================================================================
-
-/**
- * Singleton connection manager instance.
- * Use this for all Couchbase operations.
- */
 export const connectionManager = CouchbaseConnectionManager.getInstance();
 
 // Note: Signal handlers (SIGINT/SIGTERM) are handled centrally in src/index.ts

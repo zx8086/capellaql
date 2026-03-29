@@ -2,9 +2,6 @@
 
 import type { Bucket, Cluster, Collection, Scope } from "couchbase";
 
-/**
- * Enhanced connection interface with all SDK features
- */
 export interface CouchbaseConnection {
   // Core SDK objects
   cluster: Cluster;
@@ -32,9 +29,6 @@ export interface CouchbaseConnection {
   };
 }
 
-/**
- * Health status with diagnostics support
- */
 export interface HealthStatus {
   status: "healthy" | "unhealthy" | "degraded" | "disconnected" | "critical";
   timestamp: number;
@@ -57,9 +51,6 @@ export interface HealthStatus {
   };
 }
 
-/**
- * Circuit breaker statistics
- */
 export interface CircuitBreakerStats {
   state: "closed" | "open" | "half-open";
   failures: number;
@@ -73,9 +64,6 @@ export interface CircuitBreakerStats {
   errorRate?: number;
 }
 
-/**
- * Performance details for health reporting
- */
 export interface PerformanceDetails {
   avgQueryTime?: number;
   errorRate?: number;
@@ -83,9 +71,6 @@ export interface PerformanceDetails {
   connectionPoolSize?: number;
 }
 
-/**
- * Service health details
- */
 export interface ServiceHealthDetails {
   kv?: { status: string; healthy: boolean };
   query?: { status: string; healthy: boolean };
@@ -93,9 +78,6 @@ export interface ServiceHealthDetails {
   search?: { status: string; healthy: boolean };
 }
 
-/**
- * Connection metrics
- */
 export interface ConnectionMetrics {
   totalConnections: number;
   failedConnections: number;
@@ -108,9 +90,6 @@ export interface ConnectionMetrics {
   circuitBreakerState: "closed" | "open" | "half-open";
 }
 
-/**
- * Retry context for operations
- */
 export interface RetryContext {
   maxAttempts?: number;
   baseDelayMs?: number;
@@ -119,9 +98,6 @@ export interface RetryContext {
   onRetry?: (attempt: number, error: Error, nextDelay: number) => void;
 }
 
-/**
- * Operation context for error handling and logging
- */
 export interface OperationContext {
   operationType: string;
   operationId?: string;
@@ -133,9 +109,6 @@ export interface OperationContext {
   requestId?: string;
 }
 
-/**
- * Error context with SDK information
- */
 export interface CouchbaseErrorContext {
   message: string;
   cause?: Error;
@@ -151,9 +124,6 @@ export interface CouchbaseErrorContext {
   queryId?: string;
 }
 
-/**
- * Error classification structure (preserved from existing implementation)
- */
 export interface ErrorClassification {
   retryable: boolean;
   severity: "info" | "warning" | "critical";
@@ -163,9 +133,6 @@ export interface ErrorClassification {
   maxRetries?: number;
 }
 
-/**
- * Query execution options
- */
 export interface QueryExecutionOptions {
   parameters?: Record<string, any>;
   usePreparedStatement?: boolean;
@@ -180,18 +147,12 @@ export interface QueryExecutionOptions {
   clientContextId?: string;
 }
 
-/**
- * KV get options
- */
 export interface KVGetOptions {
   project?: string[];
   withExpiry?: boolean;
   timeout?: number;
 }
 
-/**
- * KV upsert options
- */
 export interface KVUpsertOptions {
   durability?: "none" | "majority" | "majorityAndPersistToActive" | "persistToMajority";
   expiry?: number;
@@ -199,18 +160,12 @@ export interface KVUpsertOptions {
   timeout?: number;
 }
 
-/**
- * Subdocument operation definition
- */
 export interface SubdocOperation {
   type: "upsert" | "insert" | "replace" | "remove" | "arrayAppend" | "arrayPrepend";
   path: string;
   value?: any;
 }
 
-/**
- * Connection string metadata
- */
 export interface ConnectionStringMeta {
   isTls: boolean;
   isCapella: boolean;
@@ -219,9 +174,6 @@ export interface ConnectionStringMeta {
   hosts: string[];
 }
 
-/**
- * Complete configuration interface for Couchbase
- */
 export interface CouchbaseConfig {
   // Connection
   connectionString: string;

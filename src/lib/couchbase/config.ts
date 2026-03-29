@@ -1,22 +1,9 @@
 /* src/lib/couchbase/config.ts */
 
-/**
- * Couchbase Configuration Module
- * Provides Zod validation and configuration loading for the Couchbase connection manager.
- * Integrates with the existing 4-pillar config system.
- */
-
 import { z } from "zod";
 import centralConfig from "$config";
 import type { ConnectionStringMeta, CouchbaseConfig } from "./types";
 
-// =============================================================================
-// ZOD VALIDATION SCHEMA
-// =============================================================================
-
-/**
- * Couchbase connection configuration schema with comprehensive validation
- */
 export const CouchbaseConfigSchema = z.object({
   // Connection details
   connectionString: z
@@ -50,7 +37,6 @@ export const CouchbaseConfigSchema = z.object({
     .optional()
     .describe("SDK timeout configurations"),
 
-  // Compression settings (LOW PRIORITY optimization)
   compression: z
     .object({
       enabled: z.boolean().default(true).describe("Enable document compression"),
@@ -60,7 +46,6 @@ export const CouchbaseConfigSchema = z.object({
     .optional()
     .describe("Compression configuration"),
 
-  // Threshold logging settings (LOW PRIORITY optimization)
   thresholdLogging: z
     .object({
       enabled: z.boolean().default(true).describe("Enable threshold logging"),
@@ -88,14 +73,6 @@ export const CouchbaseConfigSchema = z.object({
 export type CouchbaseConfigInput = z.input<typeof CouchbaseConfigSchema>;
 export type CouchbaseConfigParsed = z.output<typeof CouchbaseConfigSchema>;
 
-// =============================================================================
-// CONFIGURATION LOADING
-// =============================================================================
-
-/**
- * Load and validate Couchbase configuration from the central config system.
- * Integrates with the existing 4-pillar config pattern.
- */
 export function loadCouchbaseConfig(): CouchbaseConfig {
   const capella = centralConfig.capella;
 
@@ -117,14 +94,12 @@ export function loadCouchbaseConfig(): CouchbaseConfig {
       searchTimeout: capella.COUCHBASE_SEARCH_TIMEOUT,
     },
 
-    // Compression enabled by default (LOW PRIORITY optimization)
     compression: {
       enabled: true,
       minSize: 32,
       minRatio: 0.83,
     },
 
-    // Threshold logging enabled by default (LOW PRIORITY optimization)
     thresholdLogging: {
       enabled: true,
       kvThreshold: 500,
@@ -154,14 +129,6 @@ export function loadCouchbaseConfig(): CouchbaseConfig {
   }
 }
 
-// =============================================================================
-// PRODUCTION SECURITY VALIDATION
-// =============================================================================
-
-/**
- * Validate configuration with production-specific security checks.
- * Called after initial validation for additional production hardening.
- */
 export function validateProductionConfig(config: CouchbaseConfig): void {
   const isProduction =
     centralConfig.runtime.NODE_ENV === "production" || centralConfig.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
@@ -196,14 +163,6 @@ export function validateProductionConfig(config: CouchbaseConfig): void {
   }
 }
 
-// =============================================================================
-// CONNECTION STRING PARSING
-// =============================================================================
-
-/**
- * Parse connection string to extract metadata for connection optimization.
- * Used by connection-options.ts to configure protocol-specific settings.
- */
 export function parseConnectionString(connectionString: string): ConnectionStringMeta {
   const isTls = connectionString.startsWith("couchbases://");
   const protocol = isTls ? "couchbases" : "couchbase";
@@ -229,9 +188,5 @@ export function parseConnectionString(connectionString: string): ConnectionStrin
     hosts,
   };
 }
-
-// =============================================================================
-// EXPORTS
-// =============================================================================
 
 export { CouchbaseConfigSchema as ConfigSchema };

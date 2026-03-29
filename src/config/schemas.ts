@@ -5,10 +5,6 @@
 
 import { z } from "zod";
 
-// =============================================================================
-// TYPE DEFINITIONS
-// =============================================================================
-
 export interface ApplicationConfig {
   LOG_LEVEL: string;
   LOGGING_BACKEND: string;
@@ -85,20 +81,11 @@ export interface Config {
   telemetry: TelemetryConfig;
 }
 
-// =============================================================================
-// REUSABLE PRIMITIVES (per 4-pillar pattern)
-// =============================================================================
-
 export const NonEmptyString = z.string().min(1);
 export const PortNumber = z.number().int().min(1).max(65535);
 export const PositiveInt = z.number().int().min(1);
 export const EnvironmentType = z.enum(["development", "staging", "production", "test"]);
 
-// =============================================================================
-// ZOD SCHEMAS (Validation Only - No Defaults)
-// =============================================================================
-
-// Application schema - validation rules only
 export const ApplicationConfigSchema = z.strictObject({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).describe("Application log level"),
   LOGGING_BACKEND: z.enum(["pino", "winston"]).describe("Logging backend selection"),
@@ -114,7 +101,6 @@ export const ApplicationConfigSchema = z.strictObject({
   BASE_URL: z.string().url("BASE_URL must be a valid URL").describe("Application base URL"),
 });
 
-// Capella/Couchbase schema - validation rules only
 export const CapellaConfigSchema = z.strictObject({
   COUCHBASE_URL: z.string().url("Must be a valid Couchbase connection URL").describe("Couchbase cluster URL"),
   COUCHBASE_USERNAME: NonEmptyString.describe("Couchbase username"),
@@ -122,7 +108,6 @@ export const CapellaConfigSchema = z.strictObject({
   COUCHBASE_BUCKET: NonEmptyString.describe("Couchbase bucket name"),
   COUCHBASE_SCOPE: NonEmptyString.describe("Couchbase scope name"),
   COUCHBASE_COLLECTION: NonEmptyString.describe("Couchbase collection name"),
-  // SDK timeout configurations with validation only
   COUCHBASE_KV_TIMEOUT: z
     .number()
     .min(1000, "KV timeout must be at least 1 second")
@@ -160,7 +145,6 @@ export const CapellaConfigSchema = z.strictObject({
     .describe("Cluster bootstrap timeout"),
 });
 
-// Runtime schema - validation rules only
 export const RuntimeConfigSchema = z.strictObject({
   NODE_ENV: EnvironmentType.describe("Runtime environment"),
   CN_ROOT: NonEmptyString.describe("Application root directory"),
@@ -175,7 +159,6 @@ export const RuntimeConfigSchema = z.strictObject({
     .describe("Bun DNS cache TTL in seconds"),
 });
 
-// Deployment schema - validation rules only
 export const DeploymentConfigSchema = z.strictObject({
   BASE_URL: z.string().url().describe("Deployment base URL"),
   HOSTNAME: z.string().describe("Hostname"),
@@ -185,7 +168,6 @@ export const DeploymentConfigSchema = z.strictObject({
   K8S_NAMESPACE: z.string().optional().describe("Kubernetes namespace"),
 });
 
-// Telemetry schema (2025 compliance) - validation rules only
 export const TelemetryConfigSchema = z.strictObject({
   ENABLE_OPENTELEMETRY: z.boolean().describe("Enable OpenTelemetry"),
   SERVICE_NAME: NonEmptyString.describe("Service identifier for telemetry"),
@@ -206,7 +188,6 @@ export const TelemetryConfigSchema = z.strictObject({
     .max(3600000, "SUMMARY_LOG_INTERVAL should not exceed 1 hour")
     .refine((val) => !Number.isNaN(val), "SUMMARY_LOG_INTERVAL cannot be NaN")
     .describe("Summary log interval in milliseconds"),
-  // 2025 compliance settings with strict validation
   EXPORT_TIMEOUT_MS: z
     .number()
     .min(5000, "EXPORT_TIMEOUT_MS must be at least 5 seconds")
@@ -232,32 +213,18 @@ export const TelemetryConfigSchema = z.strictObject({
     .min(10000, "CIRCUIT_BREAKER_TIMEOUT_MS must be at least 10 seconds")
     .max(300000, "CIRCUIT_BREAKER_TIMEOUT_MS should not exceed 5 minutes")
     .describe("Circuit breaker timeout"),
-  // Log retention policy validation
   LOG_RETENTION_DEBUG_DAYS: z.number().min(1).max(365).describe("Debug log retention in days"),
   LOG_RETENTION_INFO_DAYS: z.number().min(1).max(365).describe("Info log retention in days"),
   LOG_RETENTION_WARN_DAYS: z.number().min(1).max(1095).describe("Warning log retention in days"),
   LOG_RETENTION_ERROR_DAYS: z.number().min(1).max(2555).describe("Error log retention in days"),
 });
 
-// =============================================================================
-// PRODUCTION SECURITY VALIDATION (per 4-pillar pattern)
-// =============================================================================
-
-/**
- * Production security rules.
- * These run ONLY in the ConfigSchema superRefine — the single validation
- * boundary. They are never duplicated in env-level validation.
- */
+// These run ONLY in the ConfigSchema superRefine -- the single validation boundary.
 function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): void {
   const isProduction = data.runtime.NODE_ENV === "production" || data.telemetry.DEPLOYMENT_ENVIRONMENT === "production";
 
   if (!isProduction) return;
 
-  // =========================================================================
-  // SERVICE IDENTITY VALIDATION
-  // =========================================================================
-
-  // Service name validation - no localhost/test references
   const serviceName = data.telemetry.SERVICE_NAME;
   if (serviceName.includes("localhost") || serviceName.includes("test") || serviceName.includes("local")) {
     ctx.addIssue({
@@ -267,7 +234,6 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
     });
   }
 
-  // Service version validation - no "dev" or "latest"
   const serviceVersion = data.telemetry.SERVICE_VERSION;
   if (serviceVersion === "dev" || serviceVersion === "latest" || serviceVersion === "0.0.0") {
     ctx.addIssue({
@@ -277,11 +243,6 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
     });
   }
 
-  // =========================================================================
-  // DATABASE SECURITY VALIDATION
-  // =========================================================================
-
-  // Critical security check for default passwords
   if (data.capella.COUCHBASE_PASSWORD === "password") {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -290,7 +251,6 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
     });
   }
 
-  // Password minimum length check
   if (data.capella.COUCHBASE_PASSWORD.length < 12) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -299,7 +259,6 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
     });
   }
 
-  // Check for default usernames in production
   if (data.capella.COUCHBASE_USERNAME === "Administrator") {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -308,7 +267,6 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
     });
   }
 
-  // Validate database host is not localhost in production
   try {
     const url = new URL(data.capella.COUCHBASE_URL);
     if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
@@ -322,11 +280,6 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
     // URL parsing failed, will be caught by schema validation
   }
 
-  // =========================================================================
-  // CORS AND NETWORK SECURITY
-  // =========================================================================
-
-  // Validate CORS origins in production
   if (data.application.ALLOWED_ORIGINS.some((origin) => origin === "*" || origin.includes("localhost"))) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -335,10 +288,6 @@ function addProductionSecurityValidation(data: Config, ctx: z.RefinementCtx): vo
     });
   }
 }
-
-// =============================================================================
-// UNIFIED CONFIGURATION SCHEMA
-// =============================================================================
 
 export const ConfigSchema = z
   .strictObject({
@@ -350,10 +299,6 @@ export const ConfigSchema = z
   })
   .superRefine(addProductionSecurityValidation);
 
-// =============================================================================
-// SCHEMA REGISTRY (per 4-pillar pattern)
-// =============================================================================
-
 export const SchemaRegistry = {
   Application: ApplicationConfigSchema,
   Capella: CapellaConfigSchema,
@@ -362,10 +307,6 @@ export const SchemaRegistry = {
   Telemetry: TelemetryConfigSchema,
   Config: ConfigSchema,
 } as const;
-
-// =============================================================================
-// CONFIGURATION ERROR TYPE
-// =============================================================================
 
 export class ConfigurationError extends Error {
   constructor(

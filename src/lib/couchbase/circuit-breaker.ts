@@ -1,20 +1,5 @@
 /* src/lib/couchbase/circuit-breaker.ts */
 
-/**
- * Circuit Breaker Module
- * Implements the circuit breaker pattern for fail-fast behavior and resilience.
- *
- * States:
- * - CLOSED: Normal operation, requests flow through
- * - OPEN: Failing fast, rejecting all requests (after threshold failures)
- * - HALF-OPEN: Testing recovery, allowing limited requests
- *
- * Thresholds:
- * - failureThreshold: 5 failures → OPEN
- * - successThreshold: 3 successes in HALF-OPEN → CLOSED
- * - timeout: 60s before transitioning from OPEN → HALF-OPEN
- */
-
 import { log, warn } from "../../telemetry/logger";
 import {
   CasMismatchError,
@@ -27,10 +12,6 @@ import {
 } from "./errors";
 import type { CircuitBreakerStats } from "./types";
 
-// =============================================================================
-// CONFIGURATION INTERFACE
-// =============================================================================
-
 export interface CircuitBreakerConfig {
   /** Number of failures before opening the circuit */
   failureThreshold: number;
@@ -42,10 +23,6 @@ export interface CircuitBreakerConfig {
   monitoringPeriod: number;
 }
 
-// =============================================================================
-// DEFAULT CONFIGURATION
-// =============================================================================
-
 export const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
   failureThreshold: 5,
   successThreshold: 3,
@@ -53,27 +30,6 @@ export const DEFAULT_CIRCUIT_BREAKER_CONFIG: CircuitBreakerConfig = {
   monitoringPeriod: 120000, // 2 minutes
 };
 
-// =============================================================================
-// CIRCUIT BREAKER CLASS
-// =============================================================================
-
-/**
- * Circuit breaker for fail-fast behavior and automatic recovery.
- *
- * Usage:
- * ```typescript
- * const breaker = new CircuitBreaker({ failureThreshold: 5, ... });
- *
- * try {
- *   const result = await breaker.execute(
- *     async () => await riskyOperation(),
- *     async () => fallbackValue // optional fallback
- *   );
- * } catch (error) {
- *   // Circuit is open or operation failed
- * }
- * ```
- */
 export class CircuitBreaker {
   private state: "closed" | "open" | "half-open" = "closed";
   private failures = 0;
@@ -88,14 +44,6 @@ export class CircuitBreaker {
     this.config = { ...DEFAULT_CIRCUIT_BREAKER_CONFIG, ...config };
   }
 
-  /**
-   * Execute an operation through the circuit breaker.
-   *
-   * @param operation - The async operation to execute
-   * @param fallback - Optional fallback if circuit is open
-   * @returns The operation result or fallback value
-   * @throws Error if circuit is open and no fallback provided
-   */
   async execute<T>(operation: () => Promise<T>, fallback?: () => Promise<T>): Promise<T> {
     this.totalOperations++;
 
@@ -132,10 +80,7 @@ export class CircuitBreaker {
     }
   }
 
-  /**
-   * Check if an error is a connection/service error that should trip the circuit breaker.
-   * Application-level errors (document not found, CAS mismatch, parsing errors) should NOT trip it.
-   */
+  // Application-level errors (document not found, CAS mismatch, parsing errors) should NOT trip the breaker
   private isConnectionError(error: unknown): boolean {
     // These are application-level errors - the connection is fine
     if (
@@ -154,9 +99,6 @@ export class CircuitBreaker {
     return true;
   }
 
-  /**
-   * Record a successful operation.
-   */
   private onSuccess(): void {
     this.lastSuccessTime = Date.now();
     this.failures = 0;
@@ -170,9 +112,6 @@ export class CircuitBreaker {
     }
   }
 
-  /**
-   * Record a failed operation.
-   */
   private onFailure(): void {
     this.lastFailureTime = Date.now();
 
@@ -192,9 +131,6 @@ export class CircuitBreaker {
     }
   }
 
-  /**
-   * Transition to OPEN state.
-   */
   private transitionToOpen(): void {
     this.state = "open";
     this.nextAttemptTime = Date.now() + this.config.timeout;
@@ -208,9 +144,6 @@ export class CircuitBreaker {
     });
   }
 
-  /**
-   * Transition to HALF-OPEN state.
-   */
   private transitionToHalfOpen(): void {
     this.state = "half-open";
     this.successes = 0;
@@ -222,9 +155,6 @@ export class CircuitBreaker {
     });
   }
 
-  /**
-   * Transition to CLOSED state.
-   */
   private transitionToClosed(): void {
     this.state = "closed";
     this.failures = 0;
@@ -238,9 +168,6 @@ export class CircuitBreaker {
     });
   }
 
-  /**
-   * Get the current circuit state.
-   */
   getState(): "closed" | "open" | "half-open" {
     // Check for automatic transition to half-open
     if (this.state === "open" && this.nextAttemptTime && Date.now() >= this.nextAttemptTime) {
@@ -249,9 +176,6 @@ export class CircuitBreaker {
     return this.state;
   }
 
-  /**
-   * Get detailed statistics about the circuit breaker.
-   */
   getStats(): CircuitBreakerStats {
     const errorRate = this.totalOperations > 0 ? (this.failures / this.totalOperations) * 100 : 0;
 
@@ -269,17 +193,10 @@ export class CircuitBreaker {
     };
   }
 
-  /**
-   * Check if the circuit breaker is healthy (closed).
-   */
   isHealthy(): boolean {
     return this.getState() === "closed";
   }
 
-  /**
-   * Manually reset the circuit breaker to closed state.
-   * Use with caution - typically for administrative recovery.
-   */
   reset(): void {
     this.state = "closed";
     this.failures = 0;
@@ -295,10 +212,6 @@ export class CircuitBreaker {
     });
   }
 
-  /**
-   * Force the circuit breaker to open state.
-   * Useful for maintenance windows or known issues.
-   */
   forceOpen(reason?: string): void {
     this.state = "open";
     this.nextAttemptTime = Date.now() + this.config.timeout;
@@ -313,13 +226,6 @@ export class CircuitBreaker {
   }
 }
 
-// =============================================================================
-// CIRCUIT BREAKER ERROR
-// =============================================================================
-
-/**
- * Error thrown when the circuit breaker is open and no fallback is provided.
- */
 export class CircuitBreakerOpenError extends Error {
   constructor(message: string) {
     super(message);
@@ -327,13 +233,6 @@ export class CircuitBreakerOpenError extends Error {
   }
 }
 
-// =============================================================================
-// FACTORY FUNCTION
-// =============================================================================
-
-/**
- * Create a circuit breaker with Couchbase-optimized defaults.
- */
 export function createCouchbaseCircuitBreaker(overrides?: Partial<CircuitBreakerConfig>): CircuitBreaker {
   return new CircuitBreaker({
     failureThreshold: 5,
