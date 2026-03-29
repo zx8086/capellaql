@@ -34,8 +34,6 @@ export interface CapellaConfig {
 
 export interface RuntimeConfig {
   NODE_ENV: string;
-  CN_ROOT: string;
-  CN_CXXCBC_CACHE_DIR?: string;
   SOURCE_MAP_SUPPORT: boolean;
   PRESERVE_SOURCE_MAPS: boolean;
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: number;
@@ -147,8 +145,6 @@ export const CapellaConfigSchema = z.strictObject({
 
 export const RuntimeConfigSchema = z.strictObject({
   NODE_ENV: EnvironmentType.describe("Runtime environment"),
-  CN_ROOT: NonEmptyString.describe("Application root directory"),
-  CN_CXXCBC_CACHE_DIR: z.string().optional().describe("Couchbase C++ SDK cache directory"),
   SOURCE_MAP_SUPPORT: z.boolean().describe("Enable source map support"),
   PRESERVE_SOURCE_MAPS: z.boolean().describe("Preserve source maps in production"),
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: z

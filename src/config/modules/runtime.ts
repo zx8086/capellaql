@@ -6,8 +6,6 @@ import { getEnvVar, parseEnvVar } from "../utils/env-parser";
 // Environment variable mapping for runtime section
 export const runtimeEnvMapping = {
   NODE_ENV: "NODE_ENV",
-  CN_ROOT: "CN_ROOT",
-  CN_CXXCBC_CACHE_DIR: "CN_CXXCBC_CACHE_DIR",
   SOURCE_MAP_SUPPORT: "SOURCE_MAP_SUPPORT",
   PRESERVE_SOURCE_MAPS: "PRESERVE_SOURCE_MAPS",
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: "BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS",
@@ -16,8 +14,6 @@ export const runtimeEnvMapping = {
 // Runtime configuration defaults
 export const runtimeDefaults: RuntimeConfig = {
   NODE_ENV: "development",
-  CN_ROOT: "/usr/src/app",
-  CN_CXXCBC_CACHE_DIR: undefined,
   SOURCE_MAP_SUPPORT: true,
   PRESERVE_SOURCE_MAPS: true,
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 120,
@@ -26,8 +22,6 @@ export const runtimeDefaults: RuntimeConfig = {
 // Zod schema for runtime configuration
 export const RuntimeConfigSchema = z.object({
   NODE_ENV: z.enum(["development", "staging", "production", "test"]).default("development"),
-  CN_ROOT: z.string().min(1).default("/usr/src/app"),
-  CN_CXXCBC_CACHE_DIR: z.string().optional(),
   SOURCE_MAP_SUPPORT: z.coerce.boolean().default(true),
   PRESERVE_SOURCE_MAPS: z.coerce.boolean().default(true),
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: z.coerce
@@ -43,13 +37,6 @@ export function loadRuntimeConfigFromEnv(): RuntimeConfig {
   return {
     NODE_ENV:
       (parseEnvVar(getEnvVar(runtimeEnvMapping.NODE_ENV), "string", "NODE_ENV") as string) || runtimeDefaults.NODE_ENV,
-
-    CN_ROOT:
-      (parseEnvVar(getEnvVar(runtimeEnvMapping.CN_ROOT), "string", "CN_ROOT") as string) || runtimeDefaults.CN_ROOT,
-
-    CN_CXXCBC_CACHE_DIR:
-      (parseEnvVar(getEnvVar(runtimeEnvMapping.CN_CXXCBC_CACHE_DIR), "string", "CN_CXXCBC_CACHE_DIR") as string) ||
-      runtimeDefaults.CN_CXXCBC_CACHE_DIR,
 
     SOURCE_MAP_SUPPORT:
       (parseEnvVar(getEnvVar(runtimeEnvMapping.SOURCE_MAP_SUPPORT), "boolean", "SOURCE_MAP_SUPPORT") as boolean) ??
@@ -95,8 +82,6 @@ export function validateRuntimeConfig(config: RuntimeConfig, isProduction: boole
 export function getRuntimeEnvVarPath(configPath: string): string | undefined {
   const mapping: Record<string, string> = {
     "runtime.NODE_ENV": "NODE_ENV",
-    "runtime.CN_ROOT": "CN_ROOT",
-    "runtime.CN_CXXCBC_CACHE_DIR": "CN_CXXCBC_CACHE_DIR",
     "runtime.SOURCE_MAP_SUPPORT": "SOURCE_MAP_SUPPORT",
     "runtime.PRESERVE_SOURCE_MAPS": "PRESERVE_SOURCE_MAPS",
     "runtime.BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS": "BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS",

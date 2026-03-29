@@ -28,20 +28,20 @@ RUN addgroup -g 65532 -S nonroot && \
     adduser -u 65532 -S nonroot -G nonroot
 
 # Set common environment variables optimized for Bun
-ENV CN_ROOT=/usr/src/app \
-    CN_CXXCBC_CACHE_DIR=/usr/src/app/deps/couchbase-cxx-cache \
+ENV CN_ROOT=/app \
+    CN_CXXCBC_CACHE_DIR=/app/deps/couchbase-cxx-cache \
     NODE_ENV=production \
     BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS=120 \
-    BUN_INSTALL_CACHE_DIR=/usr/src/app/.bun-cache
+    BUN_INSTALL_CACHE_DIR=/app/.bun-cache
 
-WORKDIR /usr/src/app
+WORKDIR /app
 
 # Create directories with proper permissions for UID 65532
-RUN mkdir -p /usr/src/app/logs \
-             /usr/src/app/deps/couchbase-cxx-cache \
-             /usr/src/app/.sourcemaps \
-             /usr/src/app/.bun-cache && \
-    chown -R 65532:65532 /usr/src/app
+RUN mkdir -p /app/logs \
+             /app/deps/couchbase-cxx-cache \
+             /app/.sourcemaps \
+             /app/.bun-cache && \
+    chown -R 65532:65532 /app
 
 # =============================================================================
 # Stage 2: deps-dev - Development dependencies
@@ -52,7 +52,7 @@ FROM deps-base AS deps-dev
 COPY --chown=65532:65532 package.json bun.lock* bunfig.toml tsconfig.json ./
 
 # Install ALL dependencies (including devDependencies)
-RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
+RUN --mount=type=cache,target=/app/.bun-cache,sharing=locked \
     --mount=type=cache,target=/root/.bun,sharing=locked \
     bun install --frozen-lockfile && \
     chown -R 65532:65532 node_modules
@@ -66,7 +66,7 @@ FROM deps-base AS deps-prod
 COPY --chown=65532:65532 package.json bun.lock* bunfig.toml tsconfig.json ./
 
 # Install production dependencies only
-RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
+RUN --mount=type=cache,target=/app/.bun-cache,sharing=locked \
     --mount=type=cache,target=/root/.bun,sharing=locked \
     bun install --frozen-lockfile --production && \
     chown -R 65532:65532 node_modules
@@ -96,7 +96,7 @@ COPY --chown=65532:65532 src/ ./src/
 COPY --chown=65532:65532 tsconfig.json bunfig.toml ./
 
 # Build with Bun's native bundler and optimizations
-RUN --mount=type=cache,target=/usr/src/app/.build \
+RUN --mount=type=cache,target=/app/.build \
     mkdir -p dist dist/maps && \
     bun build ./src/index.ts \
     --target=bun \
@@ -127,7 +127,7 @@ ARG COMMIT_HASH
 WORKDIR /app
 
 # Copy Bun runtime from official image
-COPY --from=oven/bun:1.1-alpine /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=oven/bun:1.3-alpine /usr/local/bin/bun /usr/local/bin/bun
 
 # Copy dumb-init for proper PID 1 signal handling
 COPY --from=deps-base /usr/bin/dumb-init /usr/bin/dumb-init
@@ -141,11 +141,11 @@ COPY --from=deps-base /usr/lib/libgcc_s.so* /usr/lib/
 COPY --from=deps-base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 
 # Copy production dependencies from deps-prod stage
-COPY --from=deps-prod --chown=65532:65532 /usr/src/app/node_modules ./node_modules
-COPY --from=deps-prod --chown=65532:65532 /usr/src/app/package.json ./package.json
+COPY --from=deps-prod --chown=65532:65532 /app/node_modules ./node_modules
+COPY --from=deps-prod --chown=65532:65532 /app/package.json ./package.json
 
 # Copy built application from builder stage
-COPY --from=builder --chown=65532:65532 /usr/src/app/dist ./dist
+COPY --from=builder --chown=65532:65532 /app/dist ./dist
 
 # Copy telemetry source (needed at runtime)
 COPY --chown=65532:65532 src/telemetry ./src/telemetry
@@ -228,11 +228,11 @@ ARG BUILD_VERSION
 ARG COMMIT_HASH
 
 # Copy production dependencies
-COPY --from=deps-prod --chown=65532:65532 /usr/src/app/node_modules ./node_modules
-COPY --from=deps-prod --chown=65532:65532 /usr/src/app/package.json ./package.json
+COPY --from=deps-prod --chown=65532:65532 /app/node_modules ./node_modules
+COPY --from=deps-prod --chown=65532:65532 /app/package.json ./package.json
 
 # Copy built application from builder stage
-COPY --from=builder --chown=65532:65532 /usr/src/app/dist ./dist
+COPY --from=builder --chown=65532:65532 /app/dist ./dist
 
 # Copy telemetry source (needed at runtime)
 COPY --chown=65532:65532 src/telemetry ./src/telemetry
@@ -280,7 +280,7 @@ LABEL org.opencontainers.image.title="capellaql" \
       org.opencontainers.image.url="https://github.com/zx8086/capellaql" \
       org.opencontainers.image.source="https://github.com/zx8086/capellaql" \
       org.opencontainers.image.documentation="https://github.com/zx8086/capellaql/README.md" \
-      org.opencontainers.image.base.name="oven/bun:1.1-alpine" \
+      org.opencontainers.image.base.name="oven/bun:1.3-alpine" \
       com.capellaql.runtime="bun" \
       com.capellaql.maintainer="Simon Owusu <simonowusupvh@gmail.com>" \
       com.capellaql.release-date="${BUILD_DATE}" \

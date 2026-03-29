@@ -92,14 +92,13 @@ const { shouldUpgradeWebSocket, websocketHandlers } = websocket;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize global paths from unified configuration
+// Initialize global paths (set by bunfig.toml in Docker, resolved dynamically otherwise)
 if (typeof globalThis.CN_ROOT === "undefined") {
-  globalThis.CN_ROOT = config.runtime.CN_ROOT || path.resolve(__dirname, "..");
+  globalThis.CN_ROOT = path.resolve(__dirname, "..");
 }
 
 if (typeof globalThis.CN_CXXCBC_CACHE_DIR === "undefined") {
-  globalThis.CN_CXXCBC_CACHE_DIR =
-    config.runtime.CN_CXXCBC_CACHE_DIR || path.join(globalThis.CN_ROOT, "deps", "couchbase-cxx-cache");
+  globalThis.CN_CXXCBC_CACHE_DIR = path.join(globalThis.CN_ROOT, "deps", "couchbase-cxx-cache");
 }
 
 if (typeof globalThis.ENV_TRUE === "undefined") {

@@ -28,8 +28,6 @@ export interface CapellaConfig {
 
 export interface RuntimeConfig {
   NODE_ENV: string;
-  CN_ROOT: string;
-  CN_CXXCBC_CACHE_DIR?: string;
   SOURCE_MAP_SUPPORT: boolean;
   PRESERVE_SOURCE_MAPS: boolean;
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: number;

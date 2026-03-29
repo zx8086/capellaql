@@ -29,8 +29,6 @@ export interface CapellaConfig {
 
 export interface RuntimeConfig {
   NODE_ENV: string;
-  CN_ROOT: string;
-  CN_CXXCBC_CACHE_DIR?: string;
   SOURCE_MAP_SUPPORT: boolean;
   PRESERVE_SOURCE_MAPS: boolean;
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: number;
@@ -144,8 +142,6 @@ const CapellaConfigSchema = z.object({
 
 const RuntimeConfigSchema = z.object({
   NODE_ENV: z.enum(["development", "staging", "production", "test"]).default("development"),
-  CN_ROOT: z.string().min(1).default("/usr/src/app"),
-  CN_CXXCBC_CACHE_DIR: z.string().optional(),
   SOURCE_MAP_SUPPORT: z.coerce.boolean().default(true),
   PRESERVE_SOURCE_MAPS: z.coerce.boolean().default(true),
   BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: z.coerce

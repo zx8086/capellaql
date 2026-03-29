@@ -35,8 +35,6 @@ const createMockConfig = (overrides: Partial<Config> = {}): Config => ({
   },
   runtime: {
     NODE_ENV: "development",
-    CN_ROOT: "/usr/src/app",
-    CN_CXXCBC_CACHE_DIR: undefined,
     SOURCE_MAP_SUPPORT: true,
     PRESERVE_SOURCE_MAPS: true,
     BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 120,
@@ -97,7 +95,6 @@ describe("Configuration Validators", () => {
       const config = createMockConfig({
         runtime: {
           NODE_ENV: "production",
-          CN_ROOT: "/usr/src/app",
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 120,
@@ -185,7 +182,6 @@ describe("Configuration Validators", () => {
       const productionConfig = createMockConfig({
         runtime: {
           NODE_ENV: "production",
-          CN_ROOT: "/usr/src/app",
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 120,
@@ -265,7 +261,6 @@ describe("Configuration Validators", () => {
         },
         runtime: {
           NODE_ENV: "production",
-          CN_ROOT: "/usr/src/app",
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: NaN, // Critical issue
@@ -300,7 +295,6 @@ describe("Configuration Validators", () => {
       const configWithWarnings = createMockConfig({
         runtime: {
           NODE_ENV: "development",
-          CN_ROOT: "/usr/src/app",
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 4000, // Above recommended
@@ -338,7 +332,6 @@ describe("Configuration Validators", () => {
         },
         runtime: {
           NODE_ENV: "production",
-          CN_ROOT: "/usr/src/app",
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 4000, // Warning
@@ -359,7 +352,6 @@ describe("Configuration Validators", () => {
       const configWithWarnings = createMockConfig({
         runtime: {
           NODE_ENV: "development",
-          CN_ROOT: "/usr/src/app",
           SOURCE_MAP_SUPPORT: true,
           PRESERVE_SOURCE_MAPS: true,
           BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 4000, // Warning only

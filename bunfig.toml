@@ -13,8 +13,8 @@ exact = true
 auto = "fallback"
 # Frozen lockfile for reproducible CI/CD builds - prevents lockfile updates during install
 frozen = true
-globalThis.CN_ROOT = "/usr/src/app"
-globalThis.CXXCBC_CACHE_DIR = "/usr/src/app/deps/couchbase-cxx-cache"
+globalThis.CN_ROOT = "/app"
+globalThis.CXXCBC_CACHE_DIR = "/app/deps/couchbase-cxx-cache"
 
 [install.lockfile]
 path = "bun.lockb"

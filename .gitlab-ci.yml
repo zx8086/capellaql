@@ -1,0 +1,10 @@
+include:
+  - component: gitlab.com/platform_engineering/platform-components/docker-factory/docker-factory@main
+    inputs:
+      language: bun
+      port: "4000"
+      entrypoint: "src/index.ts"
+      artifact_paths: "dist src/telemetry"
+      runtime_env_vars: "ENABLE_OPENTELEMETRY=true"
+      dep_files: "package.json bun.lock bunfig.toml"
+      install_context: "patches"

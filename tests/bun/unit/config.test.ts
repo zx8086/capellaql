@@ -40,8 +40,6 @@ describe("Configuration System", () => {
       },
       runtime: {
         NODE_ENV: "development",
-        CN_ROOT: "/usr/src/app",
-        CN_CXXCBC_CACHE_DIR: undefined,
         SOURCE_MAP_SUPPORT: true,
         PRESERVE_SOURCE_MAPS: true,
         BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: 120,

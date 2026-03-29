@@ -39,8 +39,6 @@ export const envVarMapping = {
 
   runtime: {
     NODE_ENV: { envVar: "NODE_ENV", type: "string" },
-    CN_ROOT: { envVar: "CN_ROOT", type: "string" },
-    CN_CXXCBC_CACHE_DIR: { envVar: "CN_CXXCBC_CACHE_DIR", type: "string" },
     SOURCE_MAP_SUPPORT: { envVar: "SOURCE_MAP_SUPPORT", type: "boolean" },
     PRESERVE_SOURCE_MAPS: { envVar: "PRESERVE_SOURCE_MAPS", type: "boolean" },
     BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS: { envVar: "BUN_CONFIG_DNS_TIME_TO_LIVE_SECONDS", type: "number" },
