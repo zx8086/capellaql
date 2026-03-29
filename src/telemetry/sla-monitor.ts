@@ -421,4 +421,4 @@ export function shutdownSlaMonitor(): void {
   }
 }
 
-export { SlaMonitor, RollingBuffer };
+export { RollingBuffer, SlaMonitor };

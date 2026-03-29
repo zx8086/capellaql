@@ -392,50 +392,50 @@ export class CouchbaseErrorClassifier {
 }
 
 export {
-  // Core
-  CouchbaseError,
+  AmbiguousTimeoutError,
   // Auth
   AuthenticationFailureError,
   BucketNotFoundError,
-  ScopeNotFoundError,
+  CasMismatchError,
   CollectionNotFoundError,
-  // Document
-  DocumentNotFoundError,
+  // Core
+  CouchbaseError,
+  DmlFailureError,
   DocumentExistsError,
   DocumentLockedError,
+  // Document
+  DocumentNotFoundError,
   DocumentNotLockedError,
-  ValueTooLargeError,
-  CasMismatchError,
-  // Timeout
-  TimeoutError,
-  AmbiguousTimeoutError,
-  UnambiguousTimeoutError,
-  // Network
-  RequestCanceledError,
-  ServiceNotAvailableError,
-  // Query
-  ParsingFailureError,
-  IndexNotFoundError,
-  IndexExistsError,
-  PreparedStatementFailureError,
-  DmlFailureError,
-  // Temporary
-  TemporaryFailureError,
-  DurabilityImpossibleError,
   DurabilityAmbiguousError,
-  DurableWriteInProgressError,
+  DurabilityImpossibleError,
   DurabilityLevelNotAvailableError,
-  // Subdocument
-  PathNotFoundError,
-  PathExistsError,
-  PathMismatchError,
-  PathInvalidError,
-  // Rate limiting
-  RateLimitedError,
-  QuotaLimitedError,
+  DurableWriteInProgressError,
   // Feature
   FeatureNotAvailableError,
+  IndexExistsError,
+  IndexNotFoundError,
+  // Query
+  ParsingFailureError,
+  PathExistsError,
+  PathInvalidError,
+  PathMismatchError,
+  // Subdocument
+  PathNotFoundError,
+  PreparedStatementFailureError,
+  QuotaLimitedError,
+  // Rate limiting
+  RateLimitedError,
+  // Network
+  RequestCanceledError,
+  ScopeNotFoundError,
+  ServiceNotAvailableError,
+  // Temporary
+  TemporaryFailureError,
+  // Timeout
+  TimeoutError,
+  UnambiguousTimeoutError,
   UnsupportedOperationError,
+  ValueTooLargeError,
 };
 
 // @see SIO-442 - Comprehensive Error Handling Improvements

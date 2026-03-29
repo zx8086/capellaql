@@ -3,6 +3,7 @@
 /* Per golden path: this is the primary import for all application code */
 
 import { getChildLogger, getLogger } from "../logging/container";
+
 export { getChildLogger };
 
 export function log(message: string, context: Record<string, unknown> = {}) {

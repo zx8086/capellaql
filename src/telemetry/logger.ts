@@ -7,6 +7,7 @@ export type { StructuredLogData } from "./winston-logger";
 export { LogLevel } from "./winston-logger";
 
 import { getChildLogger, getLogger } from "../logging/container";
+
 export { getChildLogger };
 
 export function log(message: string, meta?: Record<string, unknown>): void {

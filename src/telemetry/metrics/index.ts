@@ -2,6 +2,22 @@
 // Public API exports per monitoring-updated.md line 36
 
 export {
+  type DatabaseMetricsLabels,
+  getDatabaseMetricsStatus,
+  initializeDatabaseMetrics,
+  recordConnectionChange,
+  recordDatabaseOperation,
+  recordSLIMetric,
+} from "./databaseMetrics";
+export {
+  getMetricsStatus,
+  initializeHttpMetrics,
+  recordGraphQLRequest,
+  recordGraphQLResponseTime,
+  recordHttpRequest,
+  recordHttpResponseTime,
+} from "./httpMetrics";
+export {
   getCounter,
   getHistogram,
   getMetricsInitializationStatus,
@@ -11,50 +27,12 @@ export {
   METER_NAMES,
   resetMetrics,
 } from "./initialization";
-
 export {
   getAvailableMetricNames,
   INSTRUMENT_COUNT,
   INSTRUMENT_DEFINITIONS,
   type MetricInstruments,
 } from "./instruments";
-
-export type {
-  BaseMetricAttributes,
-  CacheOperationAttributes,
-  CircuitBreakerAttributes,
-  DatabaseConnectionAttributes,
-  DatabaseOperationAttributes,
-  ErrorMetricAttributes,
-  GCMetricAttributes,
-  GraphQLOperationAttributes,
-  GraphQLResolverAttributes,
-  HttpRequestAttributes,
-  HttpResponseAttributes,
-  MemoryMetricAttributes,
-  ProcessMetricAttributes,
-  SecurityEventAttributes,
-  TelemetryExportAttributes,
-} from "./types";
-
-export {
-  getMetricsStatus,
-  initializeHttpMetrics,
-  recordGraphQLRequest,
-  recordGraphQLResponseTime,
-  recordHttpRequest,
-  recordHttpResponseTime,
-} from "./httpMetrics";
-
-export {
-  type DatabaseMetricsLabels,
-  getDatabaseMetricsStatus,
-  initializeDatabaseMetrics,
-  recordConnectionChange,
-  recordDatabaseOperation,
-  recordSLIMetric,
-} from "./databaseMetrics";
-
 export {
   getMemoryPressureState,
   getMemoryPressureThresholds,
@@ -72,3 +50,20 @@ export {
   startMemoryPressureMonitoring,
   stopMemoryPressureMonitoring,
 } from "./process-metrics";
+export type {
+  BaseMetricAttributes,
+  CacheOperationAttributes,
+  CircuitBreakerAttributes,
+  DatabaseConnectionAttributes,
+  DatabaseOperationAttributes,
+  ErrorMetricAttributes,
+  GCMetricAttributes,
+  GraphQLOperationAttributes,
+  GraphQLResolverAttributes,
+  HttpRequestAttributes,
+  HttpResponseAttributes,
+  MemoryMetricAttributes,
+  ProcessMetricAttributes,
+  SecurityEventAttributes,
+  TelemetryExportAttributes,
+} from "./types";

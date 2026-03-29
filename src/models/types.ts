@@ -449,16 +449,16 @@ export type ValidatedConfig = z.infer<typeof ConfigSchema>;
 
 // Schema and helper exports
 export {
-  ConfigSchema,
   ApplicationConfigSchema,
   CapellaConfigSchema,
-  RuntimeConfigSchema,
+  ConfigSchema,
   DeploymentConfigSchema,
-  TelemetryConfigSchema,
-  EnvString,
-  EnvNumber,
-  EnvBoolean,
   EnvArray,
+  EnvBoolean,
+  EnvNumber,
+  EnvString,
+  RuntimeConfigSchema,
+  TelemetryConfigSchema,
 };
 
 // Note: Individual section types are already exported via the interface declarations above
