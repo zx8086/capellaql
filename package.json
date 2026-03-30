@@ -146,11 +146,7 @@
     "ws"
   ],
   "snyk": true,
-  "pnpm": {
-    "patchedDependencies": {
-      "@opentelemetry/sdk-node@0.212.0": "patches/@opentelemetry%2Fsdk-node@0.212.0.patch"
-    }
-  },
+  "pnpm": {},
   "workspaces": {
     "packages": [
       "packages/*"
@@ -192,8 +188,5 @@
       "minify": false,
       "treeshaking": true
     }
-  },
-  "patchedDependencies": {
-    "@opentelemetry/sdk-node@0.212.0": "patches/@opentelemetry%2Fsdk-node@0.212.0.patch"
   }
 }
