@@ -53,6 +53,7 @@ jobs:
           echo "Dependency list generated"
 
       - name: Run Snyk dependency scan
+        if: ${{ secrets.SNYK_TOKEN != '' }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
@@ -140,7 +141,7 @@ jobs:
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest || true
 
       - name: Run Trivy container scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 pinned
         with:
           image-ref: "${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest"
           format: "sarif"

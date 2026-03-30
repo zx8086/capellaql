@@ -2,11 +2,10 @@
 
 import type { ILogger, LogContext } from "./ports/logger.port";
 
-export type LoggingBackend = "pino" | "winston";
+export type LoggingBackend = "pino";
 
 export class LoggerContainer {
   private logger: ILogger | null = null;
-  private backend: LoggingBackend | null = null;
 
   getLogger(): ILogger {
     if (!this.logger) {
@@ -23,49 +22,21 @@ export class LoggerContainer {
     this.logger = logger;
   }
 
-  setBackend(backend: LoggingBackend): void {
-    this.backend = backend;
+  setBackend(_backend: LoggingBackend): void {
     this.logger = null;
   }
 
   reset(): void {
     this.logger = null;
-    this.backend = null;
-  }
-
-  private resolveBackend(): LoggingBackend {
-    if (this.backend) return this.backend;
-    const envBackend = process.env.LOGGING_BACKEND?.toLowerCase();
-    if (envBackend === "winston") return "winston";
-    return "pino";
   }
 
   private createLogger(): ILogger {
-    const backend = this.resolveBackend();
-
     try {
-      if (backend === "pino") {
-        const { PinoAdapter } = require("./adapters/pino.adapter");
-        return new PinoAdapter();
-      }
-      const { WinstonAdapter } = require("./adapters/winston.adapter");
-      return new WinstonAdapter();
-    } catch (primaryError) {
-      // Primary backend failed — try the other one.
-      try {
-        if (backend === "pino") {
-          const { WinstonAdapter } = require("./adapters/winston.adapter");
-          console.warn("Pino failed to load, falling back to Winston:", primaryError);
-          return new WinstonAdapter();
-        }
-        const { PinoAdapter } = require("./adapters/pino.adapter");
-        console.warn("Winston failed to load, falling back to Pino:", primaryError);
-        return new PinoAdapter();
-      } catch {
-        // Both backends failed — last-resort console fallback.
-        console.error("All logging backends failed, using console fallback");
-        return this.createConsoleFallback();
-      }
+      const { PinoAdapter } = require("./adapters/pino.adapter");
+      return new PinoAdapter();
+    } catch (error) {
+      console.error("Pino failed to load, using console fallback:", error);
+      return this.createConsoleFallback();
     }
   }
 

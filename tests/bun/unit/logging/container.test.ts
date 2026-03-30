@@ -165,10 +165,10 @@ describe("LoggerContainer", () => {
     });
 
     it("clears the backend selection", () => {
-      loggerContainer.setBackend("winston");
+      loggerContainer.setBackend("pino");
       loggerContainer.reset();
 
-      // After reset, the container resolves from env (defaults to pino).
+      // After reset, the container resolves to pino (the only backend).
       const logger = loggerContainer.getLogger();
       expect(logger).toBeDefined();
     });
@@ -179,16 +179,6 @@ describe("LoggerContainer", () => {
   /* ------------------------------------------------------------------ */
 
   describe("setBackend()", () => {
-    it("setBackend('winston') loads a Winston-backed logger", () => {
-      loggerContainer.setBackend("winston");
-      const logger = loggerContainer.getLogger();
-
-      expect(logger).toBeDefined();
-      expect(typeof logger.info).toBe("function");
-      // Should not throw when used.
-      expect(() => logger.info("winston test")).not.toThrow();
-    });
-
     it("setBackend('pino') loads a Pino-backed logger", () => {
       loggerContainer.setBackend("pino");
       const logger = loggerContainer.getLogger();
@@ -198,25 +188,12 @@ describe("LoggerContainer", () => {
       expect(() => logger.info("pino test")).not.toThrow();
     });
 
-    it("switching backend discards the previous cached logger", () => {
+    it("setBackend clears the cached logger", () => {
+      const first = loggerContainer.getLogger();
       loggerContainer.setBackend("pino");
-      const pinoLogger = loggerContainer.getLogger();
+      const second = loggerContainer.getLogger();
 
-      loggerContainer.setBackend("winston");
-      const winstonLogger = loggerContainer.getLogger();
-
-      expect(winstonLogger).not.toBe(pinoLogger);
-    });
-
-    it("switching back to pino after winston creates a new instance", () => {
-      loggerContainer.setBackend("winston");
-      const w = loggerContainer.getLogger();
-
-      loggerContainer.setBackend("pino");
-      const p = loggerContainer.getLogger();
-
-      expect(p).not.toBe(w);
-      expect(typeof p.info).toBe("function");
+      expect(second).not.toBe(first);
     });
   });
 
@@ -231,22 +208,6 @@ describe("LoggerContainer", () => {
 
       expect(logger).toBeDefined();
       expect(typeof logger.info).toBe("function");
-    });
-
-    it("respects LOGGING_BACKEND=winston", () => {
-      process.env.LOGGING_BACKEND = "winston";
-      const logger = loggerContainer.getLogger();
-
-      expect(logger).toBeDefined();
-      expect(() => logger.info("env winston")).not.toThrow();
-    });
-
-    it("respects LOGGING_BACKEND=WINSTON (case-insensitive)", () => {
-      process.env.LOGGING_BACKEND = "WINSTON";
-      const logger = loggerContainer.getLogger();
-
-      expect(logger).toBeDefined();
-      expect(() => logger.info("env WINSTON")).not.toThrow();
     });
   });
 

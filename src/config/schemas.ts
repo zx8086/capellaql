@@ -86,7 +86,7 @@ export const EnvironmentType = z.enum(["development", "staging", "production", "
 
 export const ApplicationConfigSchema = z.strictObject({
   LOG_LEVEL: z.enum(["debug", "info", "warn", "error"]).describe("Application log level"),
-  LOGGING_BACKEND: z.enum(["pino", "winston"]).describe("Logging backend selection"),
+  LOGGING_BACKEND: z.enum(["pino"]).describe("Logging backend selection"),
   TELEMETRY_MODE: z.enum(["console", "otlp", "both"]).describe("Telemetry output mode"),
   YOGA_RESPONSE_CACHE_TTL: z
     .number()

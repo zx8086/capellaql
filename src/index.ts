@@ -7,15 +7,7 @@ import { ulid } from "ulid";
 import { fileURLToPath } from "url";
 
 // Initialize telemetry FIRST - before any modules that need instrumentation
-import {
-  err,
-  initializeHttpMetrics,
-  initializeTelemetry,
-  log,
-  shutdownTelemetry,
-  telemetryLogger,
-  warn,
-} from "./telemetry";
+import { err, initializeHttpMetrics, initializeTelemetry, log, shutdownTelemetry, warn } from "./telemetry";
 
 // Early shutdown flag - allows interrupting initialization
 let earlyShutdownRequested = false;
@@ -194,7 +186,6 @@ let isShuttingDown = false;
  */
 async function createServer(): Promise<Server<WebSocketData>> {
   log("Server starting...");
-  telemetryLogger.initialize();
   initializeHttpMetrics();
   log("Server initialization completed");
 

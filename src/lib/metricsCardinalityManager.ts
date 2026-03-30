@@ -132,7 +132,7 @@ class MetricsCardinalityManager {
     }
 
     const limit = this.limits.get(metricName);
-    if (!limit || !limit.enabled) {
+    if (!limit?.enabled) {
       return { allowed: true };
     }
 

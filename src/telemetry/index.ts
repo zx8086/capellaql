@@ -173,5 +173,3 @@ export {
   createCouchbaseSearchSpan,
   createDatabaseSpan,
 } from "./tracing/dbSpans";
-export type { LogLevel, StructuredLogData } from "./winston-logger";
-export { telemetryLogger, winstonTelemetryLogger } from "./winston-logger";

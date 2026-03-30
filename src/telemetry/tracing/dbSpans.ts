@@ -1,7 +1,7 @@
 /* src/telemetry/tracing/dbSpans.ts */
 
 import { type Attributes, type Span, SpanStatusCode, trace } from "@opentelemetry/api";
-import { telemetryLogger } from "../logger";
+import { debug, err } from "../logger";
 import { recordDatabaseOperation } from "../metrics/databaseMetrics";
 
 export interface CouchbaseSpanOptions {
@@ -53,7 +53,7 @@ export async function createDatabaseSpan<T>(options: CouchbaseSpanOptions, opera
       recordDatabaseOperation(options.operation, options.bucket, duration, true, options.scope, options.collection);
 
       // Log successful operation with trace context
-      telemetryLogger.debug(`Database operation completed successfully`, {
+      debug(`Database operation completed successfully`, {
         operation: options.operation,
         bucket: options.bucket,
         scope: options.scope,
@@ -93,7 +93,7 @@ export async function createDatabaseSpan<T>(options: CouchbaseSpanOptions, opera
       );
 
       // Log error with trace context and structured metadata
-      telemetryLogger.error(`Database operation failed`, error, {
+      err(`Database operation failed`, error, {
         operation: options.operation,
         bucket: options.bucket,
         scope: options.scope,

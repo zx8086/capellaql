@@ -46,7 +46,6 @@ import {
 } from "./export-stats-tracker";
 import { markTelemetryInitialized } from "./health/telemetryHealth";
 import { initializeTelemetryCircuitBreakers, shutdownTelemetryCircuitBreakers } from "./telemetry-circuit-breaker";
-import { winstonTelemetryLogger } from "./winston-logger";
 
 interface MetricReaderLike {
   forceFlush(): Promise<void>;
@@ -180,9 +179,8 @@ export async function initializeTelemetry(): Promise<void> {
     const logProcessor = new BatchLogRecordProcessor(trackingLogExporter);
 
     // OTel SDK 0.212.0 breaking change: LoggerProvider must be explicitly registered
-    // as the global provider for OpenTelemetryTransportV3 (Winston) to work.
-    // NodeSDK no longer automatically sets the global LoggerProvider.
-    // Per migrate/telemetry/instrumentation.ts lines 141-149
+    // as the global provider. NodeSDK no longer sets it automatically.
+    // Required for OTelPinoStream to pick up the LoggerProvider via api-logs.
     loggerProvider = new LoggerProvider({
       resource,
       processors: [logProcessor],
@@ -215,7 +213,7 @@ export async function initializeTelemetry(): Promise<void> {
       // own mixin — no need for the duplicate trace_id/span_id/trace_flags.
       "@opentelemetry/instrumentation-pino": {
         disableLogCorrelation: true,
-        disableLogSending: false,
+        disableLogSending: true,
       },
     });
 
@@ -268,10 +266,10 @@ export async function initializeTelemetry(): Promise<void> {
     hostMetrics = new HostMetrics({});
     hostMetrics.start();
 
-    // OTel SDK 0.212.0 breaking change fix:
-    // Winston logger must be reinitialized AFTER the global LoggerProvider is set.
-    // Per migrate/telemetry/instrumentation.ts lines 215-220
-    winstonTelemetryLogger.reinitialize();
+    // Reinitialize Pino adapter with OTLP stream after LoggerProvider is set.
+    // Bun does not support Node.js require() hooks used by instrumentation-pino
+    // auto-patching, so we manually attach OTelPinoStream via pino.multistream.
+    getLogger().reinitialize();
 
     setInitialized();
 

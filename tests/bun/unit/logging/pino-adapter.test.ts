@@ -79,9 +79,22 @@ describe("PinoAdapter", () => {
       await expect(adapter.flush()).resolves.toBeUndefined();
     });
 
-    it("reinitialize() does not throw (no-op)", () => {
+    it("reinitialize() does not throw when LoggerProvider is unavailable", () => {
       const adapter = createSilentAdapter();
       expect(() => adapter.reinitialize()).not.toThrow();
+    });
+
+    it("reinitialize() is idempotent (second call is no-op)", () => {
+      const adapter = createSilentAdapter();
+      adapter.reinitialize();
+      expect(() => adapter.reinitialize()).not.toThrow();
+    });
+
+    it("logging still works after reinitialize()", () => {
+      const adapter = createSilentAdapter();
+      adapter.reinitialize();
+      expect(() => adapter.info("test after reinit")).not.toThrow();
+      expect(() => adapter.error("error after reinit", { key: "val" })).not.toThrow();
     });
   });
 

@@ -1,5 +1,6 @@
 import { ecsFormat } from "@elastic/ecs-pino-format";
 import { context, trace } from "@opentelemetry/api";
+import { getTimeConverter, OTelPinoStream } from "@opentelemetry/instrumentation-pino/build/src/log-sending-utils";
 import type { Logger as PinoLogger } from "pino";
 import pino from "pino";
 import type { ITelemetryLogger, LogContext } from "../ports/logger.port";
@@ -130,6 +131,7 @@ function createPinoLogger(level?: string): PinoLogger {
 
 export class PinoAdapter implements ITelemetryLogger {
   private readonly logger: PinoLogger;
+  private otelAttached = false;
 
   constructor(logger?: PinoLogger) {
     this.logger = logger ?? createPinoLogger();
@@ -168,7 +170,43 @@ export class PinoAdapter implements ITelemetryLogger {
   }
 
   reinitialize(): void {
-    // No-op — Pino uses a global LoggerProvider; no re-init required.
+    if (this.otelAttached) return;
+
+    try {
+      const pinoAny = this.logger as any;
+      const otelTimestampFromTime = getTimeConverter(this.logger, pino);
+
+      const otelStream = new OTelPinoStream({
+        messageKey: pinoAny[pino.symbols.messageKeySym] ?? "message",
+        levels: this.logger.levels,
+        otelTimestampFromTime,
+      });
+
+      // pino.metadata flag enables stream.lastLevel for OTel severity mapping
+      (otelStream as any)[Symbol.for("pino.metadata")] = true;
+
+      otelStream.once("unknown", (line: string, err: unknown) => {
+        console.warn("OTelPinoStream: could not process pino log line", {
+          line: typeof line === "string" ? line.substring(0, 200) : line,
+          err,
+        });
+      });
+
+      const origStream = pinoAny[pino.symbols.streamSym];
+
+      pinoAny[pino.symbols.streamSym] = pino.multistream(
+        [
+          { level: 0 as any, stream: origStream },
+          { level: 0 as any, stream: otelStream },
+        ],
+        { levels: this.logger.levels.values as Record<string, number> }
+      );
+
+      this.otelAttached = true;
+    } catch (err) {
+      // Non-fatal: logs still go to stdout, just not to OTLP
+      console.error("PinoAdapter: failed to attach OTLP stream:", err);
+    }
   }
 
   logHttpRequest(method: string, path: string, statusCode: number, duration: number, context?: LogContext): void {

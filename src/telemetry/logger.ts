@@ -3,8 +3,6 @@
 /* Application code importing from this path continues to work unchanged */
 
 export type { LogContext } from "../logging/ports/logger.port";
-export type { StructuredLogData } from "./winston-logger";
-export { LogLevel } from "./winston-logger";
 
 import { getChildLogger, getLogger } from "../logging/container";
 
@@ -43,6 +41,3 @@ export function err(message: string, error?: Error | unknown, meta?: Record<stri
 export function error(message: string, errorObj?: Error | unknown, meta?: Record<string, unknown>): void {
   err(message, errorObj, meta);
 }
-
-// Re-export singleton references for backward compatibility
-export { telemetryLogger, winstonTelemetryLogger } from "./winston-logger";

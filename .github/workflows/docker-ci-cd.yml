@@ -225,7 +225,7 @@ jobs:
 
       # ----- Snyk Code Scanner -----
       - name: Run Snyk Code Scan
-        if: matrix.scanner == 'snyk-code'
+        if: matrix.scanner == 'snyk-code' && secrets.SNYK_TOKEN != ''
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
@@ -245,7 +245,7 @@ jobs:
       # ----- Trivy Scanner -----
       - name: Run Trivy vulnerability scanner
         if: matrix.scanner == 'trivy'
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0 pinned
         with:
           scan-type: "fs"
           scan-ref: "."
