@@ -147,8 +147,6 @@ COPY --from=deps-prod --chown=65532:65532 /app/package.json ./package.json
 # Copy built application from builder stage
 COPY --from=builder --chown=65532:65532 /app/dist ./dist
 
-# Copy telemetry source (needed at runtime)
-COPY --chown=65532:65532 src/telemetry ./src/telemetry
 
 # Set optimized production environment variables
 ENV ENABLE_OPENTELEMETRY=true \
@@ -234,8 +232,6 @@ COPY --from=deps-prod --chown=65532:65532 /app/package.json ./package.json
 # Copy built application from builder stage
 COPY --from=builder --chown=65532:65532 /app/dist ./dist
 
-# Copy telemetry source (needed at runtime)
-COPY --chown=65532:65532 src/telemetry ./src/telemetry
 
 # Set optimized production environment variables
 ENV ENABLE_OPENTELEMETRY=true \

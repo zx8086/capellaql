@@ -82,7 +82,6 @@ RUN --mount=type=cache,target=/usr/src/app/.bun-cache,sharing=locked \
 
 # Copy built application from builder stage
 COPY --from=builder --chown=bun:bun /usr/src/app/dist ./dist
-COPY --chown=bun:bun src/telemetry ./src/telemetry
 
 # Set optimized production environment variables
 ENV ENABLE_OPENTELEMETRY=true \

@@ -3,8 +3,6 @@ include:
     inputs:
       language: bun
       port: "4000"
-      entrypoint: "src/index.ts"
-      artifact_paths: "dist src/telemetry"
-      runtime_env_vars: "ENABLE_OPENTELEMETRY=true"
+      entrypoint: "dist/index.js"
+      artifact_paths: "dist"
       dep_files: "package.json bun.lock bunfig.toml"
-      install_context: "patches"
