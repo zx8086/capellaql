@@ -19,11 +19,10 @@ CapellaQL uses a 3-layer dependency-injection logging architecture. Application 
  │  setLogger() for testing, setBackend()       │
  └──────────────────┬───────────────────────────┘
                     │ resolves from LOGGING_BACKEND
- Layer 1 — Backend Adapters
+ Layer 1 — Backend Adapter
  ┌──────────────────┴───────────────────────────┐
  │  src/logging/adapters/pino.adapter.ts        │
- │  src/logging/adapters/winston.adapter.ts     │
- │  (console fallback if both fail)             │
+ │  (console fallback if Pino fails)            │
  └──────────────────────────────────────────────┘
 ```
 
@@ -31,9 +30,9 @@ CapellaQL uses a 3-layer dependency-injection logging architecture. Application 
 
 - **Layer 3** is the only import application code should use.
 - **Layer 2** handles backend selection, lazy initialization, and provides the `setLogger()` seam for tests.
-- **Layer 1** adapters implement the `ILogger` / `ITelemetryLogger` interfaces from `src/logging/ports/logger.port.ts`. Swapping backends requires zero changes to application code.
+- **Layer 1** adapter implements the `ILogger` / `ITelemetryLogger` interfaces from `src/logging/ports/logger.port.ts`.
 
-If the primary backend fails to load, the container automatically falls back to the other backend. If both fail, it drops to a structured-JSON console fallback so the application never crashes due to logging.
+If Pino fails to load, the container automatically falls back to a structured-JSON console fallback so the application never crashes due to logging.
 
 ---
 
@@ -124,7 +123,6 @@ const opLog = serviceLog.child({ bucket: "looks", scope: "inventory" });
 | `err` | `(message: string, error?: Error \| unknown, meta?: Record<string, unknown>) => void` | Error with ECS error fields (`error.type`, `error.message`, `error.stack`) |
 | `error` | Alias for `err` | Same as `err` |
 | `getChildLogger` | `(bindings: Record<string, unknown>) => ILogger` | Child logger with pre-bound context |
-| `LogLevel` | `enum { DEBUG, INFO, WARN, ERROR }` | Log level enum (re-exported from winston-logger) |
 | `LogContext` | `type` | `Record<string, unknown>` |
 
 ### `src/logging/ports/logger.port.ts` (interfaces)
@@ -141,7 +139,7 @@ const opLog = serviceLog.child({ bucket: "looks", scope: "inventory" });
 | Variable | Values | Default | Effect |
 |---|---|---|---|
 | `LOG_LEVEL` | `silent`, `debug`, `info`, `warn`, `error` | `info` | Minimum severity for log output. `silent` suppresses all output. |
-| `LOGGING_BACKEND` | `pino`, `winston` | `pino` | Selects the Layer 1 adapter. Pino is the recommended default. |
+| `LOGGING_BACKEND` | `pino` | `pino` | Selects the Layer 1 adapter. Only Pino is supported. |
 | `TELEMETRY_MODE` | `console`, `otlp`, `both` | `both` | Controls where telemetry data is sent. `otlp` sends to an OTEL collector; `both` does console + OTLP. |
 | `NODE_ENV` | `development`, `production`, `staging`, etc. | — | `production` or `staging` = raw NDJSON to stdout. Everything else = human-readable single-line format. |
 
@@ -189,29 +187,13 @@ TELEMETRY_MODE=both
 - **Dev output:** Golden path single-line format via custom stream (ECS boilerplate stripped for readability)
 - **Production output:** Raw NDJSON to stdout with all ECS fields (for log aggregation pipelines)
 
-### Winston (legacy)
-
-- **File:** `src/logging/adapters/winston.adapter.ts`
-- **Wraps:** The existing `winstonTelemetryLogger` singleton from `src/telemetry/winston-logger.ts`
-- **Format:** ECS-compliant via `@elastic/ecs-winston-format`, includes OTLP transport
-- **Child loggers:** Simulated via `boundContext` merging (Winston lacks native child loggers)
-
-### When to use which
-
-| Scenario | Backend |
-|---|---|
-| New development (default) | **Pino** — faster, native child loggers, lower memory |
-| Existing code relying on `winstonTelemetryLogger` | **Winston** — backward-compatible wrapper |
-| Elastic/Kibana pipeline | Either — both produce ECS-compliant output |
-| Debugging locally | **Pino** — golden path single-line output |
-
-You do not need to change application code to switch backends. Set `LOGGING_BACKEND=winston` in your environment and restart.
+> **Note:** Winston was previously available as an alternative backend but has been removed. Only Pino is supported.
 
 ---
 
 ## 6a. ECS Compliance & Dual-Mode Output
 
-Both backends produce [Elastic Common Schema](https://www.elastic.co/docs/reference/ecs/logging/nodejs/pino) compliant output. The Pino adapter uses `@elastic/ecs-pino-format`; the Winston adapter uses `@elastic/ecs-winston-format`.
+The Pino backend produces [Elastic Common Schema](https://www.elastic.co/docs/reference/ecs/logging/nodejs/pino) compliant output via `@elastic/ecs-pino-format`.
 
 ### Production output (NDJSON)
 
@@ -306,14 +288,9 @@ mixin() {
 
 ### OTLP log delivery
 
-**Both backends send all log records to the Elastic backend via OTLP**, regardless of which backend is active:
+**All log records are sent to the Elastic backend via OTLP** using `@opentelemetry/instrumentation-pino` (auto-instrumentation), which patches `pino()` to add an `OTelPinoStream` via `pino.multistream()`. Every log record is teed to both stdout and the global `LoggerProvider` -> `BatchLogRecordProcessor` -> `OTLPLogExporter`.
 
-| Backend | OTLP Mechanism | How It Works |
-|---|---|---|
-| **Pino** | `@opentelemetry/instrumentation-pino` (auto-instrumentation) | Patches `pino()` to add an `OTelPinoStream` via `pino.multistream()`. Every log record is teed to both stdout and the global `LoggerProvider` → `BatchLogRecordProcessor` → `OTLPLogExporter`. |
-| **Winston** | `OpenTelemetryTransportV3` | Winston transport that writes log records directly to the global `LoggerProvider`. Configured via `winstonTelemetryLogger.reinitialize()` after the SDK starts. |
-
-Data flow for Pino (default):
+Data flow:
 
 ```
 pino.info("message", { key: "value" })

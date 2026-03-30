@@ -130,7 +130,7 @@ test("Couchbase health endpoint reachable", async () => {
 ### Graceful Skipping
 
 ```typescript
-// test/shared/test-skip-conditions.ts
+// tests/bun/shared/test-skip-conditions.ts
 export async function skipIfServiceUnavailable(
   serviceName: string,
   url: string
@@ -231,8 +231,8 @@ test/
 
 | Benefit | Description |
 |---------|-------------|
-| **Discoverability** | Find tests by domain: `test/bun/cache/` |
-| **Selective Testing** | Run domain tests: `bun test test/bun/cache/` |
+| **Discoverability** | Find tests by domain: `tests/bun/cache/` |
+| **Selective Testing** | Run domain tests: `bun test tests/bun/cache/` |
 | **Cleaner Navigation** | Better IDE file tree organization |
 | **Code Review** | Review tests by domain during PRs |
 | **Maintainability** | Related tests grouped together |
@@ -301,11 +301,11 @@ afterAll(async () => {
 {
   "scripts": {
     "test": "bun test",
-    "test:bun": "bun test test/bun/",
-    "test:bun:watch": "bun test --watch test/bun/",
-    "test:bun:coverage": "bun test --coverage test/bun/",
-    "test:bun:coverage:ci": "bun test --coverage --coverage-reporter=json test/bun/",
-    "test:bun:concurrent": "bun test --concurrent test/bun/",
+    "test:bun": "bun test tests/bun/",
+    "test:bun:watch": "bun test --watch tests/bun/",
+    "test:bun:coverage": "bun test --coverage tests/bun/",
+    "test:bun:coverage:ci": "bun test --coverage --coverage-reporter=json tests/bun/",
+    "test:bun:concurrent": "bun test --concurrent tests/bun/",
     
     "test:integration": "bun test test/integration/",
     "test:chaos": "bun test test/chaos/",
@@ -333,7 +333,7 @@ afterAll(async () => {
 ### Example: Cache Domain Tests
 
 ```
-test/bun/cache/
+tests/bun/cache/
 ├── cache-factory.test.ts                      # Factory pattern
 ├── cache-factory-errors.test.ts               # Error handling
 ├── cache-manager.test.ts                      # Manager operations
@@ -352,30 +352,52 @@ test/bun/cache/
 
 **Running cache tests:**
 ```bash
-bun test test/bun/cache/                        # All cache tests
-bun test test/bun/cache/cache-factory.test.ts  # Specific file
-bun test --watch test/bun/cache/                # Watch mode
+bun test tests/bun/cache/                        # All cache tests
+bun test tests/bun/cache/cache-factory.test.ts  # Specific file
+bun test --watch tests/bun/cache/                # Watch mode
 ```
 
-### Example: Service Layer Tests
+### Example: Unit Test Directory
 
 ```
-test/bun/services/
-├── jwt.service.test.ts                 # JWT generation/validation
-├── jwt-error-path.test.ts              # JWT error scenarios
-├── cache-health.service.test.ts        # Cache health service
-├── circuit-breaker-service.test.ts     # Circuit breaker patterns
-├── connection.test.ts                  # Couchbase connection management
-└── resolvers.test.ts                   # GraphQL resolver integration
+tests/bun/unit/
+├── couchbase/
+│   ├── circuit-breaker.test.ts         # Circuit breaker patterns
+│   ├── errors.test.ts                  # Error classification (25+ types)
+│   ├── kv-operations.test.ts           # Key-value operations
+│   ├── query-executor.test.ts          # N1QL query execution
+│   ├── repository.test.ts              # Repository pattern
+│   └── transaction-handler.test.ts     # ACID transactions
+├── config/
+│   ├── application.test.ts             # Application config validation
+│   ├── couchbase.test.ts               # Couchbase config validation
+│   └── telemetry.test.ts               # Telemetry config validation
+├── logging/
+│   ├── pino-adapter.test.ts            # Pino adapter
+│   ├── container.test.ts               # DI container
+│   ├── logger-port.test.ts             # Logger interface
+│   └── critical-lifecycle.test.ts      # Lifecycle logging
+├── middleware/
+│   ├── rateLimit.test.ts               # Rate limiting
+│   ├── security.test.ts                # Security headers
+│   ├── cors.test.ts                    # CORS handling
+│   ├── backpressure.test.ts            # Backpressure
+│   ├── methodValidation.test.ts        # HTTP method validation
+│   └── deprecation.test.ts             # Deprecation warnings
+└── telemetry/
+    ├── telemetry-emitter.test.ts       # Dual emission
+    ├── span-event-names.test.ts        # Span event constants
+    ├── export-stats-tracker.test.ts    # Export tracking
+    └── telemetry-circuit-breaker.test.ts # Per-signal breakers
 ```
 
 ### Naming Conventions
 
 | Suffix | Purpose | Example |
 |--------|---------|---------|
-| `.test.ts` | Standard unit test | `jwt.service.test.ts` |
+| `.test.ts` | Standard unit test | `circuit-breaker.test.ts` |
 | `.integration.test.ts` | Integration with live deps | `connection.integration.test.ts` |
-| `.mutation.test.ts` | Mutation-resistant tests | `jwt.mutation.test.ts` |
+| `.mutation.test.ts` | Mutation-resistant tests | `circuit-breaker.mutation.test.ts` |
 | `-errors.test.ts` | Error path coverage | `cache-factory-errors.test.ts` |
 | `-edge-cases.test.ts` | Edge case scenarios | `cache-health-edge-cases.test.ts` |
 
@@ -386,71 +408,56 @@ test/bun/services/
 ### Test Structure Pattern
 
 ```typescript
-// test/bun/services/jwt.service.test.ts
-import { describe, test, expect, beforeAll } from "bun:test";
-import { JwtService } from "../../../src/services/jwt.service";
-import { skipIfServiceUnavailable } from "../../shared/test-skip-conditions";
+// tests/bun/unit/couchbase/circuit-breaker.test.ts
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import {
+  CircuitBreaker,
+  CircuitBreakerOpenError,
+  createCouchbaseCircuitBreaker,
+  DEFAULT_CIRCUIT_BREAKER_CONFIG,
+} from "../../../../src/lib/couchbase/circuit-breaker";
 
-describe("JwtService", () => {
-  let jwtService: JwtService;
+describe("CircuitBreaker", () => {
+  let breaker: CircuitBreaker;
 
-  beforeAll(async () => {
-    // Skip tests if dependencies unavailable
-    await skipIfServiceUnavailable("Redis", process.env.REDIS_URL!);
-    
-    jwtService = new JwtService({
-      secret: process.env.JWT_SECRET!,
-      issuer: "https://sts.example.com/",
-      audience: "http://api.example.com/"
+  beforeEach(() => {
+    breaker = new CircuitBreaker({
+      failureThreshold: 3,
+      successThreshold: 2,
+      timeout: 1000, // 1 second for faster tests
     });
   });
 
-  describe("Token Generation", () => {
-    test("generates valid JWT token", async () => {
-      const token = await jwtService.generateToken({
-        sub: "test-user-001",
-        username: "testuser"
-      });
-
-      expect(token).toBeString();
-      expect(token.split(".")).toHaveLength(3); // JWT format
+  describe("initial state", () => {
+    test("starts in closed state", () => {
+      expect(breaker.getState()).toBe("closed");
     });
 
-    test("token contains correct claims", async () => {
-      const token = await jwtService.generateToken({
-        sub: "test-user-001",
-        username: "testuser"
-      });
-
-      const claims = await jwtService.verifyToken(token);
-      expect(claims.sub).toBe("test-user-001");
-      expect(claims.username).toBe("testuser");
-      expect(claims.iss).toBe("https://sts.example.com/");
+    test("starts healthy", () => {
+      expect(breaker.isHealthy()).toBe(true);
     });
 
-    test("token expires after configured duration", async () => {
-      const token = await jwtService.generateToken({
-        sub: "test-user-001"
-      }, { expiresIn: "1s" });
-
-      // Wait for expiration
-      await new Promise(resolve => setTimeout(resolve, 1100));
-
-      await expect(jwtService.verifyToken(token)).rejects.toThrow("expired");
+    test("initial stats are zero", () => {
+      const stats = breaker.getStats();
+      expect(stats.state).toBe("closed");
+      expect(stats.failures).toBe(0);
+      expect(stats.successes).toBe(0);
+      expect(stats.totalOperations).toBe(0);
     });
   });
 
-  describe("Token Validation", () => {
-    test("rejects invalid signature", async () => {
-      const tamperedToken = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.invalid.signature";
-      
-      await expect(jwtService.verifyToken(tamperedToken))
-        .rejects.toThrow("invalid signature");
+  describe("execute", () => {
+    test("executes operation successfully", async () => {
+      const result = await breaker.execute(async () => "success");
+      expect(result).toBe("success");
     });
 
-    test("rejects malformed tokens", async () => {
-      await expect(jwtService.verifyToken("not-a-jwt"))
-        .rejects.toThrow("malformed");
+    test("propagates operation errors", async () => {
+      await expect(
+        breaker.execute(async () => {
+          throw new Error("Operation failed");
+        })
+      ).rejects.toThrow("Operation failed");
     });
   });
 });
@@ -764,7 +771,7 @@ export default defineConfig({
 ### CI-Safe Tests
 
 ```typescript
-// test/playwright/ci-safe.e2e.ts
+// tests/playwright/ci-safe.e2e.ts
 import { test, expect } from "@playwright/test";
 
 // Tests that run against localhost:4000 directly
@@ -797,7 +804,7 @@ test.describe("CI-Safe API Tests", () => {
   });
 
   test("handles OPTIONS preflight", async ({ request }) => {
-    const response = await request.fetch("/tokens", {
+    const response = await request.fetch("/graphql", {
       method: "OPTIONS"
     });
     expect(response.ok()).toBeTruthy();
@@ -808,14 +815,14 @@ test.describe("CI-Safe API Tests", () => {
 ### API Best Practices Tests
 
 ```typescript
-// test/playwright/api-best-practices.e2e.ts
+// tests/playwright/api-best-practices.e2e.ts
 import { test, expect } from "@playwright/test";
 
 test.describe("API Best Practices", () => {
   test.describe("Method Validation (RFC 9110)", () => {
     test("returns 405 with Allow header for invalid method", async ({ request }) => {
-      const response = await request.fetch("/tokens", { method: "PUT" });
-      
+      const response = await request.fetch("/graphql", { method: "PUT" });
+
       expect(response.status()).toBe(405);
       expect(response.headers()["allow"]).toContain("POST");
     });
@@ -845,7 +852,7 @@ test.describe("API Best Practices", () => {
     test("rejects requests exceeding 10MB", async ({ request }) => {
       const largePayload = "x".repeat(11 * 1024 * 1024); // 11MB
       
-      const response = await request.post("/tokens", {
+      const response = await request.post("/graphql", {
         data: largePayload,
         headers: { "Content-Type": "application/json" }
       });
@@ -856,7 +863,7 @@ test.describe("API Best Practices", () => {
 
   test.describe("Content-Type Validation", () => {
     test("rejects invalid Content-Type", async ({ request }) => {
-      const response = await request.post("/tokens", {
+      const response = await request.post("/graphql", {
         data: "plain text",
         headers: { "Content-Type": "text/plain" }
       });
@@ -874,78 +881,97 @@ test.describe("API Best Practices", () => {
 ### Test Organization
 
 ```
-test/k6/
-├── smoke/                          # Quick validation (3min each)
-│   ├── health-smoke.ts             # Health endpoint
-│   ├── tokens-smoke.ts             # JWT generation
-│   ├── metrics-smoke.ts            # Metrics endpoint
-│   ├── openapi-smoke.ts            # OpenAPI spec
-│   ├── profiling-smoke.ts          # Profiling endpoints
-│   └── all-endpoints-smoke.ts      # Comprehensive
-├── load/                           # Production simulation
-│   ├── auth-load.ts                # Authentication flow
-│   ├── mixed-traffic-load.ts       # Realistic patterns
-│   └── sustained-load.ts           # Extended test
-├── stress/                         # Breaking point
-│   ├── system-stress.ts            # Find limits
-│   ├── high-concurrency-stress.ts  # Max users
-│   └── resource-exhaustion.ts      # Memory/CPU
-├── spike/                          # Traffic burst
-│   ├── traffic-spike.ts            # Sudden load
-│   └── recovery-spike.ts           # Recovery testing
-├── soak/                           # Extended endurance
-│   ├── endurance-soak.ts           # Long-running
-│   └── memory-leak-detection.ts    # Resource leaks
-└── shared/                         # Utilities
-    ├── config.ts                   # Test configuration
-    ├── thresholds.ts               # Performance thresholds
-    └── scenarios.ts                # Reusable scenarios
+tests/k6/
+├── smoke/                              # Quick validation
+│   ├── index.ts                        # Multi-scenario entry point
+│   ├── health-smoke.ts                 # Health endpoint checks
+│   └── graphql-smoke.ts               # GraphQL query validation
+├── load/                               # Production simulation
+│   ├── index.ts                        # Multi-scenario entry point
+│   ├── health-load.ts                  # Health under sustained load
+│   ├── graphql-load.ts                 # GraphQL under sustained load
+│   ├── complete-graphql-coverage.ts    # Full GraphQL coverage
+│   └── graphql-endpoints-modern.ts     # Modern endpoint patterns
+├── stress/                             # Breaking point
+│   ├── index.ts                        # Multi-scenario entry point
+│   └── system-stress.ts               # Find system limits
+├── spike/                              # Traffic burst
+│   ├── index.ts                        # Multi-scenario entry point
+│   └── spike-test.ts                  # Sudden load simulation
+├── soak/                               # Extended endurance
+│   ├── index.ts                        # Multi-scenario entry point
+│   └── soak-test.ts                   # Long-running stability
+├── scenarios/                          # Business scenarios
+│   ├── fashion-buyer-journey.ts       # End-to-end buyer flow
+│   └── database-connection-stress.ts  # Connection pool stress
+├── data/                               # Test data
+│   └── test-data-loader.ts           # SharedArray data loading
+└── utils/                              # Shared utilities
+    ├── config.ts                       # Test configuration
+    ├── metrics.ts                      # Custom K6 metrics
+    └── graphql-helpers.ts             # GraphQL query helpers
 ```
 
 ### Smoke Test Example
 
 ```typescript
-// test/k6/smoke/tokens-smoke.ts
-import http from "k6/http";
+// tests/k6/smoke/health-smoke.ts
 import { check, sleep } from "k6";
-import { Rate } from "k6/metrics";
-import { smokeOptions, getBaseUrl } from "../shared/config";
+import http from "k6/http";
+import { getConfig, getHealthEndpoint } from "../utils/config.ts";
+import { httpDuration, httpSuccessRate } from "../utils/metrics.ts";
 
-// Custom metrics
-const errorRate = new Rate("errors");
+const config = getConfig();
 
-export const options = {
-  ...smokeOptions,
-  thresholds: {
-    http_req_duration: ["p(95)<50", "p(99)<100"],
-    http_req_failed: ["rate<0.01"],
-    errors: ["rate<0.01"]
-  }
-};
+export function healthSmokeTest(): void {
+  const startTime = Date.now();
 
-const BASE_URL = getBaseUrl();
-
-export default function () {
-  // JWT token generation
-  const headers = {
-    "X-Consumer-Id": "test-consumer-001",
-    "X-Consumer-Username": "loadtest-user-001",
-    "X-Anonymous-Consumer": "false"
+  const params = {
+    tags: {
+      testType: "smoke-test",
+      endpoint: "/health",
+      component: "health",
+    },
+    timeout: config.timeout,
   };
 
-  const response = http.post(`${BASE_URL}/tokens`, null, { headers });
+  const response = http.get(getHealthEndpoint(), params);
+  const duration = Date.now() - startTime;
 
-  const success = check(response, {
+  // Record custom metrics
+  httpDuration.add(duration, { operation: "health_check" });
+  httpSuccessRate.add(response.status === 200);
+
+  const isSuccessful = check(response, {
     "status is 200": (r) => r.status === 200,
-    "has access_token": (r) => r.json("access_token") !== undefined,
-    "token is JWT format": (r) => {
-      const token = r.json("access_token");
-      return token && token.split(".").length === 3;
+    "response time < 50ms": (r) => r.timings.duration < 50,
+    "response time < 100ms": (r) => r.timings.duration < 100,
+    "response is valid JSON": (r) => {
+      try {
+        JSON.parse(r.body as string);
+        return true;
+      } catch {
+        return false;
+      }
     },
-    "expires_in is 900": (r) => r.json("expires_in") === 900
+    "response indicates healthy status": (r) => {
+      try {
+        const body = JSON.parse(r.body as string);
+        const validStatuses = ["healthy", "ok", "up"];
+        return validStatuses.includes(body.status?.toLowerCase());
+      } catch {
+        return false;
+      }
+    },
   });
 
-  errorRate.add(!success);
+  if (!isSuccessful) {
+    console.error(`Health check failed:`, {
+      status: response.status,
+      duration: response.timings.duration,
+    });
+  }
+
   sleep(1);
 }
 ```
@@ -953,74 +979,49 @@ export default function () {
 ### Load Test Example
 
 ```typescript
-// test/k6/load/auth-load.ts
-import http from "k6/http";
+// tests/k6/load/health-load.ts
 import { check, sleep } from "k6";
-import { SharedArray } from "k6/data";
-import { loadOptions, getBaseUrl } from "../shared/config";
+import http from "k6/http";
+import { getConfig, getHealthEndpoint } from "../utils/config.ts";
+import { httpDuration, httpSuccessRate } from "../utils/metrics.ts";
 
-export const options = {
-  ...loadOptions,
-  stages: [
-    { duration: "2m", target: 10 },  // Ramp up
-    { duration: "5m", target: 20 },  // Steady state
-    { duration: "2m", target: 0 }    // Ramp down
-  ],
-  thresholds: {
-    http_req_duration: ["p(95)<200", "p(99)<500"],
-    http_req_failed: ["rate<0.05"],
-    http_reqs: ["rate>100"]
-  }
-};
+const config = getConfig();
 
-const BASE_URL = getBaseUrl();
+export function healthLoadTest(): void {
+  const params = {
+    tags: {
+      testType: "load-test",
+      endpoint: "/health",
+      component: "health",
+    },
+    timeout: config.timeout,
+  };
 
-// Load test consumers from shared data
-const consumers = new SharedArray("consumers", function () {
-  return [
-    { id: "test-consumer-001", username: "loadtest-user-001" },
-    { id: "test-consumer-002", username: "loadtest-user-002" },
-    { id: "test-consumer-003", username: "loadtest-user-003" }
-  ];
-});
+  const response = http.get(getHealthEndpoint(), params);
 
-export default function () {
-  // Select random consumer
-  const consumer = consumers[Math.floor(Math.random() * consumers.length)];
+  httpDuration.add(response.timings.duration, { operation: "health_check" });
+  httpSuccessRate.add(response.status === 200);
 
-  // Generate token
-  const tokenResponse = http.post(`${BASE_URL}/tokens`, null, {
-    headers: {
-      "X-Consumer-Id": consumer.id,
-      "X-Consumer-Username": consumer.username,
-      "X-Anonymous-Consumer": "false"
-    }
-  });
-
-  check(tokenResponse, {
-    "token generated": (r) => r.status === 200
-  });
-
-  if (tokenResponse.status === 200) {
-    const token = tokenResponse.json("access_token");
-
-    // Validate token
-    const validateResponse = http.post(
-      `${BASE_URL}/tokens/validate`,
-      null,
-      {
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "X-Consumer-Id": consumer.id,
-          "X-Consumer-Username": consumer.username
-        }
+  check(response, {
+    "status is 200": (r) => r.status === 200,
+    "response time < 200ms": (r) => r.timings.duration < 200,
+    "response is valid JSON": (r) => {
+      try {
+        JSON.parse(r.body as string);
+        return true;
+      } catch {
+        return false;
       }
-    );
-
-    check(validateResponse, {
-      "token valid": (r) => r.status === 200 && r.json("valid") === true
-    });
-  }
+    },
+    "response indicates healthy": (r) => {
+      try {
+        const body = JSON.parse(r.body as string);
+        return body.status !== undefined;
+      } catch {
+        return false;
+      }
+    },
+  });
 
   sleep(Math.random() * 2 + 1); // 1-3 second think time
 }
@@ -1033,11 +1034,11 @@ export default function () {
 ### Shared Configuration
 
 ```typescript
-// test/k6/shared/config.ts
+// tests/k6/utils/config.ts
 export function getBaseUrl(): string {
   const protocol = __ENV.TARGET_PROTOCOL || "http";
   const host = __ENV.TARGET_HOST || "localhost";
-  const port = __ENV.TARGET_PORT || "3000";
+  const port = __ENV.TARGET_PORT || "4000";
   return `${protocol}://${host}:${port}`;
 }
 
@@ -1116,8 +1117,8 @@ K6_STRESS_DURATION=5m
 # Performance Thresholds (milliseconds)
 K6_HEALTH_P95_THRESHOLD=50
 K6_HEALTH_P99_THRESHOLD=100
-K6_TOKENS_P95_THRESHOLD=50
-K6_TOKENS_P99_THRESHOLD=100
+K6_GRAPHQL_P95_THRESHOLD=150
+K6_GRAPHQL_P99_THRESHOLD=300
 
 # Non-blocking thresholds (CI-friendly)
 K6_THRESHOLDS_NON_BLOCKING=false
@@ -1128,16 +1129,12 @@ K6_THRESHOLDS_NON_BLOCKING=false
 ```json
 {
   "scripts": {
-    "k6:smoke:health": "k6 run test/k6/smoke/health-smoke.ts",
-    "k6:smoke:tokens": "k6 run test/k6/smoke/tokens-smoke.ts",
-    "k6:smoke:all-endpoints": "k6 run test/k6/smoke/all-endpoints-smoke.ts",
-    
-    "k6:load": "k6 run test/k6/load/auth-load.ts",
-    "k6:stress": "k6 run test/k6/stress/system-stress.ts",
-    "k6:spike": "k6 run test/k6/spike/traffic-spike.ts",
-    "k6:soak": "k6 run test/k6/soak/endurance-soak.ts",
-    
-    "test:k6:quick": "bun run k6:smoke:health && bun run k6:smoke:tokens"
+    "test:k6:smoke:all": "k6 run tests/k6/smoke/index.ts",
+    "test:k6:load:all": "k6 run tests/k6/load/index.ts",
+    "test:k6:stress:all": "k6 run tests/k6/stress/index.ts",
+    "test:k6:spike": "k6 run tests/k6/spike/index.ts",
+    "test:k6:soak": "k6 run tests/k6/soak/index.ts",
+    "test:k6:scenario:all": "k6 run tests/k6/scenarios/fashion-buyer-journey.ts"
   }
 }
 ```
@@ -1149,81 +1146,92 @@ K6_THRESHOLDS_NON_BLOCKING=false
 ### Custom Metrics
 
 ```typescript
-// test/k6/shared/metrics.ts
+// tests/k6/utils/metrics.ts
 import { Counter, Gauge, Rate, Trend } from "k6/metrics";
 
-export const errorRate = new Rate("errors");
-export const tokenGenTime = new Trend("token_generation_time");
-export const activeUsers = new Gauge("active_users");
-export const totalRequests = new Counter("total_requests");
+// HTTP and general metrics
+export const httpErrors = new Counter("http_errors");
+export const httpDuration = new Trend("http_duration_custom");
+export const httpSuccessRate = new Rate("http_success_rate");
 
-export function trackTokenGeneration(duration: number) {
-  tokenGenTime.add(duration);
-}
+// GraphQL operation metrics
+export const graphqlDuration = new Trend("graphql_operation_duration");
+export const graphqlErrors = new Counter("graphql_errors");
+export const graphqlSuccessRate = new Rate("graphql_success_rate");
 
-export function trackError() {
-  errorRate.add(1);
-}
+// Business-specific metrics
+export const businessOperations = new Counter("business_operations_completed");
+export const looksRetrieved = new Counter("looks_retrieved");
+export const optionsRetrieved = new Counter("options_retrieved");
 
-export function trackSuccess() {
-  errorRate.add(0);
-}
+// Database connection metrics
+export const dbConnections = new Gauge("concurrent_db_connections");
+export const dbConnectionErrors = new Counter("db_connection_errors");
+
+// Cache performance metrics
+export const cacheHits = new Counter("cache_hits");
+export const cacheMisses = new Counter("cache_misses");
+export const cacheHitRate = new Rate("cache_hit_rate");
 ```
 
 **Usage:**
 ```typescript
-import { trackTokenGeneration, trackError, trackSuccess } from "../shared/metrics";
+import { httpDuration, httpSuccessRate } from "../utils/metrics.ts";
+import { recordGraphQLOperation } from "../utils/metrics.ts";
 
-export default function () {
-  const start = Date.now();
-  const response = http.post(`${BASE_URL}/tokens`, null, { headers });
-  const duration = Date.now() - start;
+export function myTest(): void {
+  const response = http.get(getHealthEndpoint(), params);
 
-  if (response.status === 200) {
-    trackTokenGeneration(duration);
-    trackSuccess();
-  } else {
-    trackError();
-  }
+  httpDuration.add(response.timings.duration, { operation: "health_check" });
+  httpSuccessRate.add(response.status === 200);
+
+  // Or for GraphQL operations:
+  recordGraphQLOperation({
+    operation: "looksSummary",
+    duration: response.timings.duration,
+    success: response.status === 200,
+    complexity: "simple",
+  });
 }
 ```
 
 ### Realistic User Behavior
 
 ```typescript
-// test/k6/load/realistic-behavior.ts
+// tests/k6/scenarios/fashion-buyer-journey.ts (pattern)
 import http from "k6/http";
-import { sleep } from "k6";
+import { check, sleep } from "k6";
+import { getConfig, getGraphQLEndpoint, getHealthEndpoint } from "../utils/config.ts";
+
+const config = getConfig();
 
 export default function () {
-  // User journey: authenticate → use API → logout pattern
-  
-  // 1. Generate token (70% of users)
+  // User journey: health check -> browse looks -> view details
+
+  // 1. Health check (warm-up)
+  http.get(getHealthEndpoint());
+
+  // 2. Browse looks summary (70% of users)
   if (Math.random() < 0.7) {
-    const tokenResponse = http.post(`${BASE_URL}/tokens`, null, { headers });
-    
-    if (tokenResponse.status === 200) {
-      const token = tokenResponse.json("access_token");
-      
-      // 2. Make authenticated API calls (2-5 calls)
-      const callCount = Math.floor(Math.random() * 4) + 2;
-      for (let i = 0; i < callCount; i++) {
-        http.get(`${BASE_URL}/api/resource`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        sleep(Math.random() * 2); // Think time between calls
-      }
+    const looksSummary = http.post(getGraphQLEndpoint(), JSON.stringify({
+      query: `{ looksSummary { id name status } }`
+    }), { headers: { "Content-Type": "application/json" } });
+
+    check(looksSummary, {
+      "looks summary returned": (r) => r.status === 200,
+    });
+
+    // 3. View details for first look (50% follow-through)
+    if (looksSummary.status === 200 && Math.random() < 0.5) {
+      http.post(getGraphQLEndpoint(), JSON.stringify({
+        query: `{ optionsSummary { id styleNumber colorCode } }`
+      }), { headers: { "Content-Type": "application/json" } });
     }
   }
-  
-  // 3. Health check monitoring (20% of traffic)
+
+  // 4. Health check monitoring (20% of traffic)
   if (Math.random() < 0.2) {
-    http.get(`${BASE_URL}/health`);
-  }
-  
-  // 4. Metrics polling (10% of traffic)
-  if (Math.random() < 0.1) {
-    http.get(`${BASE_URL}/metrics`);
+    http.get(`${config.baseUrl}/health/system`);
   }
 
   sleep(Math.random() * 5 + 3); // 3-8 second think time
@@ -1233,19 +1241,19 @@ export default function () {
 ### Performance Baselines
 
 ```typescript
-// test/k6/shared/baselines.ts
+// tests/k6/utils/baselines.ts (pattern)
 export const performanceBaselines = {
   health: {
     p95: 30,  // ms
     p99: 50
   },
-  tokens: {
-    p95: 50,
-    p99: 100
+  graphqlSimple: {
+    p95: 150,
+    p99: 300
   },
-  metrics: {
-    p95: 20,
-    p99: 50
+  graphqlComplex: {
+    p95: 500,
+    p99: 800
   },
   openapi: {
     p95: 10,
@@ -1617,60 +1625,53 @@ echo "✅ Bundled Bun executable ready at scripts/bundled-runtimes/bun-cli"
 ### Mutation-Resistant Test Pattern
 
 ```typescript
-// test/bun/mutation/jwt.mutation.test.ts
-import { describe, test, expect } from "bun:test";
-import { JwtService } from "../../../src/services/jwt.service";
+// tests/bun/unit/couchbase/circuit-breaker.mutation.test.ts
+import { beforeEach, describe, expect, test } from "bun:test";
+import { CircuitBreaker } from "../../../../src/lib/couchbase/circuit-breaker";
 
-describe("JWT Mutation Killers", () => {
-  const jwtService = new JwtService({
-    secret: "test-secret-key-for-mutation-testing",
-    issuer: "https://sts.example.com/",
-    audience: "http://api.example.com/"
-  });
+describe("CircuitBreaker Mutation Killers", () => {
+  let breaker: CircuitBreaker;
 
-  test("KILL: Token must contain exactly 3 parts", async () => {
-    const token = await jwtService.generateToken({ sub: "user-001" });
-    
-    // Mutation: Changing split(".") to split("-") must fail
-    expect(token.split(".")).toHaveLength(3);
-  });
-
-  test("KILL: Expiration must be enforced", async () => {
-    const token = await jwtService.generateToken(
-      { sub: "user-001" },
-      { expiresIn: "1s" }
-    );
-
-    await new Promise(resolve => setTimeout(resolve, 1100));
-
-    // Mutation: Removing expiration check must fail
-    await expect(jwtService.verifyToken(token))
-      .rejects.toThrow("expired");
-  });
-
-  test("KILL: Invalid signature must be rejected", async () => {
-    const validToken = await jwtService.generateToken({ sub: "user-001" });
-    const [header, payload] = validToken.split(".");
-    const tamperedToken = `${header}.${payload}.invalidsignature`;
-
-    // Mutation: Removing signature verification must fail
-    await expect(jwtService.verifyToken(tamperedToken))
-      .rejects.toThrow("invalid signature");
-  });
-
-  test("KILL: Claims must match exactly", async () => {
-    const token = await jwtService.generateToken({
-      sub: "user-001",
-      username: "testuser"
+  beforeEach(() => {
+    breaker = new CircuitBreaker({
+      failureThreshold: 3,
+      successThreshold: 2,
+      timeout: 1000,
     });
+  });
 
-    const claims = await jwtService.verifyToken(token);
+  test("KILL: Failure threshold must be exact", async () => {
+    // Mutation: Changing >= to > in threshold check must fail
+    for (let i = 0; i < 3; i++) {
+      try {
+        await breaker.execute(async () => { throw new Error("fail"); });
+      } catch { /* expected */ }
+    }
+    expect(breaker.getState()).toBe("open");
+  });
 
-    // Mutation: Changing claim values must fail
-    expect(claims.sub).toBe("user-001");
-    expect(claims.username).toBe("testuser");
-    expect(claims.iss).toBe("https://sts.example.com/");
-    expect(claims.aud).toBe("http://api.example.com/");
+  test("KILL: Open circuit must reject immediately", async () => {
+    // Force circuit open
+    for (let i = 0; i < 3; i++) {
+      try {
+        await breaker.execute(async () => { throw new Error("fail"); });
+      } catch { /* expected */ }
+    }
+
+    // Mutation: Removing open-state check must fail
+    await expect(
+      breaker.execute(async () => "should not run")
+    ).rejects.toThrow();
+  });
+
+  test("KILL: Stats must track operations accurately", async () => {
+    await breaker.execute(async () => "ok");
+
+    const stats = breaker.getStats();
+    // Mutation: Changing increment logic must fail
+    expect(stats.totalOperations).toBe(1);
+    expect(stats.failures).toBe(0);
+    expect(stats.successRate).toBe(100);
   });
 });
 ```
@@ -1721,12 +1722,12 @@ All files                | 100.00 |  100.00 |       33 |         0 |          0 
 
 ### Critical Paths Definition
 
-- JWT token generation and validation
-- Authentication/authorization logic
-- Data persistence operations
-- External API integrations
+- GraphQL resolver data fetching
+- Couchbase connection management and error handling
+- Data persistence operations (KV, N1QL, transactions)
 - Circuit breaker implementations
 - Cache fallback mechanisms
+- Logging DI container initialization
 
 ### Coverage Commands
 
@@ -1741,7 +1742,7 @@ bun run test:bun:coverage && open coverage/index.html
 bun run test:bun:coverage:ci
 
 # Coverage for specific domain
-bun test --coverage test/bun/services/
+bun test --coverage tests/bun/unit/couchbase/
 ```
 
 ### Coverage Configuration
@@ -1960,7 +1961,7 @@ jobs:
 ### Test Skip Conditions
 
 ```typescript
-// test/shared/test-skip-conditions.ts
+// tests/bun/shared/test-skip-conditions.ts
 import { test } from "bun:test";
 import { fetchWithFallback } from "../../src/utils/bun-fetch-fallback";
 
@@ -1999,7 +2000,7 @@ export async function skipIfCouchbaseUnavailable() {
 ### Test Consumers
 
 ```typescript
-// test/shared/test-consumers.ts
+// tests/bun/shared/test-consumers.ts
 export const TEST_CONSUMERS = [
   {
     id: "test-consumer-001",
@@ -2030,7 +2031,7 @@ export function getRandomTestConsumer() {
 ### Fetch Polyfill for Tests
 
 ```typescript
-// test/shared/fetch-polyfill.ts
+// tests/bun/shared/fetch-polyfill.ts
 import { fetchWithFallback } from "../../src/utils/bun-fetch-fallback";
 
 export function enableFetchPolyfill() {
@@ -2053,7 +2054,7 @@ export function enableFetchPolyfill() {
 ### Mock Servers
 
 ```typescript
-// test/shared/mock-couchbase-server.ts
+// tests/bun/shared/mock-couchbase-server.ts
 import { serve, Server } from "bun";
 
 export class MockCouchbaseServer {
@@ -2123,12 +2124,6 @@ LOG_LEVEL=silent
 PORT=4000
 HOST=localhost
 
-# JWT
-JWT_SECRET=test-secret-key-for-testing-only
-JWT_ISSUER=https://sts.example.com/
-JWT_AUDIENCE=http://api.example.com/
-JWT_EXPIRATION=900
-
 # Couchbase (live integration)
 COUCHBASE_URL=couchbase://localhost
 COUCHBASE_USERNAME=Administrator
@@ -2174,10 +2169,9 @@ process.env.REDIS_DB = "10";
 | Endpoint | P95 | P99 | Throughput |
 |----------|-----|-----|------------|
 | `/health` | <30ms | <50ms | >2000 req/s |
-| `/tokens` (generation) | <50ms | <100ms | >1000 req/s |
-| `/tokens/validate` | <50ms | <100ms | >1500 req/s |
-| `/metrics` | <20ms | <50ms | >3000 req/s |
-| `/` (OpenAPI) | <10ms | <20ms | >5000 req/s |
+| `/graphql` (simple query) | <150ms | <300ms | >1000 req/s |
+| `/graphql` (complex query) | <500ms | <800ms | >500 req/s |
+| `/health/comprehensive` | <400ms | <500ms | >500 req/s |
 
 ### Expected Performance (Production)
 
@@ -2224,10 +2218,10 @@ services:
 
 ```bash
 # Verbose test output
-bun test --verbose test/bun/specific.test.ts
+bun test --verbose tests/bun/specific.test.ts
 
 # Debug single test
-bun --inspect test test/bun/specific.test.ts
+bun --inspect test tests/bun/specific.test.ts
 
 # Check service connectivity
 curl http://localhost:8091/pools/default  # Couchbase
@@ -2245,13 +2239,13 @@ BUN_BE_BUN=1 ./scripts/bundled-runtimes/bun-cli --version
 
 ```bash
 # K6 verbose output
-K6_LOG_LEVEL=debug k6 run test/k6/load/auth-load.ts
+K6_LOG_LEVEL=debug k6 run tests/k6/load/index.ts
 
 # Playwright trace
 npx playwright test --trace on
 
 # Memory profiling
-bun --heap-prof test/bun/services/jwt.service.test.ts
+bun --heap-prof tests/bun/unit/couchbase/circuit-breaker.test.ts
 ```
 
 ---
@@ -2397,7 +2391,7 @@ test("matches snapshot", () => {
 bun run test:bun                     # All Bun tests
 bun run test:bun:watch               # Watch mode
 bun run test:bun:coverage            # With coverage
-bun test test/bun/cache/             # Domain-specific
+bun test tests/bun/cache/             # Domain-specific
 
 # Integration Tests
 bun run test:integration             # All integration tests

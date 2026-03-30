@@ -16,7 +16,7 @@ Each endpoint enforces allowed HTTP methods, returning `405 Method Not Allowed` 
 
 **Example:**
 ```http
-POST /tokens HTTP/1.1
+PUT /graphql HTTP/1.1
 ```
 
 **Response:**
@@ -29,12 +29,12 @@ Content-Type: application/problem+json
   "type": "https://httpwg.org/specs/rfc9110.html#status.405",
   "title": "Method Not Allowed",
   "status": 405,
-  "detail": "The requested method is not allowed for this endpoint. Allowed methods: GET, OPTIONS",
-  "instance": "/tokens",
+  "detail": "The requested method is not allowed for this endpoint. Allowed methods: GET, POST, OPTIONS",
+  "instance": "/graphql",
   "requestId": "550e8400-e29b-41d4-a716-446655440000",
   "timestamp": "2026-02-14T05:30:00.000Z",
   "extensions": {
-    "allowedMethods": ["GET", "OPTIONS"]
+    "allowedMethods": ["GET", "POST", "OPTIONS"]
   }
 }
 ```
@@ -42,8 +42,7 @@ Content-Type: application/problem+json
 **Allowed Methods by Endpoint:**
 | Endpoint | Allowed Methods |
 |----------|-----------------|
-| `/tokens` | GET, OPTIONS |
-| `/tokens/validate` | GET, OPTIONS |
+| `/graphql` | GET, POST, OPTIONS |
 | `/health*` | GET, OPTIONS |
 | `/debug/metrics/test` | POST, OPTIONS |
 | `/debug/profiling/*` | POST/GET, OPTIONS |
@@ -191,7 +190,7 @@ createValidationErrorResponse(
       expected: "minimum 8 characters"
     }
   ],
-  "/tokens"
+  "/graphql"
 );
 ```
 
@@ -251,7 +250,7 @@ const fallbackFetch = async (req: Request): Promise<Response> => {
 
 ```typescript
 // Method not allowed
-return createMethodNotAllowedResponse(requestId, ["GET", "OPTIONS"], "/tokens");
+return createMethodNotAllowedResponse(requestId, ["GET", "POST", "OPTIONS"], "/graphql");
 
 // Rate limit exceeded
 return createRateLimitErrorResponse(
@@ -259,7 +258,7 @@ return createRateLimitErrorResponse(
   requestId,
   { limit: 100, remaining: 0, reset: Date.now() / 1000 + 3600 },
   30,
-  "/tokens"
+  "/graphql"
 );
 
 // Validation errors
@@ -267,7 +266,7 @@ return createValidationErrorResponse(
   ErrorCodes.AUTH_007,
   requestId,
   [{ field: "username", message: "Required field missing" }],
-  "/tokens"
+  "/graphql"
 );
 
 // ETag generation

@@ -144,7 +144,7 @@ src/
 │   └── coordinator/           # Batch coordination
 ├── logging/                    # Logging infrastructure (3-layer DI)
 │   ├── ports/                 # Logger interfaces
-│   ├── adapters/              # Pino + Winston adapters
+│   ├── adapters/              # Pino adapter
 │   └── container.ts           # DI container
 ├── errors/                     # Error handling
 │   ├── problem-details.ts     # RFC 7807 responses
@@ -165,7 +165,7 @@ Copy `.env.example` and configure these key sections:
 |----------|---------|-------------|
 | PORT | 4000 | Server port |
 | LOG_LEVEL | info | Log level (debug, info, warn, error) |
-| LOGGING_BACKEND | pino | Logger backend (pino or winston) |
+| LOGGING_BACKEND | pino | Logger backend (pino) |
 | YOGA_RESPONSE_CACHE_TTL | 900000 | GraphQL response cache TTL (ms) |
 | ALLOWED_ORIGINS | http://localhost:3000 | CORS allowed origins (comma-separated) |
 

@@ -51,7 +51,7 @@
 | **Data** | Couchbase operations, resilience, batching | `src/lib/couchbase/` (connection-manager.ts, circuit-breaker.ts, data-loader.ts, kv-operations.ts, query-executor.ts, repository.ts, transaction-handler.ts, errors.ts, metrics.ts) |
 | **Configuration** | 4-pillar config with Zod validation | `src/config/` (defaults.ts, envMapping.ts, loader.ts, schemas.ts) |
 | **Telemetry** | OpenTelemetry SDK, metrics, tracing, logging | `src/telemetry/` (instrumentation.ts, metrics/, tracing/, health/, coordinator/) |
-| **Logging** | 3-layer DI architecture | `src/logging/` (ports/, adapters/pino, adapters/winston, container.ts) |
+| **Logging** | 3-layer DI architecture | `src/logging/` (ports/, adapters/pino, container.ts) |
 | **Errors** | RFC 7807 Problem Details | `src/errors/` (problem-details.ts, error-codes.ts, result.ts) |
 
 ## Technology Stack
@@ -63,7 +63,7 @@
 | Database | Couchbase Capella (SDK 4.6.1) | Document database with KV, N1QL, FTS, analytics |
 | Validation | Zod 4.3.6 | Runtime schema validation for config and inputs |
 | Observability | OpenTelemetry SDK 2.6.1 | Distributed traces, metrics, logs via OTLP HTTP |
-| Logging | Pino 10.3.1 / Winston 3.19.0 | Switchable backends via DI container |
+| Logging | Pino 10.3.1 | ECS-compliant structured logging via DI container |
 | Testing | Bun test + Playwright 1.58.2 + K6 | Unit, E2E, performance testing |
 | Container | Docker multi-arch (amd64/arm64) | Distroless production images |
 | CI/CD | GitHub Actions | Build, test, security scanning |

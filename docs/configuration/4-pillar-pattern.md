@@ -2,6 +2,8 @@
 
 A robust, type-safe configuration architecture for TypeScript/Node.js applications using Zod validation.
 
+> **Note:** This guide is a reusable pattern reference. The examples use a hypothetical JWT authentication service for illustration purposes. CapellaQL itself does not use JWT -- its actual configuration covers Couchbase, OpenTelemetry, and application settings. The pattern applies identically regardless of the domain.
+
 ---
 
 ## Table of Contents

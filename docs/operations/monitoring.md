@@ -30,7 +30,6 @@ src/telemetry/
 ├── index.ts                    # Public API exports
 ├── config.ts                   # Telemetry configuration
 ├── instrumentation.ts          # NodeSDK initialization, exporters, processors
-├── winston-logger.ts           # Structured logging with OTLP transport
 ├── logger.ts                   # Structured logging with correlation IDs
 ├── coordinator/
 │   └── BatchCoordinator.ts     # Batch coordination for exports
@@ -93,9 +92,6 @@ async function initializeTelemetry(): Promise<void> {
   // 7. Start host metrics collection
   hostMetrics = new HostMetrics({});
   hostMetrics.start();
-
-  // 8. Reinitialize Winston logger to pick up global LoggerProvider
-  winstonTelemetryLogger.reinitialize();
 }
 ```
 
@@ -244,7 +240,7 @@ console.log(JSON.stringify({
 
 The service maps custom application fields to ECS-like field names for better observability platform integration.
 
-**Implementation**: `src/telemetry/winston-logger.ts:108-135`
+**Implementation**: `src/logging/adapters/pino.adapter.ts` (ECS field mapping via `@elastic/ecs-pino-format`)
 
 #### Field Mapping Table
 
@@ -774,7 +770,7 @@ The service implements automatic SLA violation detection with optional profiling
 │  Request Latency Tracking                                    │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐                  │
 │  │  Buffer  │→│  Buffer  │→│  Buffer  │                    │
-│  │ /tokens  │  │ /health  │  │ /metrics │                  │
+│  │ /graphql │  │ /health  │  │ /metrics │                  │
 │  └────┬─────┘  └────┬─────┘  └────┬─────┘                  │
 │       │             │             │                          │
 │       ▼             ▼             ▼                          │
@@ -842,7 +838,7 @@ CONTINUOUS_PROFILING_BUFFER_SIZE=100
 
 # SLA thresholds (JSON)
 CONTINUOUS_PROFILING_SLA_THRESHOLDS='[
-  {"endpoint":"/tokens","p95":50,"p99":100},
+  {"endpoint":"/graphql","p95":150,"p99":300},
   {"endpoint":"/health","p95":20,"p99":50}
 ]'
 ```
@@ -866,7 +862,7 @@ import { getSlaMonitor } from './telemetry/sla-monitor';
 const monitor = getSlaMonitor();
 
 // Record request latency
-await monitor.recordLatency('/tokens', 45.2);  // 45.2ms
+await monitor.recordLatency('/graphql', 45.2);  // 45.2ms
 ```
 
 **Automatic Processing:**
@@ -934,7 +930,7 @@ recordSlaViolation(endpoint, metrics.p95, metrics.p99, false);
 
 warn('SLA violation detected but profiling blocked', {
   component: 'sla-monitor',
-  endpoint: '/tokens',
+  endpoint: '/graphql',
   reason: 'throttled',  // or 'overhead_exceeded', 'queue_full_or_storage_quota'
   currentP95: 75.5,
   currentP99: 120.8,
@@ -950,7 +946,7 @@ warn('SLA violation detected but profiling blocked', {
 ```typescript
 log('Automatic profiling triggered by SLA violation', {
   component: 'sla-monitor',
-  endpoint: '/tokens',
+  endpoint: '/graphql',
   currentP95: 75.5,
   currentP99: 120.8,
   thresholdP95: 50,
@@ -974,14 +970,14 @@ const stats = getSlaMonitor().getStats();
 ```typescript
 {
   enabled: true,
-  activeEndpoints: ['/tokens', '/health', '/metrics'],
+  activeEndpoints: ['/graphql', '/health', '/metrics'],
   bufferSizes: {
-    '/tokens': 100,
+    '/graphql': 100,
     '/health': 87,
     '/metrics': 45
   },
   lastTriggers: {
-    '/tokens': '2026-02-22T12:30:00.000Z'
+    '/graphql': '2026-02-22T12:30:00.000Z'
   },
   queueStats: {
     queueLength: 2,
@@ -1006,13 +1002,13 @@ const stats = getSlaMonitor().getStats();
 
 // SLA violation counter (all violations, regardless of trigger)
 slaViolationsCounter.add(1, {
-  endpoint: '/tokens',
+  endpoint: '/graphql',
   triggered: 'true'  // or 'false' if throttled
 });
 
 // Throttled violations (recorded but not profiled)
 slaViolationThrottledCounter.add(1, {
-  endpoint: '/tokens'
+  endpoint: '/graphql'
 });
 ```
 
@@ -1038,7 +1034,7 @@ resetSlaMonitor();
 ```typescript
 import { getSlaMonitor } from './telemetry/sla-monitor';
 
-app.get('/tokens', async (req, res) => {
+app.get('/graphql', async (req, res) => {
   const startTime = performance.now();
   
   try {
@@ -1046,7 +1042,7 @@ app.get('/tokens', async (req, res) => {
     res.json(result);
   } finally {
     const latency = performance.now() - startTime;
-    await getSlaMonitor().recordLatency('/tokens', latency);
+    await getSlaMonitor().recordLatency('/graphql', latency);
   }
 });
 ```
@@ -1089,7 +1085,7 @@ The service exports profiling system metrics to OpenTelemetry for monitoring pro
 ```typescript
 import { recordProfilingSessionStart } from './telemetry/profiling-metrics';
 
-recordProfilingSessionStart('/tokens', 'sla_violation');
+recordProfilingSessionStart('/graphql', 'sla_violation');
 ```
 
 **Attributes:**
@@ -1105,7 +1101,7 @@ const startTime = performance.now();
 // ... profiling logic ...
 const durationSeconds = (performance.now() - startTime) / 1000;
 
-recordProfilingSessionDuration('/tokens', 'sla_violation', durationSeconds);
+recordProfilingSessionDuration('/graphql', 'sla_violation', durationSeconds);
 ```
 
 #### SLA Violations
@@ -1114,10 +1110,10 @@ recordProfilingSessionDuration('/tokens', 'sla_violation', durationSeconds);
 import { recordSlaViolation } from './telemetry/profiling-metrics';
 
 // Violation that triggered profiling
-recordSlaViolation('/tokens', 75.5, 120.8, true);
+recordSlaViolation('/graphql', 75.5, 120.8, true);
 
 // Violation throttled (not profiled)
-recordSlaViolation('/tokens', 65.3, 105.2, false);
+recordSlaViolation('/graphql', 65.3, 105.2, false);
 ```
 
 **Attributes:**

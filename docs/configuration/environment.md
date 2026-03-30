@@ -33,7 +33,7 @@ The CapellaQL service implements a robust configuration pattern with comprehensi
 | `PORT` | `PORT` | number | `4000` | Server listening port |
 | `ALLOWED_ORIGINS` | `ALLOWED_ORIGINS` | array | `["http://localhost:3000"]` | CORS allowed origins |
 | `BASE_URL` | `BASE_URL` | string | `"http://localhost"` | Application base URL |
-| `LOGGING_BACKEND` | `LOGGING_BACKEND` | string | `"pino"` | Logging backend (`pino`, `winston`) |
+| `LOGGING_BACKEND` | `LOGGING_BACKEND` | string | `"pino"` | Logging backend (`pino`) |
 | `TELEMETRY_MODE` | `TELEMETRY_MODE` | string | `"both"` | Log output mode (`console`, `otlp`, `both`) |
 
 ### Couchbase (Capella) Settings

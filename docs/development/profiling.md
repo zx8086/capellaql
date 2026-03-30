@@ -498,7 +498,7 @@ CONTINUOUS_PROFILING_THROTTLE_MINUTES=60
 ls -lh profiles/auto/
 
 # Step 4: Analyze the profile
-cat profiles/auto/tokens-*.cpu-prof.md
+cat profiles/auto/graphql-*.cpu-prof.md
 ```
 
 ### Workflow 3: K6 Performance Testing with Profiling
