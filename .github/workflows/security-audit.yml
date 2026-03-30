@@ -53,10 +53,13 @@ jobs:
           echo "Dependency list generated"
 
       - name: Run Snyk dependency scan
-        if: ${{ secrets.SNYK_TOKEN != '' }}
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "SNYK_TOKEN not configured, skipping Snyk scan"
+            exit 0
+          fi
           npm install -g snyk
           snyk auth $SNYK_TOKEN
           snyk test --file=package.json \

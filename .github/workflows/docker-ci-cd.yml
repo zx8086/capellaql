@@ -225,10 +225,14 @@ jobs:
 
       # ----- Snyk Code Scanner -----
       - name: Run Snyk Code Scan
-        if: matrix.scanner == 'snyk-code' && secrets.SNYK_TOKEN != ''
+        if: matrix.scanner == 'snyk-code'
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         run: |
+          if [ -z "$SNYK_TOKEN" ]; then
+            echo "SNYK_TOKEN not configured, skipping Snyk scan"
+            exit 0
+          fi
           npm install -g snyk
           snyk auth $SNYK_TOKEN
           snyk test --file=package.json --sarif-file-output=snyk-code.sarif --severity-threshold=high || true
