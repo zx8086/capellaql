@@ -50,6 +50,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
       - name: Setup Environment
         id: setup
         uses: ./.github/actions/setup-environment
@@ -112,12 +118,6 @@ jobs:
           SOURCE_MAP_SUPPORT=${{ vars.SOURCE_MAP_SUPPORT }}
           PRESERVE_SOURCE_MAPS=${{ vars.PRESERVE_SOURCE_MAPS }}
           EOF
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
 
       - name: Extract metadata
         id: meta
