@@ -175,6 +175,10 @@ jobs:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
+          if [ -z "$COSIGN_PRIVATE_KEY" ]; then
+            echo "COSIGN_PRIVATE_KEY not configured, skipping image signing"
+            exit 0
+          fi
           cosign sign --yes \
             --key env://COSIGN_PRIVATE_KEY \
             ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${DIGEST}
@@ -186,6 +190,10 @@ jobs:
           COSIGN_PRIVATE_KEY: ${{ secrets.COSIGN_PRIVATE_KEY }}
           COSIGN_PASSWORD: ${{ secrets.COSIGN_PASSWORD }}
         run: |
+          if [ -z "$COSIGN_PRIVATE_KEY" ]; then
+            echo "COSIGN_PRIVATE_KEY not configured, skipping SBOM attestation"
+            exit 0
+          fi
           cosign attest --yes \
             --key env://COSIGN_PRIVATE_KEY \
             --predicate <(echo '{
