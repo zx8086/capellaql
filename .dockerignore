@@ -7,6 +7,7 @@ node_modules
 yarn.lock
 package-lock.json
 **/*.bun
+.bun-cache/
 
 # Build outputs
 /build
@@ -32,49 +33,52 @@ yarn-error.log*
 
 # Testing and coverage
 /coverage
+/test-build
+/test-config
+/playwright-report
+/test-results
 .nyc_output
 /test
 k6
+
+# StrykerJS mutation testing
+.stryker-tmp/
+reports/mutation/
 
 # Version control
 .git
 .github
 .gitignore
 
-# Docker
+# Docker (don't copy Docker config into image)
 .dockerignore
 Dockerfile
 
 # IDE and system files
 .vscode
+.zed
 .DS_Store
 *.pem
 
+# Claude/AI tooling
+.claude/
+CLAUDE.md
+AGENTS/
+
 # Documentation
 *.md
+docs/plans/
 
-# Archives
+# Archives and traces
 **/*.trace
 **/*.zip
 **/*.tar.gz
 **/*.tgz
 
-# Bun cache (large and not needed in build)
-.bun-cache/
-.bun-cache/*
-
-# CI/CD artifacts
-.github/workflows/
-.github/actions/
-AGENTS/
-
 # Large development files
 *.backup
-*.trace
 *.prof
 
 # Misc
 .vercel
-.vscode/
-
 migrate/

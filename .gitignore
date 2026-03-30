@@ -1,36 +1,27 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
-
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.js
+.bun-cache/
+package-lock.json
+**/*.bun
 
-# testing
+# Build outputs
+/build
+/dist
+
+# Testing and coverage
 /coverage
 /test-build
 /test-config
 /playwright-report
 /test-results
 
-# next.js
-/.next/
-/out/
+# StrykerJS mutation testing
+.stryker-tmp/
+reports/mutation/
 
-# production
-/build
-/dist
-
-# misc
-.DS_Store
-*.pem
-
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# local env files
-.env
+# Environment files
 .env
 .env.local
 .env.development.local
@@ -38,35 +29,31 @@ yarn-error.log*
 .env.production.local
 docker.env
 
-# vercel
-.vercel
+# Logs and debugging
+logs
+/src/logs/*
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+**/*.log
 
+# Archives and traces
 **/*.trace
 **/*.zip
 **/*.tar.gz
 **/*.tgz
-**/*.log
-package-lock.json
-**/*.bun
 
-# logs
-logs
-/src/logs/*
-
+# IDE and system files
+.DS_Store
+*.pem
 .vscode
+.zed
 
-# k6
-#/test
-#k6
-
-# AGENTS/
-.bun-cache/
+# Claude/AI tooling
+.claude/
 CLAUDE.md
 
+# Misc
+.vercel
 migrate/
-
-# StrykerJS mutation testing
-.stryker-tmp/
-reports/mutation/
-.zed
 docs/plans/
